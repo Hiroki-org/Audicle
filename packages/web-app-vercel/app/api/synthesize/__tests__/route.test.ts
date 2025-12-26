@@ -166,4 +166,280 @@ describe('/api/synthesize route', () => {
         const res = await routeModule.POST(req as any);
         expect(res.status).toBe(200);
     });
-});
+
+    describe('Text handling without separator removal', () => {
+        beforeEach(() => {
+            (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+            (getStorageProvider as jest.Mock).mockReturnValue({
+                headObject: jest.fn().mockResolvedValue({ exists: false }),
+                uploadObject: jest.fn().mockResolvedValue('https://storage.example/audio.mp3'),
+                generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/audio.mp3')
+            });
+            (getKv as jest.Mock).mockResolvedValue(null);
+        });
+
+        it('should pass text with separator characters directly to TTS without removal', async () => {
+            const textWithSeparators = 'Step1: ========== 開始';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: textWithSeparators }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+            const body = await res.json();
+            expect(body.audioUrls).toBeDefined();
+            expect(body.audioUrls.length).toBe(1);
+        });
+
+        it('should handle text with multiple consecutive dashes', async () => {
+            const textWithDashes = '--- セクション ---';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: textWithDashes }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should handle text with consecutive equals signs', async () => {
+            const textWithEquals = 'a==========b';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: textWithEquals }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should handle text with consecutive asterisks', async () => {
+            const textWithAsterisks = '***強調***';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: textWithAsterisks }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should handle text with consecutive underscores', async () => {
+            const textWithUnderscores = '___下線___';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: textWithUnderscores }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should handle text with consecutive hash signs', async () => {
+            const textWithHashes = '###見出し###';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: textWithHashes }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should handle text with consecutive tildes', async () => {
+            const textWithTildes = '~~~注意~~~';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: textWithTildes }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should handle text with mixed separator characters', async () => {
+            const complexText = '=== 見出し === --- 本文 --- *** 強調 ***';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: complexText }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should handle markdown-style separators', async () => {
+            const markdownText = '---\ntitle: Test\n---\n## Heading\n***bold***';
+            const req: any = {
+                json: async () => ({ chunks: [{ text: markdownText }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should preserve separator characters in article URLs and metadata', async () => {
+            const textWithSeparators = '====== 重要 ======';
+            const req: any = {
+                json: async () => ({ 
+                    chunks: [{ text: textWithSeparators }], 
+                    voice: 'ja-JP',
+                    articleUrl: 'https://example.com/article-with-separators'
+                })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+    });
+
+    describe('Multiple chunks with various patterns', () => {
+        beforeEach(() => {
+            (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+            (getStorageProvider as jest.Mock).mockReturnValue({
+                headObject: jest.fn().mockResolvedValue({ exists: false }),
+                uploadObject: jest.fn().mockResolvedValue('https://storage.example/audio.mp3'),
+                generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/audio.mp3')
+            });
+            (getKv as jest.Mock).mockResolvedValue(null);
+        });
+
+        it('should handle multiple chunks with different separator patterns', async () => {
+            const chunks = [
+                { text: '=== Header ===' },
+                { text: '--- Section ---' },
+                { text: '*** Important ***' },
+                { text: 'Normal text without separators' }
+            ];
+            const req: any = {
+                json: async () => ({ chunks, voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+            const body = await res.json();
+            expect(body.audioUrls.length).toBe(4);
+        });
+
+        it('should handle chunks with isSplitChunk flag', async () => {
+            const chunks = [
+                { text: 'First part', isSplitChunk: false },
+                { text: 'Second part === with separator ===', isSplitChunk: true }
+            ];
+            const req: any = {
+                json: async () => ({ chunks, voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+            const body = await res.json();
+            expect(body.chunkMetadata).toBeDefined();
+            expect(body.chunkMetadata[1].isSplitChunk).toBe(true);
+        });
+    });
+
+    describe('Byte size validation with separator characters', () => {
+        beforeEach(() => {
+            (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+            (getStorageProvider as jest.Mock).mockReturnValue({
+                headObject: jest.fn().mockResolvedValue({ exists: false }),
+                uploadObject: jest.fn().mockResolvedValue('https://storage.example/audio.mp3'),
+                generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/audio.mp3')
+            });
+            (getKv as jest.Mock).mockResolvedValue(null);
+        });
+
+        it('should handle text with separators within byte size limit', async () => {
+            // Create text with separators that's under 5000 bytes
+            const textWithSeparators = '==== '.repeat(100) + '日本語テキスト';
+            const byteSize = Buffer.byteLength(textWithSeparators, 'utf-8');
+            expect(byteSize).toBeLessThan(5000);
+
+            const req: any = {
+                json: async () => ({ chunks: [{ text: textWithSeparators }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+    });
+
+    describe('Cache behavior with separator characters', () => {
+        beforeEach(() => {
+            (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+            (getKv as jest.Mock).mockResolvedValue(null);
+        });
+
+        it('should cache text with separator characters correctly', async () => {
+            const textWithSeparators = '=== Cached Content ===';
+            (getStorageProvider as jest.Mock).mockReturnValue({
+                headObject: jest.fn().mockResolvedValue({ exists: false }),
+                uploadObject: jest.fn().mockResolvedValue('https://storage.example/cached.mp3'),
+                generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/cached.mp3')
+            });
+
+            const req: any = {
+                json: async () => ({ 
+                    chunks: [{ text: textWithSeparators }], 
+                    voice: 'ja-JP',
+                    articleUrl: 'https://example.com/test'
+                })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+            const body = await res.json();
+            expect(body.cacheStats).toBeDefined();
+            expect(body.cacheStats.cacheMisses).toBe(1);
+        });
+
+        it('should retrieve cached text with separator characters', async () => {
+            const textWithSeparators = '--- Separator Text ---';
+            (getStorageProvider as jest.Mock).mockReturnValue({
+                headObject: jest.fn().mockResolvedValue({ exists: true }),
+                generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/cached.mp3')
+            });
+
+            const req: any = {
+                json: async () => ({ 
+                    chunks: [{ text: textWithSeparators }], 
+                    voice: 'ja-JP'
+                })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+            const body = await res.json();
+            expect(body.cacheStats.cacheHits).toBe(1);
+        });
+    });
+
+    describe('Speaking rate handling', () => {
+        beforeEach(() => {
+            (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+            (getStorageProvider as jest.Mock).mockReturnValue({
+                headObject: jest.fn().mockResolvedValue({ exists: false }),
+                uploadObject: jest.fn().mockResolvedValue('https://storage.example/audio.mp3'),
+                generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/audio.mp3')
+            });
+            (getKv as jest.Mock).mockResolvedValue(null);
+        });
+
+        it('should apply custom speaking rate', async () => {
+            const req: any = {
+                json: async () => ({ 
+                    chunks: [{ text: 'Test with custom speed' }], 
+                    voice: 'ja-JP',
+                    speakingRate: 1.5
+                })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+
+        it('should default to 1.0 speaking rate when not specified', async () => {
+            const req: any = {
+                json: async () => ({ 
+                    chunks: [{ text: 'Test default speed' }], 
+                    voice: 'ja-JP'
+                })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(200);
+        });
+    });
