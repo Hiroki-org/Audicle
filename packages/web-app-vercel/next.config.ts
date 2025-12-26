@@ -19,6 +19,28 @@ const nextConfig: NextConfig = {
 
   // Next 16以降は Turbopack がデフォルトのため、空の設定を明示
   turbopack: {},
+
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 const withSerwist = withSerwistInit({

@@ -1,0 +1,4 @@
+## 2024-05-21 - API Server SSRF Vulnerability
+**Vulnerability:** The `readability_script.js` in `packages/api-server` fetches arbitrary URLs provided by the user without any validation, exposing the server to Server-Side Request Forgery (SSRF) attacks. This allows attackers to probe internal networks or access metadata services (e.g., AWS/GCP instance metadata).
+**Learning:** While the Vercel app (`packages/web-app-vercel`) implements robust SSRF protection, secondary services like the self-hosted API server can be overlooked, creating security gaps. Defense in depth requires all components to be secure independently.
+**Prevention:** Implement input validation for all URL parameters. In Node.js, use libraries like `ipaddr.js` to resolve and validate IP addresses before fetching, ensuring they don't point to private ranges (10.x.x.x, 192.168.x.x, etc.) or localhost.
