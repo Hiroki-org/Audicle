@@ -529,8 +529,40 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
     onPreviousTrack: previous,
     onStop: stop,
     onSeekTo: seekToSeconds,
-    onSeekForward: (offsetSeconds?: number) => seekBySeconds(typeof offsetSeconds === "number" ? offsetSeconds : 10),
-    onSeekBackward: (offsetSeconds?: number) => seekBySeconds(-1 * (typeof offsetSeconds === "number" ? offsetSeconds : 10)),
+  const DEFAULT_SEEK_OFFSET_SECONDS = 10;
+
+  // Media Session APIの設定（バックグラウンド再生対応）
+  useMediaSession({
+    title: articleTitle || "記事を読み上げ中",
+    artist: articleAuthor,
+    isPlaying,
+    onPlay: play,
+    onPause: pause,
+    onNextTrack: next,
+    onPreviousTrack: previous,
+    onStop: stop,
+    onSeekTo: seekToSeconds,
+    onSeekForward: (offsetSeconds?: number) =>
+      seekBySeconds(
+        typeof offsetSeconds === "number" ? offsetSeconds : DEFAULT_SEEK_OFFSET_SECONDS
+      ),
+    onSeekBackward: (offsetSeconds?: number) =>
+      seekBySeconds(
+        -1 *
+          (typeof offsetSeconds === "number"
+            ? offsetSeconds
+            : DEFAULT_SEEK_OFFSET_SECONDS)
+      ),
+    getPositionState: () => {
+      const audio = audioRef.current;
+      if (!audio) return {};
+      return {
+        duration: audio.duration,
+        position: audio.currentTime,
+        playbackRate: audio.playbackRate,
+      };
+    },
+  });
     getPositionState: () => {
       const audio = audioRef.current;
       if (!audio) return {};
