@@ -31,7 +31,8 @@ export interface PlaylistPlaybackContextType {
     playlistId: string,
     playlistName: string,
     items: PlaylistItemWithArticle[],
-    startIndex?: number
+    startIndex?: number,
+    sortKey?: string
   ) => void;
   playNext: () => void;
   playPrevious: () => void;
@@ -151,8 +152,27 @@ export function PlaylistPlaybackProvider({
       playlistId: string,
       playlistName: string,
       items: PlaylistItemWithArticle[],
-      startIndex: number = 0
+      startIndex: number = 0,
+      sortKey?: string
     ) => {
+      // デバッグ: 再生開始時のキュー順序を出力
+      logger.info("プレイリスト再生開始", {
+        playlistId,
+        playlistName,
+        startIndex,
+        totalCount: items.length,
+        sortKey: sortKey || "position",
+        queueOrder: items.slice(0, 5).map((item, idx) => ({
+          index: idx,
+          articleId: item.article_id,
+          title: item.article?.title?.substring(0, 30),
+          position: item.position,
+        })),
+      });
+
+      // sortKeyからsortFieldとsortOrderをパース
+      const { field: sortField, order: sortOrder } = parseSortOption(sortKey || null);
+
       setState({
         playlistId,
         playlistName,
@@ -160,9 +180,9 @@ export function PlaylistPlaybackProvider({
         items,
         totalCount: items.length,
         isPlaylistMode: true,
-        sortField: null,
-        sortOrder: null,
-        sortKey: null,
+        sortField,
+        sortOrder,
+        sortKey: sortKey || "position",
       });
 
       // 最初の記事に遷移（自動再生フラグ付き）
@@ -184,6 +204,17 @@ export function PlaylistPlaybackProvider({
 
   const playNext = useCallback(() => {
     setState((prevState) => {
+      // デバッグ: 次曲決定ロジックの入力値を出力
+      logger.info("playNext: 次曲決定ロジック開始", {
+        playlistId: prevState.playlistId,
+        currentIndex: prevState.currentIndex,
+        itemsLength: prevState.items.length,
+        isPlaylistMode: prevState.isPlaylistMode,
+        sortKey: prevState.sortKey,
+        currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
+        currentArticleTitle: prevState.items[prevState.currentIndex]?.article?.title?.substring(0, 30),
+      });
+
       if (!prevState.isPlaylistMode || prevState.items.length === 0) {
         logger.warn(
           "playNext: プレイリストの最後またはプレイリストモードではない",
@@ -203,6 +234,8 @@ export function PlaylistPlaybackProvider({
         currentIndex: prevState.currentIndex,
         nextIndex,
         totalCount: prevState.items.length,
+        nextArticleId: nextItem?.article_id,
+        nextArticleTitle: nextItem?.article?.title?.substring(0, 30),
         articleUrl: nextItem?.article?.url,
       });
 
@@ -221,12 +254,30 @@ export function PlaylistPlaybackProvider({
         };
       }
 
+      // デバッグ: 失敗時の状態を出力
+      logger.error("playNext: 次の記事への移動に失敗", {
+        nextItemExists: !!nextItem,
+        nextArticleUrl: nextItem?.article?.url,
+        playlistId: prevState.playlistId,
+      });
+
       return prevState;
     });
   }, [router]);
 
   const playPrevious = useCallback(() => {
     setState((prevState) => {
+      // デバッグ: 前曲決定ロジックの入力値を出力
+      logger.info("playPrevious: 前曲決定ロジック開始", {
+        playlistId: prevState.playlistId,
+        currentIndex: prevState.currentIndex,
+        itemsLength: prevState.items.length,
+        isPlaylistMode: prevState.isPlaylistMode,
+        sortKey: prevState.sortKey,
+        currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
+        currentArticleTitle: prevState.items[prevState.currentIndex]?.article?.title?.substring(0, 30),
+      });
+
       if (!prevState.isPlaylistMode || prevState.items.length === 0) {
         logger.warn(
           "playPrevious: プレイリストの最初またはプレイリストモードではない",
@@ -247,6 +298,8 @@ export function PlaylistPlaybackProvider({
         currentIndex: prevState.currentIndex,
         prevIndex,
         totalCount: prevState.items.length,
+        prevArticleId: prevItem?.article_id,
+        prevArticleTitle: prevItem?.article?.title?.substring(0, 30),
         articleUrl: prevItem?.article?.url,
       });
 
@@ -264,6 +317,13 @@ export function PlaylistPlaybackProvider({
           currentIndex: prevIndex,
         };
       }
+
+      // デバッグ: 失敗時の状態を出力
+      logger.error("playPrevious: 前の記事への移動に失敗", {
+        prevItemExists: !!prevItem,
+        prevArticleUrl: prevItem?.article?.url,
+        playlistId: prevState.playlistId,
+      });
 
       return prevState;
     });
@@ -285,6 +345,17 @@ export function PlaylistPlaybackProvider({
 
   const onArticleEnd = useCallback(() => {
     setState((prevState) => {
+      // デバッグ: 記事終了時の状態を出力
+      logger.info("onArticleEnd: 記事再生終了", {
+        playlistId: prevState.playlistId,
+        currentIndex: prevState.currentIndex,
+        itemsLength: prevState.items.length,
+        isPlaylistMode: prevState.isPlaylistMode,
+        sortKey: prevState.sortKey,
+        currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
+        currentArticleTitle: prevState.items[prevState.currentIndex]?.article?.title?.substring(0, 30),
+      });
+
       if (!prevState.isPlaylistMode) {
         logger.info("onArticleEnd: プレイリストモードではない");
         return prevState;
@@ -304,6 +375,8 @@ export function PlaylistPlaybackProvider({
         logger.info("自動的に次の記事へ遷移", {
           nextIndex,
           totalCount: prevState.items.length,
+          nextArticleId: nextItem?.article_id,
+          nextArticleTitle: nextItem?.article?.title?.substring(0, 30),
           articleUrl: nextItem?.article?.url,
         });
 
@@ -315,6 +388,13 @@ export function PlaylistPlaybackProvider({
             autoplay: true,
           });
           router.push(nextUrl);
+        } else {
+          // デバッグ: 失敗時の状態を出力
+          logger.error("onArticleEnd: 次の記事への遷移に失敗", {
+            nextItemExists: !!nextItem,
+            nextArticleUrl: nextItem?.article?.url,
+            playlistId: prevState.playlistId,
+          });
         }
 
         return { ...prevState, currentIndex: nextIndex };
@@ -426,7 +506,7 @@ export function PlaylistPlaybackProvider({
   const initializeFromPlaylist = useCallback(
     async (playlistId: string, startIndex: number = 0) => {
       try {
-        logger.info("プレイリストをIDから初期化", { playlistId });
+        logger.info("プレイリストをIDから初期化", { playlistId, startIndex });
 
         // localStorageからsortオプションを読み込み
         const sortKey = `${STORAGE_KEYS.PLAYLIST_SORT_PREFIX}${playlistId}`;
@@ -434,6 +514,14 @@ export function PlaylistPlaybackProvider({
           typeof window !== "undefined" ? localStorage.getItem(sortKey) : null;
         const { field: sortField, order: sortOrder } =
           parseSortOption(savedSortOption);
+
+        logger.info("プレイリストソート設定を読み込み", {
+          playlistId,
+          sortKey,
+          savedSortOption,
+          sortField,
+          sortOrder,
+        });
 
         // APIにソートパラメータを渡す
         const queryParams = new URLSearchParams();
@@ -463,6 +551,22 @@ export function PlaylistPlaybackProvider({
         }
 
         const index = Math.max(0, Math.min(startIndex, items.length - 1));
+        
+        // デバッグ: 初期化時のキュー順序を出力
+        logger.info("プレイリストコンテキストを初期化", {
+          playlistId: playlistData.id,
+          playlistName: playlistData.name,
+          currentIndex: index,
+          totalCount: items.length,
+          sortKey: savedSortOption || "position",
+          queueOrder: items.slice(0, 5).map((item, idx) => ({
+            index: idx,
+            articleId: item.article_id,
+            title: item.article?.title?.substring(0, 30),
+            position: item.position,
+          })),
+        });
+
         setState({
           playlistId: playlistData.id,
           playlistName: playlistData.name,
