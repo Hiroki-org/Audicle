@@ -135,7 +135,11 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
     // 次のチャンクがあれば自動的に再生
     if (currentIndex + 1 < chunks.length) {
       // onended からの連続再生は await せず非同期で開始
-      void playFromIndexRef.current(currentIndex + 1);
+      void playFromIndexRef
+        .current(currentIndex + 1)
+        .catch((error) => {
+          logger.error("Failed to auto-play next chunk", error);
+        });
     } else {
       // 最後のチャンク終了時も URL を解放
       if (currentAudioUrlRef.current?.startsWith('blob:')) {

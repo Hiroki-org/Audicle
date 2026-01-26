@@ -67,6 +67,17 @@ export function useMediaSession({
   onSeekBackward,
   getPositionState,
 }: MediaSessionOptions) {
+  type PositionState = {
+    duration: number;
+    position?: number;
+    playbackRate?: number;
+  };
+
+  const hasSetPositionState = (
+    session: MediaSession
+  ): session is MediaSession & { setPositionState: (state: PositionState) => void } =>
+    "setPositionState" in session;
+
   // コールバック関数の参照を保持（再レンダリングによる再登録を防ぐ）
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
@@ -106,9 +117,9 @@ export function useMediaSession({
 
     const mediaSession = navigator.mediaSession;
     if (!mediaSession) return;
-    // Safari等で未実装の場合がある
-    const setPositionState = (mediaSession as unknown as { setPositionState?: (state: { duration: number; position?: number; playbackRate?: number }) => void }).setPositionState;
-    if (!setPositionState) return;
+    if (!hasSetPositionState(mediaSession)) return;
+
+    const setPositionState = mediaSession.setPositionState;
 
     const state = getPositionStateRef.current?.();
     const duration = state?.duration;

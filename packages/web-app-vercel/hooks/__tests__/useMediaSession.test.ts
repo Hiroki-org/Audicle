@@ -37,7 +37,6 @@ describe("useMediaSession", () => {
       writable: true,
       configurable: true,
     });
-
     // MediaMetadataのモック
     global.MediaMetadata = jest.fn().mockImplementation((options) => options) as unknown as typeof MediaMetadata;
   });
