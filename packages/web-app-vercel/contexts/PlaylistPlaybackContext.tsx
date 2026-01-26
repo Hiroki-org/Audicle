@@ -13,6 +13,29 @@ import { STORAGE_KEYS } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import type { PlaylistItemWithArticle } from "@/types/playlist";
 
+// デバッグログ用の定数
+const DEBUG_QUEUE_PREVIEW_COUNT = 5; // キュー順序ログに出力するアイテム数
+const DEBUG_TITLE_MAX_LENGTH = 30; // タイトルの最大文字数
+
+/**
+ * デバッグ用: キュー順序を表すオブジェクト配列を生成
+ */
+function createQueueOrderLog(items: PlaylistItemWithArticle[], count: number = DEBUG_QUEUE_PREVIEW_COUNT) {
+  return items.slice(0, count).map((item, idx) => ({
+    index: idx,
+    articleId: item.article_id,
+    title: item.article?.title?.substring(0, DEBUG_TITLE_MAX_LENGTH),
+    position: item.position,
+  }));
+}
+
+/**
+ * デバッグ用: 記事タイトルを安全に切り詰める
+ */
+function truncateTitle(title: string | undefined): string | undefined {
+  return title?.substring(0, DEBUG_TITLE_MAX_LENGTH);
+}
+
 export interface PlaylistPlaybackState {
   playlistId: string | null;
   playlistName: string | null;
@@ -162,12 +185,7 @@ export function PlaylistPlaybackProvider({
         startIndex,
         totalCount: items.length,
         sortKey: sortKey || "position",
-        queueOrder: items.slice(0, 5).map((item, idx) => ({
-          index: idx,
-          articleId: item.article_id,
-          title: item.article?.title?.substring(0, 30),
-          position: item.position,
-        })),
+        queueOrder: createQueueOrderLog(items),
       });
 
       // sortKeyからsortFieldとsortOrderをパース
@@ -212,7 +230,7 @@ export function PlaylistPlaybackProvider({
         isPlaylistMode: prevState.isPlaylistMode,
         sortKey: prevState.sortKey,
         currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
-        currentArticleTitle: prevState.items[prevState.currentIndex]?.article?.title?.substring(0, 30),
+        currentArticleTitle: truncateTitle(prevState.items[prevState.currentIndex]?.article?.title),
       });
 
       if (!prevState.isPlaylistMode || prevState.items.length === 0) {
@@ -235,7 +253,7 @@ export function PlaylistPlaybackProvider({
         nextIndex,
         totalCount: prevState.items.length,
         nextArticleId: nextItem?.article_id,
-        nextArticleTitle: nextItem?.article?.title?.substring(0, 30),
+        nextArticleTitle: truncateTitle(nextItem?.article?.title),
         articleUrl: nextItem?.article?.url,
       });
 
@@ -275,7 +293,7 @@ export function PlaylistPlaybackProvider({
         isPlaylistMode: prevState.isPlaylistMode,
         sortKey: prevState.sortKey,
         currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
-        currentArticleTitle: prevState.items[prevState.currentIndex]?.article?.title?.substring(0, 30),
+        currentArticleTitle: truncateTitle(prevState.items[prevState.currentIndex]?.article?.title),
       });
 
       if (!prevState.isPlaylistMode || prevState.items.length === 0) {
@@ -299,7 +317,7 @@ export function PlaylistPlaybackProvider({
         prevIndex,
         totalCount: prevState.items.length,
         prevArticleId: prevItem?.article_id,
-        prevArticleTitle: prevItem?.article?.title?.substring(0, 30),
+        prevArticleTitle: truncateTitle(prevItem?.article?.title),
         articleUrl: prevItem?.article?.url,
       });
 
@@ -353,7 +371,7 @@ export function PlaylistPlaybackProvider({
         isPlaylistMode: prevState.isPlaylistMode,
         sortKey: prevState.sortKey,
         currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
-        currentArticleTitle: prevState.items[prevState.currentIndex]?.article?.title?.substring(0, 30),
+        currentArticleTitle: truncateTitle(prevState.items[prevState.currentIndex]?.article?.title),
       });
 
       if (!prevState.isPlaylistMode) {
@@ -376,7 +394,7 @@ export function PlaylistPlaybackProvider({
           nextIndex,
           totalCount: prevState.items.length,
           nextArticleId: nextItem?.article_id,
-          nextArticleTitle: nextItem?.article?.title?.substring(0, 30),
+          nextArticleTitle: truncateTitle(nextItem?.article?.title),
           articleUrl: nextItem?.article?.url,
         });
 
@@ -559,12 +577,7 @@ export function PlaylistPlaybackProvider({
           currentIndex: index,
           totalCount: items.length,
           sortKey: savedSortOption || "position",
-          queueOrder: items.slice(0, 5).map((item, idx) => ({
-            index: idx,
-            articleId: item.article_id,
-            title: item.article?.title?.substring(0, 30),
-            position: item.position,
-          })),
+          queueOrder: createQueueOrderLog(items),
         });
 
         setState({
