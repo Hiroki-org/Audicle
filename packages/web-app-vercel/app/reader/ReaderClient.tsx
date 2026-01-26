@@ -387,8 +387,17 @@ export default function ReaderPageClient() {
           body: JSON.stringify({ url: resolvedUrl }),
         });
         if (!extractRes.ok) {
+          let errorMessage = "記事の読み込みに失敗しました";
+          try {
+            const errorData = await extractRes.json();
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch {
+            // JSON parse failed, use default message
+          }
           logger.error("抽出APIに失敗しました", { status: extractRes.status });
-          setError("記事の読み込みに失敗しました");
+          setError(errorMessage);
           return;
         }
         const data = await extractRes.json();

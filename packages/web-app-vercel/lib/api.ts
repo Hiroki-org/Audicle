@@ -44,9 +44,18 @@ export async function extractContent(url: string): Promise<ExtractResponse> {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    logger.error(`抽出エラー: ${error}`);
-    throw new Error(`抽出に失敗しました: ${error}`);
+    const errorText = await response.text();
+    let errorMessage = errorText;
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.error) {
+        errorMessage = errorJson.error;
+      }
+    } catch {
+      // JSON parse failed, use raw text
+    }
+    logger.error(`抽出エラー: ${errorMessage}`);
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();
