@@ -22,12 +22,12 @@ export type AudioPlaybackContextType = {
   error: string;
   currentChunkId?: string;
   currentIndex: number;
-  play: () => void;
+  play: () => Promise<void>;
   pause: () => void;
   stop: () => void;
-  next: () => void;
-  previous: () => void;
-  seekToChunk: (_chunkId: string) => void;
+  next: () => Promise<void>;
+  previous: () => Promise<void>;
+  seekToChunk: (_chunkId: string) => Promise<void>;
   playbackRate: number;
   setPlaybackRate: (_rate: number) => void;
 };
