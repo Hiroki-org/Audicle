@@ -15,8 +15,40 @@ jest.mock('@/lib/logger', () => ({
     },
 }));
 
-import { extractContent } from '../api';
+import { extractContent, parseApiErrorMessage } from '../api';
 import { logger } from '@/lib/logger';
+
+describe('parseApiErrorMessage', () => {
+    it('extracts error message from valid JSON with error field', () => {
+        const errorText = JSON.stringify({ error: 'エラーメッセージ' });
+        expect(parseApiErrorMessage(errorText)).toBe('エラーメッセージ');
+    });
+
+    it('returns original text when JSON has no error field', () => {
+        const errorText = JSON.stringify({ someOtherField: 'value' });
+        expect(parseApiErrorMessage(errorText)).toBe(errorText);
+    });
+
+    it('returns original text when JSON parsing fails', () => {
+        const errorText = 'Not valid JSON';
+        expect(parseApiErrorMessage(errorText)).toBe('Not valid JSON');
+    });
+
+    it('returns default message when provided and JSON has no error field', () => {
+        const errorText = JSON.stringify({ someOtherField: 'value' });
+        expect(parseApiErrorMessage(errorText, 'デフォルトメッセージ')).toBe('デフォルトメッセージ');
+    });
+
+    it('returns default message when provided and JSON parsing fails', () => {
+        const errorText = 'Not valid JSON';
+        expect(parseApiErrorMessage(errorText, 'デフォルトメッセージ')).toBe('デフォルトメッセージ');
+    });
+
+    it('returns error field even when default message is provided', () => {
+        const errorText = JSON.stringify({ error: 'エラーメッセージ' });
+        expect(parseApiErrorMessage(errorText, 'デフォルトメッセージ')).toBe('エラーメッセージ');
+    });
+});
 
 describe('extractContent', () => {
     beforeEach(() => {

@@ -11,7 +11,7 @@ import { usePlaylistPlayback } from "@/contexts/PlaylistPlaybackContext";
 import { useAudioPlayback } from "@/contexts/AudioPlaybackContext";
 import { Chunk } from "@/types/api";
 import { Playlist } from "@/types/playlist";
-import { extractContent } from "@/lib/api";
+import { extractContent, parseApiErrorMessage } from "@/lib/api";
 import { articleStorage } from "@/lib/articleStorage";
 import { logger } from "@/lib/logger";
 import { useDownload } from "@/hooks/useDownload";
@@ -387,15 +387,8 @@ export default function ReaderPageClient() {
           body: JSON.stringify({ url: resolvedUrl }),
         });
         if (!extractRes.ok) {
-          let errorMessage = "記事の読み込みに失敗しました";
-          try {
-            const errorData = await extractRes.json();
-            if (errorData.error) {
-              errorMessage = errorData.error;
-            }
-          } catch {
-            // JSON parse failed, use default message
-          }
+          const errorText = await extractRes.text();
+          const errorMessage = parseApiErrorMessage(errorText, "記事の読み込みに失敗しました");
           logger.error("抽出APIに失敗しました", { status: extractRes.status });
           setError(errorMessage);
           return;
