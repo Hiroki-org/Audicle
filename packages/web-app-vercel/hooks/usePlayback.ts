@@ -544,9 +544,9 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
     onSeekBackward: (offsetSeconds?: number) =>
       seekBySeconds(
         -1 *
-          (typeof offsetSeconds === "number"
-            ? offsetSeconds
-            : DEFAULT_SEEK_OFFSET_SECONDS)
+        (typeof offsetSeconds === "number"
+          ? offsetSeconds
+          : DEFAULT_SEEK_OFFSET_SECONDS)
       ),
     getPositionState: () => {
       const audio = audioRef.current;
