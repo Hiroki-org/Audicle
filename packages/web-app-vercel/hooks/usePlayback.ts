@@ -26,6 +26,7 @@ const PREFETCH_AHEAD = 3; // 3つ先まで先読み
 // localStorage のキー定数
 const PLAYBACK_RATE_STORAGE_KEY = "audicle-playback-rate";
 const DEFAULT_PLAYBACK_RATE = 1.0;
+const DEFAULT_SEEK_OFFSET_SECONDS = 10;
 
 /**
  * 指定時間待機する
@@ -114,6 +115,13 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
 
   // onended ハンドラを共通化
   const handleAudioEnded = useCallback(async (currentIndex: number) => {
+    if (currentIndex < 0 || currentIndex >= chunks.length) {
+      logger.warn("handleAudioEnded called with invalid index", {
+        currentIndex,
+        chunksLength: chunks.length,
+      });
+      return;
+    }
     const chunk = chunks[currentIndex];
     // 見出しの後、または段落間にポーズ
     if (shouldRespectInterChunkDelay()) {
@@ -529,19 +537,6 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
     onPreviousTrack: previous,
     onStop: stop,
     onSeekTo: seekToSeconds,
-  const DEFAULT_SEEK_OFFSET_SECONDS = 10;
-
-  // Media Session APIの設定（バックグラウンド再生対応）
-  useMediaSession({
-    title: articleTitle || "記事を読み上げ中",
-    artist: articleAuthor,
-    isPlaying,
-    onPlay: play,
-    onPause: pause,
-    onNextTrack: next,
-    onPreviousTrack: previous,
-    onStop: stop,
-    onSeekTo: seekToSeconds,
     onSeekForward: (offsetSeconds?: number) =>
       seekBySeconds(
         typeof offsetSeconds === "number" ? offsetSeconds : DEFAULT_SEEK_OFFSET_SECONDS
@@ -553,16 +548,6 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
             ? offsetSeconds
             : DEFAULT_SEEK_OFFSET_SECONDS)
       ),
-    getPositionState: () => {
-      const audio = audioRef.current;
-      if (!audio) return {};
-      return {
-        duration: audio.duration,
-        position: audio.currentTime,
-        playbackRate: audio.playbackRate,
-      };
-    },
-  });
     getPositionState: () => {
       const audio = audioRef.current;
       if (!audio) return {};
