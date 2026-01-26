@@ -8,10 +8,10 @@ import ReaderView from "@/components/ReaderView";
 import { PlaylistSelectorModal } from "@/components/PlaylistSelectorModal";
 import { PlaylistCompletionScreen } from "@/components/PlaylistCompletionScreen";
 import { usePlaylistPlayback } from "@/contexts/PlaylistPlaybackContext";
+import { useAudioPlayback } from "@/contexts/AudioPlaybackContext";
 import { Chunk } from "@/types/api";
 import { Playlist } from "@/types/playlist";
 import { extractContent } from "@/lib/api";
-import { usePlayback } from "@/hooks/usePlayback";
 import { articleStorage } from "@/lib/articleStorage";
 import { logger } from "@/lib/logger";
 import { useDownload } from "@/hooks/useDownload";
@@ -129,14 +129,22 @@ export default function ReaderPageClient() {
 
   useEffect(() => {
     if (!url) return;
+    let safeUrlForLog: string | undefined;
+    try {
+      const u = new URL(url);
+      safeUrlForLog = `${u.origin}${u.pathname}`;
+    } catch {
+      safeUrlForLog = undefined;
+    }
     logger.info("ReaderClient articleUrl ready", {
-      articleUrl: url,
+      articleUrl: safeUrlForLog,
       chunkCount,
     });
   }, [url, chunkCount]);
 
-  // 再生制御フック
+  // グローバル再生制御（ページ遷移で止めない）
   const {
+    setSource: setPlaybackSource,
     isPlaying,
     isLoading: isPlaybackLoading,
     error: playbackError,
@@ -147,33 +155,67 @@ export default function ReaderPageClient() {
     seekToChunk,
     playbackRate,
     setPlaybackRate,
-  } = usePlayback({
-    chunks,
-    articleUrl: url,
-    voiceModel: effectiveVoiceModel,
-    playbackSpeed: settings.playback_speed,
-    articleTitle: title,
-    articleAuthor: url ? new URL(url).hostname : undefined,
-    onArticleEnd: () => {
-      if (isPlaylistMode && playlistState.isPlaylistMode) {
-        // プレイリストの最後の記事の場合は完了画面を表示
-        if (currentPlaylistIndex >= playlistState.totalCount - 1) {
-          setShowCompletionScreen(true);
-          logger.info("プレイリスト完了", {
-            playlistId: playlistState.playlistId,
-            totalCount: playlistState.totalCount,
-          });
-        } else {
-          // そうでなければ次の記事へ進む
-          logger.info("次の記事へ進む", {
-            currentIndex: currentPlaylistIndex,
-            totalCount: playlistState.totalCount,
-          });
-          onArticleEnd();
-        }
+  } = useAudioPlayback();
+
+  const handleArticleEnd = useCallback(() => {
+    if (isPlaylistMode && playlistState.isPlaylistMode) {
+      // プレイリストの最後の記事の場合は完了画面を表示
+      if (currentPlaylistIndex >= playlistState.totalCount - 1) {
+        setShowCompletionScreen(true);
+        logger.info("プレイリスト完了", {
+          playlistId: playlistState.playlistId,
+          totalCount: playlistState.totalCount,
+        });
+        return;
       }
-    },
-  });
+
+      // そうでなければ次の記事へ進む
+      logger.info("次の記事へ進む", {
+        currentIndex: currentPlaylistIndex,
+        totalCount: playlistState.totalCount,
+      });
+      onArticleEnd();
+    }
+  }, [
+    isPlaylistMode,
+    playlistState.isPlaylistMode,
+    playlistState.totalCount,
+    playlistState.playlistId,
+    currentPlaylistIndex,
+    onArticleEnd,
+  ]);
+
+  // 記事データが揃ったらグローバルプレーヤーのsourceを更新
+  useEffect(() => {
+    if (!isClient) return;
+    if (!url || chunks.length === 0) return;
+
+    let author: string | undefined;
+    try {
+      author = new URL(url).hostname;
+    } catch {
+      author = undefined;
+    }
+
+    setPlaybackSource({
+      chunks,
+      articleUrl: url,
+      voiceModel: effectiveVoiceModel,
+      playbackSpeed: settings.playback_speed,
+      title: title || "記事を読み上げ中",
+      author,
+      onArticleEnd: handleArticleEnd,
+    });
+  }, [
+    isClient,
+    url,
+    chunks,
+    effectiveVoiceModel,
+    settings.playback_speed,
+    title,
+    handleArticleEnd,
+    setPlaybackSource,
+  ]);
 
   // ダウンロード機能（モバイルメニュー用）はReaderViewに集約されています
   const { status: downloadStatus, startDownload } = useDownload({
@@ -455,8 +497,6 @@ export default function ReaderPageClient() {
           id: articleIdFromQuery,
           title: article.title,
         });
-        // 前の再生状態をクリア
-        stop();
         setTitle(article.title);
         setChunks(article.chunks);
         setUrl(article.url);
@@ -520,9 +560,6 @@ export default function ReaderPageClient() {
           articleId: item.article_id,
           articleUrl: item.article?.url,
         });
-
-        // 前の再生状態をクリア
-        stop();
 
         // 正常にロードできる場合は、過去のエラー表示をクリア
         setError("");
@@ -779,7 +816,6 @@ export default function ReaderPageClient() {
         return;
       }
 
-      stop(); // ページ遷移前に再生を停止
       const item = playlistState.items[index];
       const targetPlaylistId = playlistIdFromQuery || playlistState.playlistId;
       if (item && item.article?.url && targetPlaylistId) {
@@ -792,7 +828,7 @@ export default function ReaderPageClient() {
         router.push(readerUrl);
       }
     },
-    [playlistIdFromQuery, playlistState, router, stop, currentPlaylistIndex]
+    [playlistIdFromQuery, playlistState, router, currentPlaylistIndex]
   );
 
   // プレイリストのインデックスを循環させるユーティリティ
@@ -822,7 +858,6 @@ export default function ReaderPageClient() {
           <div className="relative flex items-center justify-center gap-2 mb-2">
             <button
               onClick={() => {
-                stop(); // ページ遷移前に再生を停止
                 if (isPlaylistMode && playlistState.playlistId) {
                   router.push(`/playlists/${playlistState.playlistId}`);
                 } else {

@@ -3,6 +3,8 @@ import { getOrCreateDefaultPlaylist } from '../playlist-utils';
 import * as supabaseLocal from '../supabaseLocal';
 import { supabase } from '../supabase';
 
+const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 // supabaseLocalモジュールのモック
 jest.mock('../supabaseLocal', () => ({
   getPlaylistsForOwner: jest.fn(),
@@ -29,11 +31,23 @@ const mockedSupabase = supabase as jest.Mocked<any>;
 describe('getOrCreateDefaultPlaylist', () => {
   afterEach(() => {
     jest.clearAllMocks();
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    // Restore env to avoid leaking state across tests/suites.
+    if (typeof ORIGINAL_SUPABASE_URL === "string") {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGINAL_SUPABASE_URL;
+    } else {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    }
   });
 
   describe('local fallback (no SUPABASE_URL)', () => {
     const userEmail = 'test@example.com';
+
+    beforeEach(() => {
+      // Ensure we always test the local fallback path, even if the host
+      // environment sets NEXT_PUBLIC_SUPABASE_URL.
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    });
 
     it('should return existing default playlist', async () => {
       const existingPlaylist = {
@@ -207,18 +221,18 @@ describe('getOrCreateDefaultPlaylist', () => {
     });
 
     it('should return an error on unexpected Supabase find error', async () => {
-        const findError = { message: 'Unexpected error' };
-        mockedSupabase.from.mockReturnValue({
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          order: jest.fn().mockReturnThis(),
-          single: jest.fn().mockResolvedValue({ data: null, error: findError }),
-        });
-
-        const { playlist, error } = await getOrCreateDefaultPlaylist(userEmail);
-
-        expect(playlist).toBeUndefined();
-        expect(error).toBe('Failed to find default playlist');
+      const findError = { message: 'Unexpected error' };
+      mockedSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        order: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: null, error: findError }),
       });
+
+      const { playlist, error } = await getOrCreateDefaultPlaylist(userEmail);
+
+      expect(playlist).toBeUndefined();
+      expect(error).toBe('Failed to find default playlist');
+    });
   });
 });

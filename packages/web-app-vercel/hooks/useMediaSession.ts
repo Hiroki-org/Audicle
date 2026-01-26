@@ -27,6 +27,20 @@ interface MediaSessionOptions {
   onPreviousTrack?: () => void;
   /** 停止ハンドラ */
   onStop?: () => void;
+
+  /** シーク（絶対位置）ハンドラ */
+  onSeekTo?: (positionSeconds: number) => void;
+  /** シーク（前進）ハンドラ */
+  onSeekForward?: (offsetSeconds?: number) => void;
+  /** シーク（後退）ハンドラ */
+  onSeekBackward?: (offsetSeconds?: number) => void;
+
+  /** 現在位置情報の取得（MediaSession.setPositionState 用） */
+  getPositionState?: () => {
+    duration?: number;
+    position?: number;
+    playbackRate?: number;
+  };
 }
 
 /**
@@ -48,13 +62,32 @@ export function useMediaSession({
   onNextTrack,
   onPreviousTrack,
   onStop,
+  onSeekTo,
+  onSeekForward,
+  onSeekBackward,
+  getPositionState,
 }: MediaSessionOptions) {
+  type PositionState = {
+    duration: number;
+    position?: number;
+    playbackRate?: number;
+  };
+
+  const hasSetPositionState = (
+    session: MediaSession
+  ): session is MediaSession & { setPositionState: (state: PositionState) => void } =>
+    "setPositionState" in session;
+
   // コールバック関数の参照を保持（再レンダリングによる再登録を防ぐ）
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
   const onNextTrackRef = useRef(onNextTrack);
   const onPreviousTrackRef = useRef(onPreviousTrack);
   const onStopRef = useRef(onStop);
+  const onSeekToRef = useRef(onSeekTo);
+  const onSeekForwardRef = useRef(onSeekForward);
+  const onSeekBackwardRef = useRef(onSeekBackward);
+  const getPositionStateRef = useRef(getPositionState);
 
   // Refを更新
   useEffect(() => {
@@ -63,7 +96,53 @@ export function useMediaSession({
     onNextTrackRef.current = onNextTrack;
     onPreviousTrackRef.current = onPreviousTrack;
     onStopRef.current = onStop;
-  }, [onPlay, onPause, onNextTrack, onPreviousTrack, onStop]);
+    onSeekToRef.current = onSeekTo;
+    onSeekForwardRef.current = onSeekForward;
+    onSeekBackwardRef.current = onSeekBackward;
+    getPositionStateRef.current = getPositionState;
+  }, [
+    onPlay,
+    onPause,
+    onNextTrack,
+    onPreviousTrack,
+    onStop,
+    onSeekTo,
+    onSeekForward,
+    onSeekBackward,
+    getPositionState,
+  ]);
+
+  const updatePositionState = useCallback(() => {
+    if (!("mediaSession" in navigator)) return;
+
+    const mediaSession = navigator.mediaSession;
+    if (!mediaSession) return;
+    if (!hasSetPositionState(mediaSession)) return;
+
+    const setPositionState = mediaSession.setPositionState;
+
+    const state = getPositionStateRef.current?.();
+    const duration = state?.duration;
+    if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) return;
+
+    const rawPosition = state?.position;
+    const position =
+      typeof rawPosition === "number" && Number.isFinite(rawPosition)
+        ? Math.min(Math.max(rawPosition, 0), duration)
+        : undefined;
+
+    const rawRate = state?.playbackRate;
+    const playbackRate =
+      typeof rawRate === "number" && Number.isFinite(rawRate) && rawRate > 0
+        ? rawRate
+        : undefined;
+
+    try {
+      setPositionState({ duration, position, playbackRate });
+    } catch (error) {
+      logger.warn("Failed to set Media Session position state", error);
+    }
+  }, []);
 
   // メタデータを更新
   const updateMetadata = useCallback(() => {
@@ -149,6 +228,34 @@ export function useMediaSession({
       onStopRef.current?.();
     };
 
+    // シーク（絶対）
+    const seekToHandler = (details: MediaSessionActionDetails) => {
+      const seekTime = (details as unknown as { seekTime?: number }).seekTime;
+      if (typeof seekTime === "number" && Number.isFinite(seekTime)) {
+        logger.info("Media Session: seekto action triggered", { seekTime });
+        onSeekToRef.current?.(seekTime);
+      }
+    };
+
+    // シーク（前進/後退）
+    const seekForwardHandler = (details: MediaSessionActionDetails) => {
+      const seekOffset = (details as unknown as { seekOffset?: number })
+        .seekOffset;
+      logger.info("Media Session: seekforward action triggered", {
+        seekOffset,
+      });
+      onSeekForwardRef.current?.(seekOffset);
+    };
+
+    const seekBackwardHandler = (details: MediaSessionActionDetails) => {
+      const seekOffset = (details as unknown as { seekOffset?: number })
+        .seekOffset;
+      logger.info("Media Session: seekbackward action triggered", {
+        seekOffset,
+      });
+      onSeekBackwardRef.current?.(seekOffset);
+    };
+
     // アクションハンドラを登録
     try {
       navigator.mediaSession.setActionHandler("play", playHandler);
@@ -156,6 +263,9 @@ export function useMediaSession({
       navigator.mediaSession.setActionHandler("nexttrack", nextTrackHandler);
       navigator.mediaSession.setActionHandler("previoustrack", previousTrackHandler);
       navigator.mediaSession.setActionHandler("stop", stopHandler);
+      navigator.mediaSession.setActionHandler("seekto", seekToHandler);
+      navigator.mediaSession.setActionHandler("seekforward", seekForwardHandler);
+      navigator.mediaSession.setActionHandler("seekbackward", seekBackwardHandler);
     } catch (error) {
       logger.error("Failed to set Media Session action handlers", error);
     }
@@ -168,6 +278,9 @@ export function useMediaSession({
         navigator.mediaSession.setActionHandler("nexttrack", null);
         navigator.mediaSession.setActionHandler("previoustrack", null);
         navigator.mediaSession.setActionHandler("stop", null);
+        navigator.mediaSession.setActionHandler("seekto", null);
+        navigator.mediaSession.setActionHandler("seekforward", null);
+        navigator.mediaSession.setActionHandler("seekbackward", null);
       } catch (error) {
         logger.error("Failed to clear Media Session action handlers", error);
       }
@@ -183,7 +296,8 @@ export function useMediaSession({
   // 再生状態が変わったら更新
   useEffect(() => {
     updatePlaybackState(isPlaying);
-  }, [isPlaying, updatePlaybackState]);
+    updatePositionState();
+  }, [isPlaying, updatePlaybackState, updatePositionState]);
 
   return {
     updateMetadata,

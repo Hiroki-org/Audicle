@@ -111,7 +111,7 @@ describe("usePlayback", () => {
 
     // 再生を開始
     await act(async () => {
-      result.current.play();
+      await result.current.play();
     });
 
     // 非同期処理を待つ
@@ -125,7 +125,7 @@ describe("usePlayback", () => {
     // play()が一度だけ呼ばれたことを確認
     // 修正前は2回呼ばれていたが、修正後は1回のみ
     expect(mockAudioInstance.playCallCount).toBe(1);
-    
+
     // 音声ソースが設定されていることを確認
     expect(mockAudioInstance.src).toBe("blob:mock-audio-url");
   });
@@ -161,9 +161,10 @@ describe("usePlayback", () => {
 
     // 短時間に複数回再生を試みる
     await act(async () => {
-      result.current.play();
-      result.current.play();
-      result.current.play();
+      const p1 = result.current.play();
+      const p2 = result.current.play();
+      const p3 = result.current.play();
+      await Promise.allSettled([p1, p2, p3]);
     });
 
     // 非同期処理を待つ
@@ -215,7 +216,7 @@ describe("usePlayback", () => {
 
       // 最初のチャンクを再生
       await act(async () => {
-        result.current.play();
+        await result.current.play();
       });
 
       await waitFor(() => {
@@ -223,8 +224,8 @@ describe("usePlayback", () => {
       });
 
       // next() を呼ぶ
-      act(() => {
-        result.current.next();
+      await act(async () => {
+        await result.current.next();
       });
 
       // 次のチャンクへ移動することを確認
@@ -260,7 +261,7 @@ describe("usePlayback", () => {
 
       // 最初のチャンクを再生
       await act(async () => {
-        result.current.play();
+        await result.current.play();
       });
 
       await waitFor(() => {
@@ -268,8 +269,8 @@ describe("usePlayback", () => {
       });
 
       // 最後のチャンクで next() を呼ぶ
-      act(() => {
-        result.current.next();
+      await act(async () => {
+        await result.current.next();
       });
 
       // currentIndex が変わらないことを確認（何もしない）
@@ -313,7 +314,7 @@ describe("usePlayback", () => {
 
       // 2番目のチャンクを直接再生
       await act(async () => {
-        result.current.seekToChunk("chunk-2");
+        await result.current.seekToChunk("chunk-2");
       });
 
       await waitFor(() => {
@@ -321,8 +322,8 @@ describe("usePlayback", () => {
       });
 
       // previous() を呼ぶ
-      act(() => {
-        result.current.previous();
+      await act(async () => {
+        await result.current.previous();
       });
 
       // 前のチャンクへ移動することを確認
@@ -364,7 +365,7 @@ describe("usePlayback", () => {
 
       // 最初のチャンクを再生
       await act(async () => {
-        result.current.play();
+        await result.current.play();
       });
 
       await waitFor(() => {
@@ -372,8 +373,8 @@ describe("usePlayback", () => {
       });
 
       // 最初のチャンクで previous() を呼ぶ
-      act(() => {
-        result.current.previous();
+      await act(async () => {
+        await result.current.previous();
       });
 
       // currentIndex が 0 のまま（最初から再生）
@@ -423,7 +424,7 @@ describe("usePlayback", () => {
 
       // 再生を開始
       await act(async () => {
-        result.current.play();
+        await result.current.play();
       });
 
       await waitFor(() => {
@@ -431,15 +432,15 @@ describe("usePlayback", () => {
       });
 
       // next() を呼んでも何もしない
-      act(() => {
-        result.current.next();
+      await act(async () => {
+        await result.current.next();
       });
 
       expect(result.current.currentIndex).toBe(0);
 
       // previous() を呼んでも最初から再生
-      act(() => {
-        result.current.previous();
+      await act(async () => {
+        await result.current.previous();
       });
 
       expect(result.current.currentIndex).toBe(0);

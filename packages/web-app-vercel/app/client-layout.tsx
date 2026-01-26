@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode, useMemo, useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import { PlaylistPlaybackProvider } from "@/contexts/PlaylistPlaybackContext";
+import { AudioPlaybackProvider } from "@/contexts/AudioPlaybackContext";
 import { useSession } from "next-auth/react";
 import { useUserSettings } from "@/lib/hooks/useUserSettings";
 import SessionProviderWrapper from "./session-provider-wrapper";
@@ -65,8 +66,10 @@ function Content({ children }: { children: ReactNode }) {
 
   return (
     <PlaylistPlaybackProvider>
-      <Toaster position="top-right" />
-      {children}
+      <AudioPlaybackProvider>
+        <Toaster position="top-right" />
+        {children}
+      </AudioPlaybackProvider>
     </PlaylistPlaybackProvider>
   );
 }
