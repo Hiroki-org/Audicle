@@ -74,6 +74,10 @@ class ExtractResponse(BaseModel):
 # Google Cloud TTS APIの最大リクエストバイト数
 MAX_TTS_BYTES = 5000
 
+# Maximum number of concurrent TTS API requests
+# This prevents hitting Google Cloud TTS API rate limits
+MAX_CONCURRENT_TTS_REQUESTS = int(os.getenv("MAX_CONCURRENT_TTS_REQUESTS", "10"))
+
 
 def _merge_punctuation(sentences: List[str], delimiters: set) -> List[str]:
     """句読点を前の文に結合する"""
@@ -241,13 +245,50 @@ async def synthesize_speech(request: SynthesizeRequest):
         text_chunks = _split_text(request.text)
         logger.info(f"Split text into {len(text_chunks)} chunks")
 
-        logger.info(f"Synthesizing {len(text_chunks)} chunks in parallel")
-        tasks = [
-            _synthesize_to_bytes(chunk, request.voice)
-            for chunk in text_chunks
-        ]
-        audio_chunks = await asyncio.gather(*tasks)
+        # Create a semaphore to limit concurrent API requests
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_TTS_REQUESTS)
 
+        async def synthesize_chunk_with_logging(chunk: str, index: int) -> bytes:
+            """Wrapper function to add logging and concurrency control"""
+            async with semaphore:
+                logger.info(f"Synthesizing chunk {index + 1}/{len(text_chunks)}")
+                try:
+                    result = await _synthesize_to_bytes(chunk, request.voice)
+                    logger.debug(f"Chunk {index + 1}/{len(text_chunks)} completed")
+                    return result
+                except Exception as e:
+                    logger.error(f"Error synthesizing chunk {index + 1}/{len(text_chunks)}: {e}")
+                    raise
+
+        logger.info(f"Synthesizing {len(text_chunks)} chunks in parallel (max {MAX_CONCURRENT_TTS_REQUESTS} concurrent)")
+        tasks = [
+            synthesize_chunk_with_logging(chunk, i)
+            for i, chunk in enumerate(text_chunks)
+        ]
+        
+        # Use return_exceptions=True so we can log all failures and provide
+        # better diagnostics while still failing the whole request.
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        errors = [r for r in results if isinstance(r, Exception)]
+        if errors:
+            # Log all individual chunk errors for better diagnostics
+            for idx, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logger.error(
+                        "Error synthesizing chunk %d: %s",
+                        idx + 1,
+                        str(result),
+                    )
+            # Raise a summarized error so the outer exception handler
+            # can trigger the existing fallback behavior.
+            raise RuntimeError(
+                f"Synthesis failed for {len(errors)} out of {len(results)} chunks: "
+                + "; ".join(f"{type(e).__name__}: {e}" for e in errors[:3])  # Limit to first 3 errors
+                + (f" (and {len(errors) - 3} more)" if len(errors) > 3 else "")
+            )
+
+        audio_chunks = results  # all results are successful chunk bytes here
         full_audio = b"".join(audio_chunks)
 
         return Response(
