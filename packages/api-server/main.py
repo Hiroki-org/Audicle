@@ -241,11 +241,12 @@ async def synthesize_speech(request: SynthesizeRequest):
         text_chunks = _split_text(request.text)
         logger.info(f"Split text into {len(text_chunks)} chunks")
 
-        audio_chunks = []
-        for i, chunk in enumerate(text_chunks):
-            logger.info(f"Synthesizing chunk {i+1}/{len(text_chunks)}")
-            audio_chunk = await _synthesize_to_bytes(chunk, request.voice)
-            audio_chunks.append(audio_chunk)
+        logger.info(f"Synthesizing {len(text_chunks)} chunks in parallel")
+        tasks = [
+            _synthesize_to_bytes(chunk, request.voice)
+            for chunk in text_chunks
+        ]
+        audio_chunks = await asyncio.gather(*tasks)
 
         full_audio = b"".join(audio_chunks)
 
