@@ -49,8 +49,7 @@ export async function setDefaultSort(page: Page) {
  * プレイリストリストページで「デフォルトプレイリスト」のLocatorを返します
  */
 export function getDefaultPlaylistLocator(page: Page) {
-    const defaultPlaylistItem = page
+    return page
         .locator('a[data-testid="playlist-item"]')
         .filter({ hasText: 'デフォルトプレイリスト' });
-    return defaultPlaylistItem;
 }
