@@ -252,20 +252,16 @@ async def synthesize_speech(request: SynthesizeRequest):
             """Wrapper function to add logging and concurrency control"""
             async with semaphore:
                 logger.info(f"Synthesizing chunk {index + 1}/{len(text_chunks)}")
-                try:
-                    result = await _synthesize_to_bytes(chunk, request.voice)
-                    logger.debug(f"Chunk {index + 1}/{len(text_chunks)} completed")
-                    return result
-                except Exception as e:
-                    logger.error(f"Error synthesizing chunk {index + 1}/{len(text_chunks)}: {e}")
-                    raise
+                result = await _synthesize_to_bytes(chunk, request.voice)
+                logger.debug(f"Chunk {index + 1}/{len(text_chunks)} completed")
+                return result
 
         logger.info(f"Synthesizing {len(text_chunks)} chunks in parallel (max {MAX_CONCURRENT_TTS_REQUESTS} concurrent)")
         tasks = [
             synthesize_chunk_with_logging(chunk, i)
             for i, chunk in enumerate(text_chunks)
         ]
-        
+
         # Use return_exceptions=True so we can log all failures and provide
         # better diagnostics while still failing the whole request.
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -288,7 +284,8 @@ async def synthesize_speech(request: SynthesizeRequest):
                 + (f" (and {len(errors) - 3} more)" if len(errors) > 3 else "")
             )
 
-        audio_chunks = results  # all results are successful chunk bytes here
+        # All results are successful chunk bytes at this point
+        audio_chunks = results
         full_audio = b"".join(audio_chunks)
 
         return Response(
