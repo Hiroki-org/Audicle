@@ -1,6 +1,7 @@
 // 記事データの型定義と保存機能
 
 import { Chunk } from "@/types/api";
+import { logger } from "@/lib/logger";
 
 export interface Article {
   id: string;
@@ -45,12 +46,13 @@ export const articleStorage = {
           localStorage.setItem(STORAGE_KEY_INDEX, JSON.stringify(index));
           // レガシーデータを削除
           localStorage.removeItem(LEGACY_STORAGE_KEY);
+          logger.success("Migration successful: Split storage enabled");
         } else {
           // 空または不正なデータの場合は単に削除
           localStorage.removeItem(LEGACY_STORAGE_KEY);
         }
       } catch (e) {
-        console.error("Migration failed", e);
+        logger.error("Migration failed", e);
       }
     }
   },
