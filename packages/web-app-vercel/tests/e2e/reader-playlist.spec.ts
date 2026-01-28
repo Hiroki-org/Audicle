@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearLocalStorage } from '../helpers/testSetup';
+import { clearLocalStorage, selectDefaultPlaylist } from '../helpers/testSetup';
 
 test.describe('Reader - プレイリスト関連のナビゲーション', () => {
     test('プレイリスト詳細 -> リーダーにプレイリストクエリが含まれ、前へ/次へボタンが表示される', async ({ page }) => {
@@ -8,9 +8,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
 
         // Explicitly select the Default Playlist rather than assuming it is the first item
-        const defaultPlaylistItem = page
-            .locator('a[data-testid="playlist-item"]')
-            .filter({ hasText: 'デフォルトプレイリスト' });
+        const defaultPlaylistItem = await selectDefaultPlaylist(page);
         await expect(defaultPlaylistItem).toHaveCount(1);
         await defaultPlaylistItem.click();
 
@@ -62,9 +60,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
         
         // Explicitly select the Default Playlist rather than assuming it is the first item
-        const defaultPlaylistItem = page
-            .locator('a[data-testid="playlist-item"]')
-            .filter({ hasText: 'デフォルトプレイリスト' });
+        const defaultPlaylistItem = await selectDefaultPlaylist(page);
         await expect(defaultPlaylistItem).toHaveCount(1);
         await defaultPlaylistItem.click();
 
@@ -111,9 +107,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
         
         // Explicitly select the Default Playlist rather than assuming it is the first item
-        const defaultPlaylistItem = page
-            .locator('a[data-testid="playlist-item"]')
-            .filter({ hasText: 'デフォルトプレイリスト' });
+        const defaultPlaylistItem = await selectDefaultPlaylist(page);
         await expect(defaultPlaylistItem).toHaveCount(1);
         await defaultPlaylistItem.click();
 

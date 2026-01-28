@@ -43,3 +43,14 @@ export async function setDefaultSort(page: Page) {
         localStorage.setItem(key, 'newest');
     }, STORAGE_KEYS.HOME_SORT);
 }
+
+/**
+ * デフォルトプレイリストを選択する
+ * プレイリストリストページで「デフォルトプレイリスト」を明示的に選択します
+ */
+export async function selectDefaultPlaylist(page: Page) {
+    const defaultPlaylistItem = page
+        .locator('a[data-testid="playlist-item"]')
+        .filter({ hasText: 'デフォルトプレイリスト' });
+    return defaultPlaylistItem;
+}
