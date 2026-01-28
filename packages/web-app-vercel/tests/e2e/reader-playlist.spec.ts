@@ -1,12 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { clearLocalStorage } from '../helpers/testSetup';
 
-test.describe('Reader - Playlist related navigation', () => {
-    test.beforeEach(async ({ page }) => {
-        // No mocks needed, assuming seeded data exists
-    });
-
-    test('Playlist detail -> reader contains playlist query and prev/next visible', async ({ page }) => {
+test.describe('Reader - プレイリスト関連のナビゲーション', () => {
+    test('プレイリスト詳細 -> リーダーにプレイリストクエリが含まれ、前へ/次へボタンが表示される', async ({ page }) => {
         // Navigate to playlists list
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
@@ -36,7 +32,7 @@ test.describe('Reader - Playlist related navigation', () => {
         await expect(page.getByTestId('article-title')).toContainText('Apple');
     });
 
-    test('Home -> reader uses default playlist and prev/next visible', async ({ page }) => {
+    test('ホーム -> リーダーがデフォルトプレイリストを使用し、前へ/次へボタンが表示される', async ({ page }) => {
         // Open home and click first article (home shows default playlist items)
         await page.goto('/');
         await page.waitForSelector('a[data-testid="playlist-article"]', { state: 'visible' });
@@ -56,7 +52,7 @@ test.describe('Reader - Playlist related navigation', () => {
         await expect(next).toBeVisible();
     });
 
-    test('Prev/Next transitions within playlist navigate correctly', async ({ page }) => {
+    test('プレイリスト内の前へ/次へ遷移が正しくナビゲートする', async ({ page }) => {
         // Navigate to playlists list
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
@@ -96,7 +92,7 @@ test.describe('Reader - Playlist related navigation', () => {
         await expect(page.getByTestId('article-title')).toContainText('Banana');
     });
 
-    test('Playlist sort order is respected in Prev/Next navigation', async ({ page }) => {
+    test('前へ/次へナビゲーションでプレイリストのソート順が尊重される', async ({ page }) => {
         await clearLocalStorage(page);
 
         // Navigate to playlist
