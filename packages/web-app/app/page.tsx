@@ -91,7 +91,10 @@ export default function Home() {
                     </p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-400 dark:text-gray-500">
                       <span>{formatDate(article.createdAt)}</span>
-                      <span>{article.chunks.length} チャンク</span>
+                      <span>
+                        {article.chunkCount ?? article.chunks?.length ?? 0}{" "}
+                        チャンク
+                      </span>
                     </div>
                   </div>
                   <button
