@@ -2,7 +2,6 @@ import asyncio
 import os
 import time
 import uuid
-import random
 
 # Try to import asyncpg, handle if missing
 try:
@@ -32,7 +31,7 @@ async def setup_data(conn):
 
     # Create bookmarks to add
     # We create them beforehand to isolate the measurement to playlist_items insertion
-    article_ids = []
+    bookmark_ids = []
     total_items = CONCURRENCY * ITEMS_PER_WORKER
     print(f"Creating {total_items} bookmarks...")
 
@@ -44,14 +43,14 @@ async def setup_data(conn):
         bm_id = str(uuid.uuid4())
         art_url = f"http://example.com/{bm_id}"
         values.append((bm_id, user_email, art_url, 'Test Article'))
-        article_ids.append(bm_id)
+        bookmark_ids.append(bm_id)
 
     await conn.executemany("""
         INSERT INTO bookmarks (id, owner_email, article_url, article_title)
         VALUES ($1, $2, $3, $4)
     """, values)
 
-    return playlist_id, article_ids
+    return playlist_id, bookmark_ids
 
 async def worker(pool, playlist_id, bookmark_ids):
     async with pool.acquire() as conn:
@@ -74,7 +73,11 @@ async def run_benchmark():
     print(f"Connecting to DB...")
     pool = None
     try:
-        pool = await asyncpg.create_pool(DB_URL)
+        pool = await asyncpg.create_pool(
+            DB_URL,
+            min_size=CONCURRENCY,
+            max_size=CONCURRENCY,
+        )
 
         print("Setting up test data...")
         async with pool.acquire() as conn:
@@ -131,6 +134,26 @@ async def run_benchmark():
                      print("✅ Positions are contiguous.")
                 else:
                      print("⚠️ Positions have gaps.")
+
+        # Cleanup test data
+        print("Cleaning up test data...")
+        async with pool.acquire() as conn:
+            # Delete playlist items
+            await conn.execute("""
+                DELETE FROM playlist_items WHERE playlist_id = $1
+            """, playlist_id)
+            
+            # Delete bookmarks created by this benchmark
+            await conn.execute("""
+                DELETE FROM bookmarks WHERE owner_email LIKE 'bench_%@example.com'
+            """)
+            
+            # Delete playlist
+            await conn.execute("""
+                DELETE FROM playlists WHERE id = $1
+            """, playlist_id)
+        
+        print("✅ Test data cleaned up successfully.")
 
     except Exception as e:
         print(f"An error occurred during the benchmark: {e}")
