@@ -20,7 +20,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const TEST_USER_ID = "test-user-id-123";
-const TEST_USER_EMAIL = "test@example.com";
+const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
 
 async function runMigrations() {
     console.log("マイグレーションを実行中...");
@@ -102,6 +102,26 @@ async function seedTestData() {
     // 2. テスト記事の作成（E2Eで必要な件数を確保）
     console.log("2. テスト記事を作成中...");
     const articles = [
+        // E2Eテスト用の固定記事（Apple, Banana, Cherry）
+        {
+            owner_email: TEST_USER_EMAIL,
+            url: "https://example.com/apple?a=1",
+            title: "Apple",
+            thumbnail_url: "https://via.placeholder.com/300",
+        },
+        {
+            owner_email: TEST_USER_EMAIL,
+            url: "https://example.com/banana?b=2",
+            title: "Banana",
+            thumbnail_url: "https://via.placeholder.com/300",
+        },
+        {
+            owner_email: TEST_USER_EMAIL,
+            url: "https://example.com/cherry?c=3",
+            title: "Cherry",
+            thumbnail_url: "https://via.placeholder.com/300",
+        },
+        // その他の記事
         {
             owner_email: TEST_USER_EMAIL,
             url: "https://example.com/article-1",
