@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearLocalStorage } from '../helpers/testSetup';
+import { clearLocalStorage, getDefaultPlaylistLocator } from '../helpers/testSetup';
 
 test.describe('Reader - プレイリスト関連のナビゲーション', () => {
     test('プレイリスト詳細 -> リーダーにプレイリストクエリが含まれ、前へ/次へボタンが表示される', async ({ page }) => {
@@ -7,10 +7,10 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
 
-        // Click the Default Playlist (explicitly find by text)
-        const defaultPlaylist = page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'デフォルトプレイリスト' }).first();
-        await expect(defaultPlaylist).toBeVisible();
-        await defaultPlaylist.click();
+        // Explicitly select the Default Playlist rather than assuming it is the first item
+        const defaultPlaylistItem = getDefaultPlaylistLocator(page);
+        await expect(defaultPlaylistItem).toHaveCount(1);
+        await defaultPlaylistItem.click();
 
         // Verify we are on playlist detail page
         await page.waitForSelector('a[data-testid="playlist-article"]', { state: 'visible' });
@@ -59,8 +59,10 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
 
-        // Click the Default Playlist
-        await page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'デフォルトプレイリスト' }).first().click();
+        // Explicitly select the Default Playlist rather than assuming it is the first item
+        const defaultPlaylistItem = getDefaultPlaylistLocator(page);
+        await expect(defaultPlaylistItem).toHaveCount(1);
+        await defaultPlaylistItem.click();
 
         // Wait for articles
         await page.waitForSelector('a[data-testid="playlist-article"]', { state: 'visible' });
@@ -91,9 +93,9 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await expect(page.getByTestId('article-title')).toContainText('Cherry');
 
         // Click previous -> Banana
-        const currentUrl = page.url();
+        const thirdUrl = page.url();
         await prev.click();
-        await page.waitForURL((url) => url.toString() !== currentUrl);
+        await page.waitForURL((url) => url.toString() !== thirdUrl);
         await expect(page.getByTestId('article-title')).toContainText('Banana');
     });
 
@@ -103,7 +105,11 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Navigate to playlist
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
-        await page.locator('a[data-testid="playlist-item"]').first().click();
+
+        // Explicitly select the Default Playlist rather than assuming it is the first item
+        const defaultPlaylistItem = getDefaultPlaylistLocator(page);
+        await expect(defaultPlaylistItem).toHaveCount(1);
+        await defaultPlaylistItem.click();
 
         // Change sort to Title Descending (Z-A)
         await page.waitForSelector('[data-testid="playlist-sort-select"]', { state: 'visible' });
