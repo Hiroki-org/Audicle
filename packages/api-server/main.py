@@ -241,9 +241,19 @@ async def synthesize_speech(request: SynthesizeRequest):
         text_chunks = _split_text(request.text)
         logger.info(f"Split text into {len(text_chunks)} chunks")
 
-        logger.info(f"Synthesizing {len(text_chunks)} chunks in parallel")
+        logger.info("Synthesizing %d chunks in parallel", len(text_chunks))
+
+        # Limit concurrency to avoid thread pool exhaustion
+        # Default to 5 concurrent requests
+        max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def _synthesize_with_semaphore(chunk_text: str, voice_name: str):
+            async with semaphore:
+                return await _synthesize_to_bytes(chunk_text, voice_name)
+
         tasks = [
-            _synthesize_to_bytes(chunk, request.voice)
+            _synthesize_with_semaphore(chunk, request.voice)
             for chunk in text_chunks
         ]
         audio_chunks = await asyncio.gather(*tasks)
