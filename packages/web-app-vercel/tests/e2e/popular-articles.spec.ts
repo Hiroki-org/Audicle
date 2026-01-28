@@ -53,19 +53,15 @@ test.describe('人気記事（認証済み）', () => {
             });
         });
 
-        // Mock /api/synthesize - Return a minimal WAV file header
+        // Mock /api/synthesize - Return JSON with base64-encoded audio
         await page.route('**/api/synthesize', async route => {
-            const wavHeader = Buffer.from('524946462400000057415645666d7420100000000100010044ac000088580100020010006461746100000000', 'hex');
+            // Minimal valid silent MP3 file (base64-encoded)
+            const validAudioBase64 = '//uQxAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==';
             await route.fulfill({
                 status: 200,
-                contentType: 'audio/wav',
-                body: wavHeader
+                contentType: 'application/json',
+                body: JSON.stringify({ audio: validAudioBase64, duration: 10.5 })
             });
-        });
-
-        // Mock /api/cache/check - avoid unexpected 404s in logs (optional)
-        await page.route('**/api/cache/check', async route => {
-             await route.fulfill({ status: 404 }); // Cache miss
         });
 
         page.on('console', msg => {
@@ -126,12 +122,12 @@ test.describe('人気記事（認証済み）', () => {
                 { timeout: 15000 }
             ),
             page.goto('/popular')
-        ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
-
-        // Reactの状態更新とレンダリングを待つ
-        await page.waitForTimeout(2000);
+        ]);
 
         const articles = page.locator('[data-testid="article-card"]');
+        // 人気記事カードが表示されるまで待機（固定時間ではなくUI状態に基づく待機）
+        await expect(articles.first()).toBeVisible({ timeout: 10000 });
+
         const count = await articles.count();
         console.log('[DEBUG] Article card count after waiting:', count);
 
@@ -167,12 +163,12 @@ test.describe('人気記事（認証済み）', () => {
                 { timeout: 15000 }
             ),
             page.goto('/popular')
-        ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
-
-        // Reactの状態更新とレンダリングを待つ
-        await page.waitForTimeout(2000);
+        ]);
 
         const articles = page.locator('[data-testid="article-card"]');
+        // 人気記事カードが表示されるまで待機（固定時間ではなくUI状態に基づく待機）
+        await expect(articles.first()).toBeVisible({ timeout: 10000 });
+
         const count = await articles.count();
         console.log('[DEBUG] Article card count after waiting:', count);
 
@@ -199,12 +195,12 @@ test.describe('人気記事（認証済み）', () => {
                 { timeout: 15000 }
             ),
             page.goto('/popular')
-        ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
-
-        // Reactの状態更新とレンダリングを待つ
-        await page.waitForTimeout(2000);
+        ]);
 
         const articles = page.locator('[data-testid="article-card"]');
+        // 人気記事カードが表示されるまで待機（固定時間ではなくUI状態に基づく待機）
+        await expect(articles.first()).toBeVisible({ timeout: 10000 });
+
         const count = await articles.count();
         if (count === 0) {
             console.log('No popular articles available, skipping test');
