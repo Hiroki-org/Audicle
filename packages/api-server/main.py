@@ -196,21 +196,30 @@ async def extract_content(request: ExtractRequest):
     """URLから本文を抽出する"""
     try:
         # Node.jsスクリプトを実行してReadability.jsで本文抽出
-        result = subprocess.run(
-            ["node", "readability_script.js", request.url],
-            capture_output=True,
-            text=True,
-            timeout=30
+        proc = await asyncio.create_subprocess_exec(
+            "node", "readability_script.js", request.url,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
 
-        if result.returncode != 0:
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            raise subprocess.TimeoutExpired(
+                ["node", "readability_script.js", request.url],
+                30
+            )
+
+        if proc.returncode != 0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Extraction failed: {result.stderr}"
+                detail=f"Extraction failed: {stderr.decode()}"
             )
 
         # JSONレスポンスをパース
-        extracted_data = json.loads(result.stdout)
+        extracted_data = json.loads(stdout.decode())
 
         return ExtractResponse(
             title=extracted_data.get("title", ""),
