@@ -257,10 +257,20 @@ async def synthesize_speech(request: SynthesizeRequest):
                 logger.debug("Chunk %d/%d completed", index + 1, len(text_chunks))
                 return result
 
-        logger.info("Synthesizing %d chunks in parallel (max %d concurrent)", len(text_chunks), MAX_CONCURRENT_TTS_REQUESTS)
+        logger.info("Synthesizing %d chunks in parallel", len(text_chunks))
+
+        # Limit concurrency to avoid thread pool exhaustion
+        # Default to 5 concurrent requests
+        max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def _synthesize_with_semaphore(chunk_text: str, voice_name: str):
+            async with semaphore:
+                return await _synthesize_to_bytes(chunk_text, voice_name)
+
         tasks = [
-            synthesize_chunk_with_logging(chunk, i)
-            for i, chunk in enumerate(text_chunks)
+            _synthesize_with_semaphore(chunk, request.voice)
+            for chunk in text_chunks
         ]
 
         # Use return_exceptions=True so we can log all failures and provide
