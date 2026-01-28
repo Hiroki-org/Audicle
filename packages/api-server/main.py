@@ -215,11 +215,11 @@ async def extract_content(request: ExtractRequest):
         if proc.returncode != 0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Extraction failed: {stderr.decode()}"
+                detail=f"Extraction failed: {stderr.decode('utf-8', errors='replace')}"
             )
 
         # JSONレスポンスをパース
-        extracted_data = json.loads(stdout.decode())
+        extracted_data = json.loads(stdout.decode('utf-8', errors='replace'))
 
         return ExtractResponse(
             title=extracted_data.get("title", ""),
