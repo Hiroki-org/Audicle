@@ -7,8 +7,12 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
 
-        // Click the first playlist (which should be the Default Playlist with Apple, Banana, Cherry)
-        await page.locator('a[data-testid="playlist-item"]').first().click();
+        // Explicitly select the Default Playlist rather than assuming it is the first item
+        const defaultPlaylistItem = page
+            .locator('a[data-testid="playlist-item"]')
+            .filter({ hasText: 'デフォルトプレイリスト' });
+        await expect(defaultPlaylistItem).toHaveCount(1);
+        await defaultPlaylistItem.click();
 
         // Verify we are on playlist detail page
         await page.waitForSelector('a[data-testid="playlist-article"]', { state: 'visible' });
@@ -56,7 +60,13 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Navigate to playlists list
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
-        await page.locator('a[data-testid="playlist-item"]').first().click();
+        
+        // Explicitly select the Default Playlist rather than assuming it is the first item
+        const defaultPlaylistItem = page
+            .locator('a[data-testid="playlist-item"]')
+            .filter({ hasText: 'デフォルトプレイリスト' });
+        await expect(defaultPlaylistItem).toHaveCount(1);
+        await defaultPlaylistItem.click();
 
         // Wait for articles
         await page.waitForSelector('a[data-testid="playlist-article"]', { state: 'visible' });
@@ -87,8 +97,9 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await expect(page.getByTestId('article-title')).toContainText('Cherry');
 
         // Click previous -> Banana
+        const thirdUrl = page.url();
         await prev.click();
-        await page.waitForURL((url) => url.toString() !== page.url());
+        await page.waitForURL((url) => url.toString() !== thirdUrl);
         await expect(page.getByTestId('article-title')).toContainText('Banana');
     });
 
@@ -98,7 +109,13 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Navigate to playlist
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
-        await page.locator('a[data-testid="playlist-item"]').first().click();
+        
+        // Explicitly select the Default Playlist rather than assuming it is the first item
+        const defaultPlaylistItem = page
+            .locator('a[data-testid="playlist-item"]')
+            .filter({ hasText: 'デフォルトプレイリスト' });
+        await expect(defaultPlaylistItem).toHaveCount(1);
+        await defaultPlaylistItem.click();
 
         // Change sort to Title Descending (Z-A)
         await page.waitForSelector('[data-testid="playlist-sort-select"]', { state: 'visible' });
