@@ -239,24 +239,25 @@ async def extract_content(request: ExtractRequest):
 async def synthesize_speech(request: SynthesizeRequest):
     """テキストを音声化してMP3を返す"""
     try:
-        logger.info(f"Synthesizing text: {request.text[:100]}...")
-        logger.info(f"Using voice: {request.voice}")
+        logger.info("Synthesizing text: %s...", request.text[:100])
+        logger.info("Using voice: %s", request.voice)
 
         text_chunks = _split_text(request.text)
-        logger.info(f"Split text into {len(text_chunks)} chunks")
+        logger.info("Split text into %d chunks", len(text_chunks))
 
         # Create a semaphore to limit concurrent API requests
+        # This prevents hitting Google Cloud TTS API rate limits
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_TTS_REQUESTS)
 
         async def synthesize_chunk_with_logging(chunk: str, index: int) -> bytes:
             """Wrapper function to add logging and concurrency control"""
             async with semaphore:
-                logger.info(f"Synthesizing chunk {index + 1}/{len(text_chunks)}")
+                logger.info("Synthesizing chunk %d/%d", index + 1, len(text_chunks))
                 result = await _synthesize_to_bytes(chunk, request.voice)
-                logger.debug(f"Chunk {index + 1}/{len(text_chunks)} completed")
+                logger.debug("Chunk %d/%d completed", index + 1, len(text_chunks))
                 return result
 
-        logger.info(f"Synthesizing {len(text_chunks)} chunks in parallel (max {MAX_CONCURRENT_TTS_REQUESTS} concurrent)")
+        logger.info("Synthesizing %d chunks in parallel (max %d concurrent)", len(text_chunks), MAX_CONCURRENT_TTS_REQUESTS)
         tasks = [
             synthesize_chunk_with_logging(chunk, i)
             for i, chunk in enumerate(text_chunks)
@@ -295,7 +296,7 @@ async def synthesize_speech(request: SynthesizeRequest):
         )
 
     except Exception as e:
-        logger.error(f"Synthesis error: {str(e)}")
+        logger.error("Synthesis error: %s", str(e))
 
         # フォールバック処理
         try:
@@ -332,7 +333,7 @@ async def synthesize_speech(request: SynthesizeRequest):
                 )
 
         except Exception as fallback_error:
-            logger.error(f"Fallback also failed: {str(fallback_error)}")
+            logger.error("Fallback also failed: %s", str(fallback_error))
             raise HTTPException(
                 status_code=500,
                 detail=(
