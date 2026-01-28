@@ -45,10 +45,10 @@ export async function setDefaultSort(page: Page) {
 }
 
 /**
- * デフォルトプレイリストを選択する
- * プレイリストリストページで「デフォルトプレイリスト」を明示的に選択します
+ * デフォルトプレイリストのLocatorを取得する
+ * プレイリストリストページで「デフォルトプレイリスト」のLocatorを返します
  */
-export async function selectDefaultPlaylist(page: Page) {
+export function getDefaultPlaylistLocator(page: Page) {
     const defaultPlaylistItem = page
         .locator('a[data-testid="playlist-item"]')
         .filter({ hasText: 'デフォルトプレイリスト' });

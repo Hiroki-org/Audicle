@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearLocalStorage, selectDefaultPlaylist } from '../helpers/testSetup';
+import { clearLocalStorage, getDefaultPlaylistLocator } from '../helpers/testSetup';
 
 test.describe('Reader - プレイリスト関連のナビゲーション', () => {
     test('プレイリスト詳細 -> リーダーにプレイリストクエリが含まれ、前へ/次へボタンが表示される', async ({ page }) => {
@@ -8,7 +8,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
 
         // Explicitly select the Default Playlist rather than assuming it is the first item
-        const defaultPlaylistItem = await selectDefaultPlaylist(page);
+        const defaultPlaylistItem = getDefaultPlaylistLocator(page);
         await expect(defaultPlaylistItem).toHaveCount(1);
         await defaultPlaylistItem.click();
 
@@ -58,9 +58,9 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Navigate to playlists list
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
-        
+
         // Explicitly select the Default Playlist rather than assuming it is the first item
-        const defaultPlaylistItem = await selectDefaultPlaylist(page);
+        const defaultPlaylistItem = getDefaultPlaylistLocator(page);
         await expect(defaultPlaylistItem).toHaveCount(1);
         await defaultPlaylistItem.click();
 
@@ -105,9 +105,9 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Navigate to playlist
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
-        
+
         // Explicitly select the Default Playlist rather than assuming it is the first item
-        const defaultPlaylistItem = await selectDefaultPlaylist(page);
+        const defaultPlaylistItem = getDefaultPlaylistLocator(page);
         await expect(defaultPlaylistItem).toHaveCount(1);
         await defaultPlaylistItem.click();
 
