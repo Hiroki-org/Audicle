@@ -72,75 +72,72 @@ async def run_benchmark():
         return
 
     print(f"Connecting to DB...")
+    pool = None
     try:
         pool = await asyncpg.create_pool(DB_URL)
-    except Exception as e:
-        print(f"Failed to connect to DB: {e}")
-        print("Please set DATABASE_URL environment variable correctly.")
-        return
 
-    print("Setting up test data...")
-    async with pool.acquire() as conn:
-        try:
+        print("Setting up test data...")
+        async with pool.acquire() as conn:
             playlist_id, all_bm_ids = await setup_data(conn)
-        except Exception as e:
-            print(f"Setup failed: {e}")
-            await pool.close()
-            return
 
-    print(f"Starting benchmark: {CONCURRENCY} workers, {ITEMS_PER_WORKER} items each.")
+        print(f"Starting benchmark: {CONCURRENCY} workers, {ITEMS_PER_WORKER} items each.")
 
-    # Split bookmarks among workers
-    worker_tasks = []
-    chunk_size = ITEMS_PER_WORKER
+        # Split bookmarks among workers
+        worker_tasks = []
+        chunk_size = ITEMS_PER_WORKER
 
-    start_time = time.time()
+        start_time = time.time()
 
-    for i in range(CONCURRENCY):
-        chunk = all_bm_ids[i*chunk_size : (i+1)*chunk_size]
-        worker_tasks.append(worker(pool, playlist_id, chunk))
+        for i in range(CONCURRENCY):
+            chunk = all_bm_ids[i*chunk_size : (i+1)*chunk_size]
+            worker_tasks.append(worker(pool, playlist_id, chunk))
 
-    await asyncio.gather(*worker_tasks)
+        await asyncio.gather(*worker_tasks)
 
-    end_time = time.time()
-    duration = end_time - start_time
-    total_items = CONCURRENCY * ITEMS_PER_WORKER
+        end_time = time.time()
+        duration = end_time - start_time
+        total_items = CONCURRENCY * ITEMS_PER_WORKER
 
-    print(f"Benchmark finished in {duration:.2f} seconds.")
-    print(f"Throughput: {total_items / duration:.2f} items/sec")
+        print(f"Benchmark finished in {duration:.2f} seconds.")
+        print(f"Throughput: {total_items / duration:.2f} items/sec")
 
-    # Verify positions
-    async with pool.acquire() as conn:
-        positions = await conn.fetch("""
-            SELECT position FROM playlist_items
-            WHERE playlist_id = $1
-            ORDER BY position
-        """, playlist_id)
+        # Verify positions
+        async with pool.acquire() as conn:
+            positions = await conn.fetch("""
+                SELECT position FROM playlist_items
+                WHERE playlist_id = $1
+                ORDER BY position
+            """, playlist_id)
 
-        pos_list = [r['position'] for r in positions]
+            pos_list = [r['position'] for r in positions]
 
-        count = len(pos_list)
-        unique_count = len(set(pos_list))
+            count = len(pos_list)
+            unique_count = len(set(pos_list))
 
-        print(f"Total items inserted: {count}")
+            print(f"Total items inserted: {count}")
 
-        if count != unique_count:
-            print(f"❌ DUPLICATE POSITIONS DETECTED! Unique: {unique_count}, Total: {count}")
-        else:
-            print("✅ No duplicate positions.")
-
-        if count > 0:
-            min_pos = min(pos_list)
-            max_pos = max(pos_list)
-            print(f"Position range: {min_pos} to {max_pos}")
-
-            # Check for gaps
-            if max_pos - min_pos + 1 == count:
-                 print("✅ Positions are contiguous.")
+            if count != unique_count:
+                print(f"❌ DUPLICATE POSITIONS DETECTED! Unique: {unique_count}, Total: {count}")
             else:
-                 print("⚠️ Positions have gaps.")
+                print("✅ No duplicate positions.")
 
-    await pool.close()
+            if count > 0:
+                min_pos = min(pos_list)
+                max_pos = max(pos_list)
+                print(f"Position range: {min_pos} to {max_pos}")
+
+                # Check for gaps
+                if max_pos - min_pos + 1 == count:
+                     print("✅ Positions are contiguous.")
+                else:
+                     print("⚠️ Positions have gaps.")
+
+    except Exception as e:
+        print(f"An error occurred during the benchmark: {e}")
+    finally:
+        if pool:
+            print("Closing DB pool...")
+            await pool.close()
 
 if __name__ == "__main__":
     asyncio.run(run_benchmark())
