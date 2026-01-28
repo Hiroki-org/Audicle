@@ -53,22 +53,15 @@ test.describe('人気記事（認証済み）', () => {
             });
         });
 
-        // Mock /api/synthesize - Return a JSON with base64 encoded WAV
+        // Mock /api/synthesize - Return JSON with base64-encoded audio
         await page.route('**/api/synthesize', async route => {
-            const wavHeader = Buffer.from('524946462400000057415645666d7420100000000100010044ac000088580100020010006461746100000000', 'hex');
-            const base64Audio = wavHeader.toString('base64');
+            // Minimal valid silent MP3 file (base64-encoded)
+            const validAudioBase64 = '//uQxAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==';
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({
-                    audio: base64Audio
-                })
+                body: JSON.stringify({ audio: validAudioBase64 })
             });
-        });
-
-        // Mock /api/cache/check - avoid unexpected 404s in logs (optional)
-        await page.route('**/api/cache/check', async route => {
-             await route.fulfill({ status: 404 }); // Cache miss
         });
 
         page.on('console', msg => {
@@ -188,10 +181,8 @@ test.describe('人気記事（認証済み）', () => {
         const count = await articles.count();
         console.log('[DEBUG] Article card count:', count);
 
-        if (count === 0) {
-            console.log('No popular articles available, skipping test');
-            test.skip();
-        }
+        // 記事カードが存在することを確認（モックにより必ず1つ以上存在する）
+        expect(count).toBeGreaterThan(0);
 
         // 記事カードをクリック
         await articles.first().click();
@@ -229,10 +220,8 @@ test.describe('人気記事（認証済み）', () => {
         }
 
         const count = await articles.count();
-        if (count === 0) {
-            console.log('No popular articles available, skipping test');
-            test.skip();
-        }
+        // 記事カードが存在することを確認（モックにより必ず1つ以上存在する）
+        expect(count).toBeGreaterThan(0);
 
         const articleCard = articles.first();
         await articleCard.click();
