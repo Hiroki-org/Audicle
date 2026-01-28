@@ -125,23 +125,14 @@ test.describe('人気記事（認証済み）', () => {
         ]);
 
         const articles = page.locator('[data-testid="article-card"]');
-        // Wait for articles to be attached to DOM first, then check count
-        await articles.first().waitFor({ state: 'attached', timeout: 10000 }).catch(() => {
-            // If no articles are found, skip the test gracefully
-        });
+        // 人気記事カードが表示されるまで待機
+        await expect(articles.first()).toBeVisible({ timeout: 10000 });
 
         const count = await articles.count();
         console.log('[DEBUG] Article card count after waiting:', count);
 
-        if (count === 0) {
-            console.log('No popular articles available');
-            // データがない場合はページ自体が表示されることを確認
-            // 「人気記事」という見出しを特定
-            await expect(page.getByRole('heading', { name: '人気記事' })).toBeVisible();
-            test.skip();
-        }
-
-        // 記事カードが表示されることを確認
+        // 記事カードが表示されることを確認（モックにより必ず1つ以上存在する）
+        expect(count).toBeGreaterThan(0);
         await expect(articles.first()).toBeVisible();
     });
 
@@ -168,18 +159,14 @@ test.describe('人気記事（認証済み）', () => {
         ]);
 
         const articles = page.locator('[data-testid="article-card"]');
-        // Wait for articles to be attached to DOM first, then check count
-        await articles.first().waitFor({ state: 'attached', timeout: 10000 }).catch(() => {
-            // If no articles are found, skip the test gracefully
-        });
+        // 人気記事カードが表示されるまで待機
+        await expect(articles.first()).toBeVisible({ timeout: 10000 });
 
         const count = await articles.count();
         console.log('[DEBUG] Article card count after waiting:', count);
 
-        if (count === 0) {
-            console.log('No popular articles available, skipping test');
-            test.skip();
-        }
+        // 記事カードが存在することを確認（モックにより必ず1つ以上存在する）
+        expect(count).toBeGreaterThan(0);
 
         // 記事カードをクリック
         await articles.first().click();
@@ -202,16 +189,12 @@ test.describe('人気記事（認証済み）', () => {
         ]);
 
         const articles = page.locator('[data-testid="article-card"]');
-        // Wait for articles to be attached to DOM first, then check count
-        await articles.first().waitFor({ state: 'attached', timeout: 10000 }).catch(() => {
-            // If no articles are found, skip the test gracefully
-        });
+        // 人気記事カードが表示されるまで待機
+        await expect(articles.first()).toBeVisible({ timeout: 10000 });
 
         const count = await articles.count();
-        if (count === 0) {
-            console.log('No popular articles available, skipping test');
-            test.skip();
-        }
+        // 記事カードが存在することを確認（モックにより必ず1つ以上存在する）
+        expect(count).toBeGreaterThan(0);
 
         const articleCard = articles.first();
         await articleCard.click();
