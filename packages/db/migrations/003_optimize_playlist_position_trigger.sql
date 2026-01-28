@@ -8,7 +8,7 @@ BEGIN
   -- This prevents serialization with other operations on the playlists table (like updating name/metadata),
   -- while still strictly serializing insertions into the same playlist to maintain position integrity.
   -- pg_advisory_xact_lock automatically releases at the end of the transaction.
-  -- Using 2-argument form with a fixed namespace (123456789) and UUID-derived key to avoid 32-bit hash collisions.
+  -- Using 2-argument form with a fixed namespace (123456789) and integer hash derived from playlist_id to avoid 32-bit collisions.
   PERFORM pg_advisory_xact_lock(123456789, hashtext(NEW.playlist_id::text));
 
   -- Calculate and set the next position safely within the transaction

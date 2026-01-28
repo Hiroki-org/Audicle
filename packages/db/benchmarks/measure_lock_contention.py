@@ -50,7 +50,7 @@ async def setup_data(conn):
         VALUES ($1, $2, $3, $4)
     """, values)
 
-    return playlist_id, bookmark_ids
+    return playlist_id, bookmark_ids, user_email
 
 async def worker(pool, playlist_id, bookmark_ids):
     async with pool.acquire() as conn:
@@ -72,6 +72,8 @@ async def run_benchmark():
 
     print(f"Connecting to DB...")
     pool = None
+    playlist_id = None
+    user_email = None
     try:
         pool = await asyncpg.create_pool(
             DB_URL,
@@ -81,7 +83,7 @@ async def run_benchmark():
 
         print("Setting up test data...")
         async with pool.acquire() as conn:
-            playlist_id, all_bm_ids = await setup_data(conn)
+            playlist_id, all_bm_ids, user_email = await setup_data(conn)
 
         print(f"Starting benchmark: {CONCURRENCY} workers, {ITEMS_PER_WORKER} items each.")
 
@@ -135,29 +137,33 @@ async def run_benchmark():
                 else:
                      print("⚠️ Positions have gaps.")
 
-        # Cleanup test data
-        print("Cleaning up test data...")
-        async with pool.acquire() as conn:
-            # Delete playlist items
-            await conn.execute("""
-                DELETE FROM playlist_items WHERE playlist_id = $1
-            """, playlist_id)
-            
-            # Delete bookmarks created by this benchmark
-            await conn.execute("""
-                DELETE FROM bookmarks WHERE owner_email LIKE 'bench_%@example.com'
-            """)
-            
-            # Delete playlist
-            await conn.execute("""
-                DELETE FROM playlists WHERE id = $1
-            """, playlist_id)
-        
-        print("✅ Test data cleaned up successfully.")
-
     except Exception as e:
         print(f"An error occurred during the benchmark: {e}")
     finally:
+        # Cleanup test data
+        if pool and playlist_id and user_email:
+            try:
+                print("Cleaning up test data...")
+                async with pool.acquire() as conn:
+                    # Delete playlist items
+                    await conn.execute("""
+                        DELETE FROM playlist_items WHERE playlist_id = $1
+                    """, playlist_id)
+                    
+                    # Delete bookmarks created by this benchmark run
+                    await conn.execute("""
+                        DELETE FROM bookmarks WHERE owner_email = $1
+                    """, user_email)
+                    
+                    # Delete playlist
+                    await conn.execute("""
+                        DELETE FROM playlists WHERE id = $1
+                    """, playlist_id)
+                
+                print("✅ Test data cleaned up successfully.")
+            except Exception as cleanup_error:
+                print(f"⚠️ Error during cleanup: {cleanup_error}")
+        
         if pool:
             print("Closing DB pool...")
             await pool.close()
