@@ -105,21 +105,22 @@ async function seedTestData() {
     console.log("2. テスト記事を作成中...");
     const articles = [
         // E2Eテスト用の固定記事（Apple, Banana, Cherry）
+        // 抽出処理が成功するように、実際に存在するURL（example.comのルート）を使用し、クエリパラメータで識別する
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/apple?a=1",
+            url: "https://example.com/?id=apple",
             title: "Apple",
             thumbnail_url: "https://via.placeholder.com/300",
         },
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/banana?b=2",
+            url: "https://example.com/?id=banana",
             title: "Banana",
             thumbnail_url: "https://via.placeholder.com/300",
         },
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/cherry?c=3",
+            url: "https://example.com/?id=cherry",
             title: "Cherry",
             thumbnail_url: "https://via.placeholder.com/300",
         },
