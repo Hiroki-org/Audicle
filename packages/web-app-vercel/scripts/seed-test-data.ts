@@ -20,14 +20,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const TEST_USER_ID = "test-user-id-123";
-
-if (!process.env.TEST_USER_EMAIL) {
-    console.warn("⚠️ TEST_USER_EMAIL が環境変数に設定されていません。デフォルトの test@example.com を使用します。");
-    console.warn("   テストコードで認証されるユーザーのメールアドレスと、シードデータの TEST_USER_EMAIL は必ず一致させてください。");
-    console.warn("   例: .env.test.local に TEST_USER_EMAIL を設定し、テストでも同じ値を使用してください。");
-}
-
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
+
+console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 async function runMigrations() {
     console.log("マイグレーションを実行中...");

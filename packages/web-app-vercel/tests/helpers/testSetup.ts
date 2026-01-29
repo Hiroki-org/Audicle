@@ -43,13 +43,3 @@ export async function setDefaultSort(page: Page) {
         localStorage.setItem(key, 'newest');
     }, STORAGE_KEYS.HOME_SORT);
 }
-
-/**
- * デフォルトプレイリストのLocatorを取得する
- * プレイリストリストページで「デフォルトプレイリスト」のLocatorを返します
- */
-export function getDefaultPlaylistLocator(page: Page) {
-    return page
-        .locator('a[data-testid="playlist-item"]')
-        .filter({ hasText: 'デフォルトプレイリスト' });
-}
