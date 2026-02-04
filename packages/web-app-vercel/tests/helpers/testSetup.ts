@@ -2,7 +2,8 @@ import { Page } from '@playwright/test';
 import { STORAGE_KEYS } from '@/lib/constants';
 
 /**
- * localStorageをクリアする（ページ遷移後に呼び出す）
+ * localStorageのみをクリアする（認証状態を保持）
+ * ソート順などの設定をリセットしたい場合に使用
  */
 export async function clearLocalStorage(page: Page) {
     try {
@@ -17,8 +18,32 @@ export async function clearLocalStorage(page: Page) {
             /* noop */
         }
 
-        // Also clear cookies in the context to avoid persisted auth/session
-        // interfering with isolated tests.
+        // Note: We intentionally do NOT clear cookies here to preserve auth session.
+        // Use clearLocalStorageAndCookies if you need to clear everything.
+
+        await page.evaluate(() => {
+            localStorage.clear();
+            try { sessionStorage.clear(); } catch (e) { /* ignore */ }
+        });
+    } catch (error) {
+        // localStorageアクセスできない場合は無視（デフォルト値が使われる）
+        console.warn('localStorage clear failed:', error);
+    }
+}
+
+/**
+ * localStorageとCookiesを両方クリアする（完全にリセット）
+ * 認証状態もクリアされるため、未認証状態でのテストに使用
+ */
+export async function clearLocalStorageAndCookies(page: Page) {
+    try {
+        try {
+            await page.goto('/');
+            await page.waitForLoadState('load');
+        } catch (e) {
+            /* noop */
+        }
+
         try {
             await page.context().clearCookies();
         } catch (e) {
@@ -30,8 +55,7 @@ export async function clearLocalStorage(page: Page) {
             try { sessionStorage.clear(); } catch (e) { /* ignore */ }
         });
     } catch (error) {
-        // localStorageアクセスできない場合は無視（デフォルト値が使われる）
-        console.warn('localStorage clear failed:', error);
+        console.warn('localStorage/cookies clear failed:', error);
     }
 }
 
