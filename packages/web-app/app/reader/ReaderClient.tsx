@@ -6,7 +6,7 @@ import ReaderView from "@/components/ReaderView";
 import { Chunk } from "@/types/api";
 import { extractContent } from "@/lib/api";
 import { usePlayback } from "@/hooks/usePlayback";
-import { articleStorage, type Article } from "@/lib/storage";
+import { articleStorage } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 import { Play, Pause } from "lucide-react";
 
@@ -41,7 +41,7 @@ export default function ReaderPageClient() {
       if (article) {
         logger.info("記事を読み込み", { id: articleId, title: article.title });
         setTitle(article.title);
-        setChunks(article.chunks);
+        setChunks(article.chunks || []);
         setUrl(article.url);
       } else {
         logger.warn("記事が見つかりません", { id: articleId });
@@ -68,7 +68,7 @@ export default function ReaderPageClient() {
       setTitle(response.title);
 
       // 記事を保存
-      const newArticle: Article = {
+      const newArticle = {
         id: Date.now().toString(),
         url,
         title: response.title,
