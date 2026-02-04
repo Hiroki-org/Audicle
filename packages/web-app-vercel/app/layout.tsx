@@ -2,7 +2,6 @@
 
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import dynamic from "next/dynamic";
 import ClientLayout from "./client-layout";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import { STORAGE_KEYS } from "@/lib/constants";

@@ -10,7 +10,6 @@ import { useSession } from "next-auth/react";
 import { useUserSettings } from "@/lib/hooks/useUserSettings";
 import SessionProviderWrapper from "./session-provider-wrapper";
 import { applyTheme, getCurrentTheme } from "@/lib/theme";
-import { DEFAULT_SETTINGS, ColorTheme } from "@/types/settings";
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const queryClient = useMemo(
@@ -43,7 +42,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
 }
 
 function Content({ children }: { children: ReactNode }) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const { data: userSettings } = useUserSettings();
 
   // Initialize theme on mount
