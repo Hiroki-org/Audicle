@@ -13,7 +13,7 @@ jobs:
         working-directory: packages/web-app-vercel
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -36,7 +36,7 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
@@ -93,7 +93,7 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
@@ -133,7 +133,7 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
@@ -173,7 +173,7 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
@@ -212,7 +212,7 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
