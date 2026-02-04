@@ -409,12 +409,24 @@ function preparePage() {
     if (container) {
       const allElements = container.querySelectorAll("*");
       let paragraphId = 0;
+      const tasks = [];
       allElements.forEach((el) => {
         if (shouldUseElementForPlayback(el)) {
-          prepareClickableElement(el, paragraphId);
+          tasks.push({ element: el, id: paragraphId });
           paragraphId++;
         }
       });
+
+      const cache = new Map();
+      const results = tasks.map((task) => ({
+        task,
+        palette: computeAdaptiveColors(task.element, cache),
+      }));
+
+      results.forEach(({ task, palette }) => {
+        applyClickableStyles(task.element, task.id, palette);
+      });
+
       preparedWithCustomRule = paragraphId > 0;
     }
   }
@@ -424,12 +436,23 @@ function preparePage() {
     const selectors = "article p, main p, .post-body p, .entry-content p";
     const paragraphs = document.querySelectorAll(selectors);
     let paragraphId = 0;
+    const tasks = [];
     paragraphs.forEach((p) => {
       const text = (p.textContent || "").trim();
       if (shouldUseElementForPlayback(p, text)) {
-        prepareClickableElement(p, paragraphId);
+        tasks.push({ element: p, id: paragraphId });
         paragraphId++;
       }
+    });
+
+    const cache = new Map();
+    const results = tasks.map((task) => ({
+      task,
+      palette: computeAdaptiveColors(task.element, cache),
+    }));
+
+    results.forEach(({ task, palette }) => {
+      applyClickableStyles(task.element, task.id, palette);
     });
   }
   if (!isClickAttached) {
@@ -478,10 +501,14 @@ function prepareClickableElement(element, paragraphId) {
     return;
   }
 
+  const palette = computeAdaptiveColors(element);
+  applyClickableStyles(element, paragraphId, palette);
+}
+
+function applyClickableStyles(element, paragraphId, palette) {
   element.dataset.audicleId = paragraphId;
   element.classList.add("audicle-clickable");
 
-  const palette = computeAdaptiveColors(element);
   element.style.setProperty("--audicle-hover-bg", palette.hoverBg);
   element.style.setProperty("--audicle-hover-outline", palette.hoverOutline);
 }
@@ -840,6 +867,7 @@ function buildQueueWithNewRulesManager() {
 
   // 抽出されたブロックを200文字分割キューに変換
   const queue = [];
+  const styleTasks = [];
 
   extraction.forEach((item, blockIndex) => {
     const element = item.element;
@@ -855,7 +883,7 @@ function buildQueueWithNewRulesManager() {
 
     // 要素にIDとクラスを設定（ハイライト用）
     if (element) {
-      prepareClickableElement(element, paragraphId);
+      styleTasks.push({ element, id: paragraphId });
     }
 
     // 200文字ごとに分割して音声キューに追加
@@ -885,6 +913,17 @@ function buildQueueWithNewRulesManager() {
         });
       }
     }
+  });
+
+  // Batch process styles
+  const cache = new Map();
+  const styleResults = styleTasks.map((task) => ({
+    task,
+    palette: computeAdaptiveColors(task.element, cache),
+  }));
+
+  styleResults.forEach(({ task, palette }) => {
+    applyClickableStyles(task.element, task.id, palette);
   });
 
   const info = {
@@ -1141,6 +1180,7 @@ function convertBlocksToQueue(blocks) {
   );
 
   const queue = [];
+  const styleTasks = [];
 
   blocks.forEach((block, index) => {
     // 各ブロックのテキストをchunkSize文字ごとに分割
@@ -1159,8 +1199,19 @@ function convertBlocksToQueue(blocks) {
 
     // 要素にIDとクラスを設定（ハイライト用）
     if (block.element) {
-      prepareClickableElement(block.element, block.id);
+      styleTasks.push({ element: block.element, id: block.id });
     }
+  });
+
+  // Batch process styles
+  const cache = new Map();
+  const styleResults = styleTasks.map((task) => ({
+    task,
+    palette: computeAdaptiveColors(task.element, cache),
+  }));
+
+  styleResults.forEach(({ task, palette }) => {
+    applyClickableStyles(task.element, task.id, palette);
   });
 
   console.log(`[RulesManager] Converted to ${queue.length} queue chunks`);
@@ -1187,11 +1238,13 @@ function buildQueueWithCustomRule(rule) {
     "elements"
   );
 
+  const styleTasks = [];
+
   allElements.forEach((el) => {
     const tagName = el.tagName.toLowerCase();
     const text = (el.textContent || "").trim();
     if (shouldUseElementForPlayback(el, text)) {
-      prepareClickableElement(el, paragraphId);
+      styleTasks.push({ element: el, id: paragraphId });
       console.log(
         "buildQueueWithCustomRule: Added element",
         tagName,
@@ -1208,6 +1261,16 @@ function buildQueueWithCustomRule(rule) {
       }
       paragraphId++;
     }
+  });
+
+  const cache = new Map();
+  const styleResults = styleTasks.map((task) => ({
+    task,
+    palette: computeAdaptiveColors(task.element, cache),
+  }));
+
+  styleResults.forEach(({ task, palette }) => {
+    applyClickableStyles(task.element, task.id, palette);
   });
 
   console.log(
@@ -1545,8 +1608,8 @@ function fullBatchFetch(callback) {
   if (callback) callback();
 }
 
-function computeAdaptiveColors(element) {
-  const baseBackground = getEffectiveBackgroundColor(element);
+function computeAdaptiveColors(element, cache = null) {
+  const baseBackground = getEffectiveBackgroundColor(element, cache);
   const textColor = getEffectiveTextColor(element);
 
   const baseLum = getRelativeLuminance(baseBackground);
@@ -1592,26 +1655,36 @@ function getEffectiveTextColor(element) {
   return parsed || { r: 32, g: 32, b: 32, a: 1 };
 }
 
-function getEffectiveBackgroundColor(element) {
-  let current = element;
-  while (current && current !== document.documentElement) {
-    const style = window.getComputedStyle(current);
-    const parsed = parseColorString(style.backgroundColor);
-    if (parsed && parsed.a > 0.01) {
-      return { r: parsed.r, g: parsed.g, b: parsed.b, a: 1 };
-    }
-    current = current.parentElement;
+function getEffectiveBackgroundColor(element, cache = null) {
+  if (cache && cache.has(element)) {
+    return cache.get(element);
   }
 
-  const body = document.body || document.documentElement;
-  const bodyColor = parseColorString(
-    window.getComputedStyle(body).backgroundColor
-  );
-  if (bodyColor) {
-    return { r: bodyColor.r, g: bodyColor.g, b: bodyColor.b, a: 1 };
+  if (!element || element === document.documentElement) {
+    const body = document.body || document.documentElement;
+    const bodyColor = parseColorString(
+      window.getComputedStyle(body).backgroundColor
+    );
+    const result = bodyColor
+      ? { r: bodyColor.r, g: bodyColor.g, b: bodyColor.b, a: 1 }
+      : { r: 255, g: 255, b: 255, a: 1 };
+
+    if (cache) cache.set(element, result);
+    return result;
   }
 
-  return { r: 255, g: 255, b: 255, a: 1 };
+  const style = window.getComputedStyle(element);
+  const parsed = parseColorString(style.backgroundColor);
+  let result;
+
+  if (parsed && parsed.a > 0.01) {
+    result = { r: parsed.r, g: parsed.g, b: parsed.b, a: 1 };
+  } else {
+    result = getEffectiveBackgroundColor(element.parentElement, cache);
+  }
+
+  if (cache) cache.set(element, result);
+  return result;
 }
 
 function ensureTextContrast(backgroundColor, preferredTextColor) {
