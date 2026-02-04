@@ -85,9 +85,17 @@ def _merge_punctuation(sentences: List[str], delimiters: set) -> List[str]:
     i = 0
     while i < len(sentences):
         current_sentence = sentences[i]
-        while i + 1 < len(sentences) and sentences[i+1] in delimiters:
+        # Common case: 0 or 1 delimiter
+        if i + 1 < len(sentences) and sentences[i+1] in delimiters:
             current_sentence += sentences[i+1]
             i += 1
+            # Edge case: Multiple delimiters (use list/join for efficiency)
+            if i + 1 < len(sentences) and sentences[i+1] in delimiters:
+                parts = [current_sentence]
+                while i + 1 < len(sentences) and sentences[i+1] in delimiters:
+                    parts.append(sentences[i+1])
+                    i += 1
+                current_sentence = "".join(parts)
         merged_sentences.append(current_sentence)
         i += 1
     return merged_sentences
