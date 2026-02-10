@@ -127,23 +127,46 @@ test.describe('人気記事（認証済み）', () => {
         await expect(page.locator('h1, [data-testid="article-title"]')).toBeVisible();
     });
 
-    test.skip('人気記事からの音声再生', async ({ page }) => {
-        // TODO: 音声プレーヤー実装完了後に有効化
-        // このテストは音声再生機能の実装を待っている
-        await page.goto('/popular');
+    test('人気記事からの音声再生', async ({ page }) => {
+        // gotoとwaitForResponseを同時に実行（他のテストと同様）
+        await Promise.all([
+            page.waitForResponse(
+                resp => resp.url().includes('/api/stats/popular') && resp.status() === 200,
+                { timeout: 15000 }
+            ),
+            page.goto('/popular')
+        ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
 
-        const articleCard = page.locator('[data-testid="article-card"]').first();
+        // Reactの状態更新とレンダリングを待つ
+        await page.waitForTimeout(2000);
+
+        const articles = page.locator('[data-testid="article-card"]');
+        const count = await articles.count();
+
+        if (count === 0) {
+            console.log('No popular articles available, skipping test');
+            test.skip();
+        }
+
+        const articleCard = articles.first();
         await articleCard.click();
 
-        // 音声プレーヤーが表示される
-        await expect(page.locator('[data-testid="audio-player"]')).toBeVisible();
+        // /readerページに遷移することを確認
+        await expect(page).toHaveURL(/\/reader/);
+
+        // 音声プレーヤー（再生ボタン）が表示されるのを待つ
+        // モバイル/デスクトップで表示状態が異なるため、visibleなものを探す
+        const playButton = page.locator('[data-testid="play-button"]').filter({ hasNot: page.locator('.hidden') }).first();
+        // または単に :visible 擬似クラスを使用
+        // const playButton = page.locator('[data-testid="play-button"]:visible');
+
+        await expect(page.locator('[data-testid="play-button"]:visible')).toBeVisible({ timeout: 10000 });
 
         // 再生ボタンをクリック
-        await page.click('[data-testid="play-button"]');
+        await page.locator('[data-testid="play-button"]:visible').click();
 
-        // 音声が再生される
-        const audio = page.locator('audio');
-        await expect(audio).toHaveJSProperty('paused', false);
+        // 一時停止ボタンが表示される（再生状態になった）ことを確認
+        await expect(page.locator('[data-testid="pause-button"]:visible')).toBeVisible();
     });
 });
 
