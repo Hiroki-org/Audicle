@@ -11,6 +11,9 @@ import {
 } from '../indexedDB';
 
 // Polyfill structuredClone for JSDOM
+// NOTE: This is a simplified implementation sufficient for AudioCacheEntry (Blob, primitive types, arrays, plain objects).
+// It does not support Map, Set, Date, RegExp, or circular references.
+// If the data structure becomes more complex, consider using a full polyfill like 'core-js' or 'structured-clone'.
 if (!global.structuredClone) {
     global.structuredClone = function mockStructuredClone(obj: any): any {
         if (obj instanceof Blob) return obj;
