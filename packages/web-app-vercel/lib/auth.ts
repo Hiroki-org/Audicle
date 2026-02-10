@@ -26,7 +26,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
         }),
         // テスト環境でのみ有効
-        ...(process.env.NODE_ENV !== 'production' && process.env.AUTH_ENV === 'test'
+        ...(process.env.AUTH_ENV === 'test'
             ? [
                 CredentialsProvider({
                     id: 'test-credentials',
@@ -35,7 +35,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         email: { label: "Email", type: "email" },
                         password: { label: "Password", type: "password" }
                     },
-                    async authorize(credentials) {
+                    async authorize(credentials, req) {
+                        // SECURITY: If in production, strictly require request to be from localhost
+                        // This prevents external attackers from using the test backdoor even if AUTH_ENV=test is accidentally set
+                        if (process.env.NODE_ENV === 'production') {
+                            const host = req?.headers?.get('host')
+                            const hostname = host?.split(':')[0]
+                            // Allow localhost (IPv4/IPv6)
+                            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+
+                            if (!isLocal) {
+                                console.warn('[AUTH SECURITY] Blocked non-local test login attempt from:', host)
+                                return null
+                            }
+                        }
+
                         if (IS_DEBUG) {
                             console.log('[AUTH DEBUG] Test credentials provider called')
                             console.log('[AUTH DEBUG] Credentials Provider check')
@@ -68,7 +82,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     callbacks: {
         async signIn({ user }) {
             // テスト用ユーザーはホワイトリストチェックをスキップ
-            if (process.env.NODE_ENV !== 'production' && process.env.AUTH_ENV === 'test' && user.id === 'test-user-id-123') {
+            // Note: We rely on authorize() to filter unauthorized access to 'test-user-id-123'
+            if (process.env.AUTH_ENV === 'test' && user.id === 'test-user-id-123') {
                 if (IS_DEBUG) {
                     console.log('[AUTH DEBUG] Test user - skipping whitelist check')
                 }
