@@ -217,6 +217,7 @@ async function seedTestData() {
     // 3. 人気記事の統計データを作成（access_count >= 5）
     console.log("3. 人気記事の統計データを作成中...");
     const popularArticles = createdArticles.slice(2);
+    const now = new Date().toISOString();
     const fixedAccessCounts = [15, 20, 25];
 
     const statsData = popularArticles.map((article, i) => {
@@ -230,7 +231,7 @@ async function seedTestData() {
             unique_users: 10,
             cache_hit_rate: 0.85,
             is_fully_cached: true,
-            last_accessed_at: new Date().toISOString(),
+            last_accessed_at: now,
         };
     });
 
