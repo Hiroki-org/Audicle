@@ -174,3 +174,35 @@ describe('safeFetch', () => {
         await expect(safeFetch('http://example.com')).rejects.toThrow('Blocked access');
     });
 });
+
+    test('should block if ANY resolved IP is private (multiple A records)', (done) => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            // Simulate multiple IPs: one public, one private
+            callback(null, [
+                { address: '93.184.216.34', family: 4 },
+                { address: '127.0.0.1', family: 4 }
+            ]);
+        });
+
+        safeLookup('mixed-dns.com', {}, (err, address, family) => {
+            expect(err).toBeTruthy();
+            expect(err!.message).toContain('Blocked access');
+            done();
+        });
+    });
+
+    test('should block if ANY resolved IP is private (multiple A records) - reverse order', (done) => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            // Simulate multiple IPs: one private, one public
+            callback(null, [
+                { address: '127.0.0.1', family: 4 },
+                { address: '93.184.216.34', family: 4 }
+            ]);
+        });
+
+        safeLookup('mixed-dns-reverse.com', {}, (err, address, family) => {
+            expect(err).toBeTruthy();
+            expect(err!.message).toContain('Blocked access');
+            done();
+        });
+    });

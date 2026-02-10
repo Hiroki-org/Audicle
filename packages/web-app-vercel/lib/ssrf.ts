@@ -58,34 +58,39 @@ export function safeLookup(
     options: any,
     callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
 ): void {
-    dns.lookup(hostname, options, (err, address, family) => {
-        if (err) return callback(err, address as string, family);
+    // Always request all addresses to check for any unsafe IPs (e.g. DNS rebinding via multiple A records)
+    dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
+        if (err) return callback(err, '', 0);
 
-        // dns.lookup might return string or object depending on options
-        // But http.request usually calls it expecting (err, address, family) where address is string
-        // unless all: true is passed.
-
-        const addrToCheck = Array.isArray(address) ? address[0].address : (address as string);
-
-        if (!addrToCheck) {
+        if (!addresses || (Array.isArray(addresses) && addresses.length === 0)) {
              // Should not happen on success, but just in case
-             return callback(null, address as string, family);
-        }
-
-        try {
-            const ip = ipaddr.parse(addrToCheck);
-            if (ip.range() !== 'unicast') {
-                const error = new Error(`SSRF: Blocked access to ${addrToCheck}`);
-                (error as any).code = 'ENOTFOUND'; // Simulate DNS failure for blocked IPs
-                return callback(error as NodeJS.ErrnoException, '', 0);
-            }
-        } catch (_e) {
-             const error = new Error(`SSRF: Invalid IP ${addrToCheck}`);
-             (error as any).code = 'EINVAL';
+             // Fallback to error or empty string if no addresses found
+             const error = new Error(`DNS lookup for ${hostname} returned no addresses`);
+             (error as any).code = 'ENOTFOUND';
              return callback(error as NodeJS.ErrnoException, '', 0);
         }
 
-        callback(null, address as string, family);
+        // Ensure addresses is an array (dns.lookup with all: true returns array of objects)
+        const addrList = (Array.isArray(addresses) ? addresses : [addresses]) as { address: string; family: number }[];
+
+        for (const { address } of addrList) {
+            try {
+                const ip = ipaddr.parse(address);
+                if (ip.range() !== 'unicast') {
+                    const error = new Error(`SSRF: Blocked access to non-unicast address ${address}`);
+                    (error as any).code = 'ENOTFOUND'; // Simulate DNS failure for blocked IPs
+                    return callback(error as NodeJS.ErrnoException, '', 0);
+                }
+            } catch (_e) {
+                 const error = new Error(`SSRF: Invalid IP ${address}`);
+                 (error as any).code = 'EINVAL';
+                 return callback(error as NodeJS.ErrnoException, '', 0);
+            }
+        }
+
+        // If all addresses are safe, use the first one (as http.request expects a single address for the connection)
+        const first = addrList[0];
+        callback(null, first.address, first.family);
     });
 }
 
