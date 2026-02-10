@@ -83,7 +83,7 @@ describe('isSafeUrl', () => {
                         { address: '127.0.0.1', family: 4 },
                     ]);
                 } else {
-                    callback(null, '93.184.216.34', 4);
+                    callback(null, "93.184.216.34", 4);
                 }
             }
         }));
@@ -93,5 +93,84 @@ describe('isSafeUrl', () => {
 
         jest.dontMock('dns');
         jest.resetModules();
+    });
+});
+
+import { safeLookup, safeFetch } from '../ssrf';
+import dns from 'dns';
+
+describe('safeLookup', () => {
+    let lookupSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+        lookupSpy = jest.spyOn(dns, 'lookup');
+    });
+
+    afterEach(() => {
+        lookupSpy.mockRestore();
+    });
+
+    test('should allow public IP', (done) => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            callback(null, "93.184.216.34", 4);
+        });
+
+        safeLookup('example.com', {}, (err, address, family) => {
+            expect(err).toBeNull();
+            expect(address).toBe('93.184.216.34');
+            done();
+        });
+    });
+
+    test('should block private IP', (done) => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            callback(null, "127.0.0.1", 4);
+        });
+
+        safeLookup('localhost', {}, (err, address, family) => {
+            expect(err).toBeTruthy();
+            expect(err!.message).toContain('Blocked access');
+            done();
+        });
+    });
+
+    test('should block AWS metadata IP', (done) => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            callback(null, "169.254.169.254", 4);
+        });
+
+        safeLookup('metadata', {}, (err, address, family) => {
+            expect(err).toBeTruthy();
+            expect(err!.message).toContain('Blocked access');
+            done();
+        });
+    });
+});
+
+describe('safeFetch', () => {
+    let lookupSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+        lookupSpy = jest.spyOn(dns, 'lookup');
+    });
+
+    afterEach(() => {
+        lookupSpy.mockRestore();
+    });
+
+    test('should reject request to private IP', async () => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            callback(null, "127.0.0.1", 4);
+        });
+
+        await expect(safeFetch('http://example.com')).rejects.toThrow('Blocked access');
+    });
+
+    test('should reject request to AWS metadata IP', async () => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            callback(null, "169.254.169.254", 4);
+        });
+
+        await expect(safeFetch('http://example.com')).rejects.toThrow('Blocked access');
     });
 });

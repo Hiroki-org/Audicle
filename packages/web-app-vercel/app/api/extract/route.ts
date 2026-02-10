@@ -3,7 +3,7 @@ import { Readability } from '@mozilla/readability';
 import { normalizeArticleText } from '@/lib/parseArticle';
 import { parseHTML } from 'linkedom';
 import { ExtractResponse } from '@/types/api';
-import { isSafeUrl } from '@/lib/ssrf';
+import { isSafeUrl, safeFetch } from '@/lib/ssrf';
 
 // Node.js runtimeを明示的に指定（JSDOMはEdge Runtimeで動作しない）
 export const runtime = 'nodejs';
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
         }
 
         // SSRFチェック (initial check)
+        // Note: safeFetch also performs SSRF checks, but this provides early feedback
         if (!(await isSafeUrl(url))) {
             console.warn('[Extract API] SSRF attempt blocked:', url);
             return NextResponse.json(
@@ -159,9 +160,8 @@ async function fetchWithTimeout(url: string, timeout: number = 8000): Promise<st
 
     try {
         while (redirectCount < maxRedirects) {
-            const response = await fetch(currentUrl, {
+            const response = await safeFetch(currentUrl, {
                 signal: controller.signal,
-                redirect: 'manual', // 自動リダイレクトを無効化
                 headers: {
                     'User-Agent':
                         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
