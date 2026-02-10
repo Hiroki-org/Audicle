@@ -121,13 +121,6 @@ export function PlaybackSpeedDial({
     [onValueChange, onOpenChange, speeds]
   );
 
-  const handlePresetClick = useCallback(
-    (speed: number) => {
-      onValueChange(speed);
-    },
-    [onValueChange]
-  );
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
