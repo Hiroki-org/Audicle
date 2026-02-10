@@ -79,84 +79,99 @@ MAX_TTS_BYTES = 5000
 MAX_CONCURRENT_TTS_REQUESTS = int(os.getenv("MAX_CONCURRENT_TTS_REQUESTS", "10"))
 
 
-def _merge_punctuation(sentences: List[str], delimiters: set) -> List[str]:
-    """句読点を前の文に結合する"""
-    merged_sentences = []
+def _chunk_text(text: str, limit: int, separators: List[str]) -> List[str]:
+    """
+    Recursively splits text into chunks smaller than `limit` bytes using `separators`.
+
+    Args:
+        text: The text to split.
+        limit: The maximum byte size (UTF-8) per chunk.
+        separators: A list of regex patterns to split by, in order of priority.
+                    Patterns should capture the delimiter (e.g., r'([。])') so it can be preserved.
+    """
+    # Check if text fits in limit
+    if len(text.encode('utf-8')) <= limit:
+        return [text]
+
+    # If no separators left, force split by byte limit
+    if not separators:
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = start + limit
+            # Adjust end to avoid splitting multi-byte characters
+            # and ensure chunk size <= limit
+            while len(text[start:end].encode('utf-8')) > limit:
+                end -= 1
+
+            # Safety check to prevent infinite loop if a single char > limit (unlikely for UTF-8 and decent limit)
+            if end <= start:
+                end = start + 1
+
+            chunks.append(text[start:end])
+            start = end
+        return chunks
+
+    # Use first separator
+    sep_pattern = separators[0]
+    next_separators = separators[1:]
+
+    # Split text. Regex should capture delimiters so they are included in the list.
+    # e.g., re.split(r'([。])', "A。B") -> ["A", "。", "B"]
+    parts = [s for s in re.split(sep_pattern, text) if s]
+
+    # Merge punctuation/delimiters back to the previous sentence
+    merged_parts = []
     i = 0
-    while i < len(sentences):
-        current_sentence = sentences[i]
-        # Common case: 0 or 1 delimiter
-        if i + 1 < len(sentences) and sentences[i+1] in delimiters:
-            current_sentence += sentences[i+1]
-            i += 1
-            # Edge case: Multiple delimiters (use list/join for efficiency)
-            if i + 1 < len(sentences) and sentences[i+1] in delimiters:
-                parts = [current_sentence]
-                while i + 1 < len(sentences) and sentences[i+1] in delimiters:
-                    parts.append(sentences[i+1])
-                    i += 1
-                current_sentence = "".join(parts)
-        merged_sentences.append(current_sentence)
+    while i < len(parts):
+        current = parts[i]
+
+        # Check if next part matches the separator pattern (is a delimiter)
+        if i + 1 < len(parts) and re.fullmatch(sep_pattern, parts[i+1]):
+             current += parts[i+1]
+             i += 1
+
+             # Handle consecutive delimiters (e.g., "Hello!!!")
+             # Keep appending as long as they match the pattern
+             while i + 1 < len(parts) and re.fullmatch(sep_pattern, parts[i+1]):
+                 current += parts[i+1]
+                 i += 1
+
+        merged_parts.append(current)
         i += 1
-    return merged_sentences
 
+    parts = merged_parts
 
-def _split_text(text: str) -> List[str]:
-    """テキストをGoogle Cloud TTS APIの制限内に分割する"""
+    # Accumulate parts into chunks
     chunks = []
     current_chunk = ""
-    # 。、！、？、\nなどで分割
-    sentences = [s for s in re.split(r'([。！？\n])', text) if s]
-    sentences = _merge_punctuation(sentences, {'。', '！', '？', '\n'})
 
-    for sentence in sentences:
-        if len((current_chunk + sentence).encode('utf-8')) > MAX_TTS_BYTES:
-            if current_chunk:
-                chunks.append(current_chunk)
-            current_chunk = sentence
+    for part in parts:
+        if len((current_chunk + part).encode('utf-8')) > limit:
+             if current_chunk:
+                 chunks.append(current_chunk)
+             current_chunk = part
         else:
-            current_chunk += sentence
+             current_chunk += part
 
     if current_chunk:
         chunks.append(current_chunk)
 
-    # 1文が5000バイトを超える場合の処理
+    # Recursively process any chunks that are still too big
     final_chunks = []
     for chunk in chunks:
-        if len(chunk.encode('utf-8')) > MAX_TTS_BYTES:
-            # さらに句読点「、」で分割
-            sub_sentences = [s for s in re.split(r'(、)', chunk) if s]
-            sub_sentences = _merge_punctuation(sub_sentences, {'、'})
-
-            sub_chunk = ""
-            for s in sub_sentences:
-                if len((sub_chunk + s).encode('utf-8')) > MAX_TTS_BYTES:
-                    if sub_chunk:
-                        final_chunks.append(sub_chunk)
-                    sub_chunk = s
-                else:
-                    sub_chunk += s
-            if sub_chunk:
-                final_chunks.append(sub_chunk)
+        if len(chunk.encode('utf-8')) > limit:
+            final_chunks.extend(_chunk_text(chunk, limit, next_separators))
         else:
             final_chunks.append(chunk)
 
-    # それでも5000バイトを超えるチャンクを強制的に分割
-    result_chunks = []
-    for chunk in final_chunks:
-        if len(chunk.encode('utf-8')) > MAX_TTS_BYTES:
-            start = 0
-            while start < len(chunk):
-                end = start + MAX_TTS_BYTES
-                # utf-8のバイト境界を考慮
-                while len(chunk[start:end].encode('utf-8')) > MAX_TTS_BYTES:
-                    end -= 1
-                result_chunks.append(chunk[start:end])
-                start = end
-        else:
-            result_chunks.append(chunk)
+    return final_chunks
 
-    return result_chunks
+
+def _split_text(text: str) -> List[str]:
+    """テキストをGoogle Cloud TTS APIの制限内に分割する"""
+    # First split by major punctuation, then by comma if needed, then force split
+    return _chunk_text(text, MAX_TTS_BYTES, [r'([。！？\n])', r'(、)'])
 
 
 async def _synthesize_to_bytes(text: str, voice: str) -> bytes:
