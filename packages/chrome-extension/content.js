@@ -496,15 +496,6 @@ function shouldUseElementForPlayback(element, providedText) {
   );
 }
 
-function prepareClickableElement(element, paragraphId) {
-  if (!element) {
-    return;
-  }
-
-  const palette = computeAdaptiveColors(element);
-  applyClickableStyles(element, paragraphId, palette);
-}
-
 function applyClickableStyles(element, paragraphId, palette) {
   element.dataset.audicleId = paragraphId;
   element.classList.add("audicle-clickable");
