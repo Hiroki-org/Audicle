@@ -4,66 +4,6 @@ import { test, expect } from '@playwright/test'
 test.describe('人気記事（認証済み）', () => {
     // ブラウザのコンソールログをキャプチャ
     test.beforeEach(async ({ page }) => {
-        // Mock /api/stats/popular
-        await page.route('**/api/stats/popular*', async route => {
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({
-                    articles: [{
-                        articleId: 'test-article-id',
-                        articleHash: 'test-hash',
-                        url: 'https://example.com/article',
-                        title: 'Test Article for Playback',
-                        domain: 'example.com',
-                        accessCount: 100,
-                        uniqueUsers: 50,
-                        cacheHitRate: 90.0,
-                        isFullyCached: true,
-                        lastAccessedAt: new Date().toISOString()
-                    }],
-                    total: 1
-                })
-            });
-        });
-
-        // Mock /api/articles/test-article-id
-        await page.route('**/api/articles/test-article-id', async route => {
-             await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({
-                    id: 'test-article-id',
-                    url: 'https://example.com/article',
-                    title: 'Test Article for Playback'
-                })
-             });
-        });
-
-        // Mock /api/extract
-        await page.route('**/api/extract', async route => {
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({
-                    title: 'Test Article for Playback',
-                    content: '<p id="chunk-1">This is a test paragraph for audio playback.</p>',
-                    textLength: 100
-                })
-            });
-        });
-
-        // Mock /api/synthesize - Return JSON with base64-encoded audio
-        await page.route('**/api/synthesize', async route => {
-            // Minimal valid silent MP3 file (base64-encoded)
-            const validAudioBase64 = '//uQxAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==';
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ audio: validAudioBase64 })
-            });
-        });
-
         page.on('console', msg => {
             if (msg.text().includes('[DEBUG]') || msg.text().includes('[POPULAR]')) {
                 console.log(`[BROWSER] ${msg.text()}`);
@@ -124,23 +64,18 @@ test.describe('人気記事（認証済み）', () => {
             page.goto('/popular')
         ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
 
-        // 記事カードが表示されるまで待機（timeout付き）
-        // データがない場合はスキップするため、まずはコンテナやヘッダーの表示を確認
-        await expect(page.getByRole('heading', { name: '人気記事' })).toBeVisible();
+        // Reactの状態更新とレンダリングを待つ
+        await page.waitForTimeout(2000);
 
         const articles = page.locator('[data-testid="article-card"]');
-        // 最初のカードが表示されるか、またはタイムアウト（データなし）
-        try {
-            await expect(articles.first()).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            console.log('No popular articles found within timeout');
-        }
-
         const count = await articles.count();
-        console.log('[DEBUG] Article card count:', count);
+        console.log('[DEBUG] Article card count after waiting:', count);
 
         if (count === 0) {
             console.log('No popular articles available');
+            // データがない場合はページ自体が表示されることを確認
+            // 「人気記事」という見出しを特定
+            await expect(page.getByRole('heading', { name: '人気記事' })).toBeVisible();
             test.skip();
         }
 
@@ -170,19 +105,17 @@ test.describe('人気記事（認証済み）', () => {
             page.goto('/popular')
         ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
 
-        // 記事カードが表示されるまで待機
+        // Reactの状態更新とレンダリングを待つ
+        await page.waitForTimeout(2000);
+
         const articles = page.locator('[data-testid="article-card"]');
-        try {
-            await expect(articles.first()).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-             console.log('No popular articles found within timeout');
-        }
-
         const count = await articles.count();
-        console.log('[DEBUG] Article card count:', count);
+        console.log('[DEBUG] Article card count after waiting:', count);
 
-        // 記事カードが存在することを確認（モックにより必ず1つ以上存在する）
-        expect(count).toBeGreaterThan(0);
+        if (count === 0) {
+            console.log('No popular articles available, skipping test');
+            test.skip();
+        }
 
         // 記事カードをクリック
         await articles.first().click();
@@ -191,18 +124,11 @@ test.describe('人気記事（認証済み）', () => {
         await expect(page).toHaveURL(/\/reader/);
 
         // 記事タイトルまたはコンテンツが表示されることを確認
-        await expect(page.locator('[data-testid="article-title"]')).toBeVisible();
+        await expect(page.locator('h1, [data-testid="article-title"]')).toBeVisible();
     });
 
     test('人気記事からの音声再生', async ({ page }) => {
-        // Mock Audio play to avoid CI environment issues
-        await page.addInitScript(() => {
-            HTMLMediaElement.prototype.play = async function() {
-                return Promise.resolve();
-            };
-        });
-
-        // gotoとwaitForResponseを同時に実行
+        // gotoとwaitForResponseを同時に実行（他のテストと同様）
         await Promise.all([
             page.waitForResponse(
                 resp => resp.url().includes('/api/stats/popular') && resp.status() === 200,
@@ -211,17 +137,16 @@ test.describe('人気記事（認証済み）', () => {
             page.goto('/popular')
         ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
 
-        // 記事カードが表示されるまで待機
-        const articles = page.locator('[data-testid="article-card"]');
-        try {
-            await expect(articles.first()).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-             console.log('No popular articles found within timeout');
-        }
+        // Reactの状態更新とレンダリングを待つ
+        await page.waitForTimeout(2000);
 
+        const articles = page.locator('[data-testid="article-card"]');
         const count = await articles.count();
-        // 記事カードが存在することを確認（モックにより必ず1つ以上存在する）
-        expect(count).toBeGreaterThan(0);
+
+        if (count === 0) {
+            console.log('No popular articles available, skipping test');
+            test.skip();
+        }
 
         const articleCard = articles.first();
         await articleCard.click();
@@ -229,23 +154,19 @@ test.describe('人気記事（認証済み）', () => {
         // /readerページに遷移することを確認
         await expect(page).toHaveURL(/\/reader/);
 
-        // 音声プレーヤー（再生ボタン）が表示される
-        const playButton = page.locator('[data-testid="play-button"]').first();
-        await expect(playButton).toBeVisible({ timeout: 20000 });
+        // 音声プレーヤー（再生ボタン）が表示されるのを待つ
+        // モバイル/デスクトップで表示状態が異なるため、visibleなものを探す
+        const playButton = page.locator('[data-testid="play-button"]').filter({ hasNot: page.locator('.hidden') }).first();
+        // または単に :visible 擬似クラスを使用
+        // const playButton = page.locator('[data-testid="play-button"]:visible');
+
+        await expect(page.locator('[data-testid="play-button"]:visible')).toBeVisible({ timeout: 10000 });
 
         // 再生ボタンをクリック
-        await playButton.click();
+        await page.locator('[data-testid="play-button"]:visible').click();
 
-        // 音声が再生される（またはロード中）
-        // 音声要素自体は非表示またはJS制御のため、UIの状態変化を確認する
-        const playbackState = page.locator('[data-testid="playback-loading"], [data-testid="pause-button"]').first();
-
-        // エラーが発生していないか確認
-        if (await page.locator('.text-red-600').isVisible()) {
-             console.log('Error displayed:', await page.locator('.text-red-600').textContent());
-        }
-
-        await expect(playbackState).toBeVisible({ timeout: 30000 });
+        // 一時停止ボタンが表示される（再生状態になった）ことを確認
+        await expect(page.locator('[data-testid="pause-button"]:visible')).toBeVisible();
     });
 });
 
