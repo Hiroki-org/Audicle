@@ -313,14 +313,39 @@ async function seedTestData() {
         });
     }
 
+    console.log(`   → 準備完了: ${playlistItems.length}件のアイテムを追加します`);
+
     if (playlistItems.length > 0) {
-        const { error: itemError } = await supabase.from("playlist_items").insert(playlistItems);
+        const { data: insertedItems, error: itemError } = await supabase
+            .from("playlist_items")
+            .insert(playlistItems)
+            .select();
 
         if (itemError) {
             console.error("プレイリストアイテムの追加に失敗:", itemError);
             process.exit(1);
         }
+
+        console.log(`   → API成功: 追加されたアイテム数: ${insertedItems?.length ?? 0}`);
+
+        // 検証: アイテムが正しく取得できるか確認
+        // 少し待機（念のため）
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const { count, error: verifyError } = await supabase
+            .from("playlist_items")
+            .select("*", { count: "exact", head: true })
+            .eq("playlist_id", defaultPlaylist.id);
+
+        if (verifyError) {
+             console.error("⚠️ 検証: プレイリストアイテムの確認に失敗:", verifyError);
+        } else {
+             console.log(`   → 検証: データベース上のアイテム数: ${count}`);
+        }
+    } else {
+        console.log("⚠️ 追加するプレイリストアイテムがありませんでした");
     }
+
     console.log("✓ プレイリストアイテムを追加しました");
 
     console.log("\n✅ テストデータの投入が完了しました！");
