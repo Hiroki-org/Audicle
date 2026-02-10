@@ -1,5 +1,5 @@
-
-import { isSafeUrl } from '../ssrf';
+import { isSafeUrl, safeLookup, safeFetch } from '../ssrf';
+import dns from 'dns';
 
 describe('isSafeUrl', () => {
     // Public/Safe URLs
@@ -96,9 +96,6 @@ describe('isSafeUrl', () => {
     });
 });
 
-import { safeLookup, safeFetch } from '../ssrf';
-import dns from 'dns';
-
 describe('safeLookup', () => {
     let lookupSpy: jest.SpyInstance;
 
@@ -111,11 +108,12 @@ describe('safeLookup', () => {
     });
 
     test('should allow public IP', (done) => {
+        // safeLookup uses { all: true } so we must return an array of objects
         lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
-            callback(null, "93.184.216.34", 4);
+            callback(null, [{ address: "93.184.216.34", family: 4 }]);
         });
 
-        safeLookup('example.com', {}, (err, address, family) => {
+        safeLookup('example.com', {}, (err, address, _family) => {
             expect(err).toBeNull();
             expect(address).toBe('93.184.216.34');
             done();
@@ -124,10 +122,10 @@ describe('safeLookup', () => {
 
     test('should block private IP', (done) => {
         lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
-            callback(null, "127.0.0.1", 4);
+            callback(null, [{ address: "127.0.0.1", family: 4 }]);
         });
 
-        safeLookup('localhost', {}, (err, address, family) => {
+        safeLookup('localhost', {}, (err, _address, _family) => {
             expect(err).toBeTruthy();
             expect(err!.message).toContain('Blocked access');
             done();
@@ -136,10 +134,42 @@ describe('safeLookup', () => {
 
     test('should block AWS metadata IP', (done) => {
         lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
-            callback(null, "169.254.169.254", 4);
+            callback(null, [{ address: "169.254.169.254", family: 4 }]);
         });
 
-        safeLookup('metadata', {}, (err, address, family) => {
+        safeLookup('metadata', {}, (err, _address, _family) => {
+            expect(err).toBeTruthy();
+            expect(err!.message).toContain('Blocked access');
+            done();
+        });
+    });
+
+    test('should block if ANY resolved IP is private (multiple A records)', (done) => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            // Simulate multiple IPs: one public, one private
+            callback(null, [
+                { address: '93.184.216.34', family: 4 },
+                { address: '127.0.0.1', family: 4 }
+            ]);
+        });
+
+        safeLookup('mixed-dns.com', {}, (err, _address, _family) => {
+            expect(err).toBeTruthy();
+            expect(err!.message).toContain('Blocked access');
+            done();
+        });
+    });
+
+    test('should block if ANY resolved IP is private (multiple A records) - reverse order', (done) => {
+        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
+            // Simulate multiple IPs: one private, one public
+            callback(null, [
+                { address: '127.0.0.1', family: 4 },
+                { address: '93.184.216.34', family: 4 }
+            ]);
+        });
+
+        safeLookup('mixed-dns-reverse.com', {}, (err, _address, _family) => {
             expect(err).toBeTruthy();
             expect(err!.message).toContain('Blocked access');
             done();
@@ -160,7 +190,8 @@ describe('safeFetch', () => {
 
     test('should reject request to private IP', async () => {
         lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
-            callback(null, "127.0.0.1", 4);
+            // safeFetch calls safeLookup which calls dns.lookup with all: true
+            callback(null, [{ address: "127.0.0.1", family: 4 }]);
         });
 
         await expect(safeFetch('http://example.com')).rejects.toThrow('Blocked access');
@@ -168,41 +199,9 @@ describe('safeFetch', () => {
 
     test('should reject request to AWS metadata IP', async () => {
         lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
-            callback(null, "169.254.169.254", 4);
+            callback(null, [{ address: "169.254.169.254", family: 4 }]);
         });
 
         await expect(safeFetch('http://example.com')).rejects.toThrow('Blocked access');
     });
 });
-
-    test('should block if ANY resolved IP is private (multiple A records)', (done) => {
-        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
-            // Simulate multiple IPs: one public, one private
-            callback(null, [
-                { address: '93.184.216.34', family: 4 },
-                { address: '127.0.0.1', family: 4 }
-            ]);
-        });
-
-        safeLookup('mixed-dns.com', {}, (err, address, family) => {
-            expect(err).toBeTruthy();
-            expect(err!.message).toContain('Blocked access');
-            done();
-        });
-    });
-
-    test('should block if ANY resolved IP is private (multiple A records) - reverse order', (done) => {
-        lookupSpy.mockImplementation((hostname: string, options: any, callback: any) => {
-            // Simulate multiple IPs: one private, one public
-            callback(null, [
-                { address: '127.0.0.1', family: 4 },
-                { address: '93.184.216.34', family: 4 }
-            ]);
-        });
-
-        safeLookup('mixed-dns-reverse.com', {}, (err, address, family) => {
-            expect(err).toBeTruthy();
-            expect(err!.message).toContain('Blocked access');
-            done();
-        });
-    });
