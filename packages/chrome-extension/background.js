@@ -396,31 +396,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  // 全キュー一括フェッチ
-  if (message.command === "fullBatchFetch") {
-    loadConfig().then(async (config) => {
-      const synthesizer = SynthesizerFactory.create(
-        config.synthesizerType,
-        config
-      );
-
-      const promises = message.batch.map(async ({ index, text }) => {
-        try {
-          const audioDataUrl = await synthesizer.synthesize(text);
-          return { index, audioDataUrl };
-        } catch (error) {
-          console.error("Speech synthesis error for index", index, ":", error);
-          return { index, error: error.message };
-        }
-      });
-
-      const results = await Promise.all(promises);
-      const audioDataUrls = results.filter((r) => r.audioDataUrl);
-      sendResponse({ audioDataUrls });
-    });
-
-    return true;
-  }
 
   // 再生開始通知
   if (message.command === "playbackStarted") {
