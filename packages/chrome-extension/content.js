@@ -1591,23 +1591,6 @@ function fetchRemainingInBackground(priorityStartIndex) {
   );
 }
 
-// 全体的なバッチ取得（必要に応じて順次リクエストに変更）
-function fullBatchFetch(callback) {
-  console.log("fullBatchFetch: Starting full sequential loading");
-
-  // 全ての未キャッシュ項目を順次キューに追加
-  for (let i = 0; i < playbackQueue.length; i++) {
-    if (!audioCache.has(i)) {
-      const item = playbackQueue[i];
-      if (item && item.text) {
-        addToRequestQueue({ index: i, text: item.text });
-      }
-    }
-  }
-
-  if (callback) callback();
-}
-
 function computeAdaptiveColors(element, cache = null) {
   const baseBackground = getEffectiveBackgroundColor(element, cache);
   const textColor = getEffectiveTextColor(element);
