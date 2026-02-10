@@ -14,6 +14,51 @@ class AudioSynthesizer {
   }
 }
 
+class RemoteAudioSynthesizer extends AudioSynthesizer {
+  constructor(serverUrl, endpoint, name) {
+    super();
+    this.serverUrl = serverUrl;
+    this.endpoint = endpoint;
+    this.name = name;
+  }
+
+  async synthesize(text) {
+    console.log(`[${this.name}] Synthesizing: "${text}"`);
+    console.log(`[${this.name}] Server URL: ${this.serverUrl}`);
+
+    try {
+      const cleanedText = cleanText(text);
+
+      const response = await fetch(`${this.serverUrl}${this.endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: cleanedText,
+        }),
+      });
+
+      if (!response.ok) {
+        let errorDetails = `${response.status} ${response.statusText}`;
+        try {
+          const text = await response.text();
+          if (text) errorDetails += ` ${text}`;
+        } catch (e) {
+          // ignore
+        }
+        throw new Error(`${this.name} error: ${errorDetails}`);
+      }
+
+      const blob = await response.blob();
+      return await blobToDataURL(blob);
+    } catch (error) {
+      console.error(`[${this.name}] Error:`, error);
+      throw new Error(`${this.name} synthesis failed: ${error.message}`);
+    }
+  }
+}
+
 // Google翻訳TTS実装
 class GoogleTTSSynthesizer extends AudioSynthesizer {
   constructor() {
@@ -29,11 +74,7 @@ class GoogleTTSSynthesizer extends AudioSynthesizer {
     const response = await fetch(ttsUrl);
     const blob = await response.blob();
 
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.readAsDataURL(blob);
-    });
+    return await blobToDataURL(blob);
   }
 }
 
@@ -52,193 +93,51 @@ class TestSynthesizer extends AudioSynthesizer {
     const response = await fetch(sampleUrl);
     const blob = await response.blob();
 
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.readAsDataURL(blob);
-    });
+    return await blobToDataURL(blob);
   }
 }
 
 // Edge TTS実装（Python TTS Serverを使用）
-class EdgeTTSSynthesizer extends AudioSynthesizer {
+class EdgeTTSSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
-    super();
-    this.serverUrl = config.serverUrls?.edge_tts || "http://localhost:8001";
-  }
-
-  async synthesize(text) {
-    console.log(`[EdgeTTSSynthesizer] Synthesizing: "${text}"`);
-
-    try {
-      const cleanedText = cleanText(text);
-
-      const response = await fetch(`${this.serverUrl}/synthesize/simple`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: cleanedText,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Edge TTS Server error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const blob = await response.blob();
-
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error(`[EdgeTTSSynthesizer] Error:`, error);
-      throw new Error(`Edge TTS synthesis failed: ${error.message}`);
-    }
+    super(
+      config.serverUrls?.edge_tts || "http://localhost:8001",
+      "/synthesize/simple",
+      "EdgeTTSSynthesizer"
+    );
   }
 }
 
 // Docker Edge TTS実装（Docker化されたTTS Serverを使用）
-class EdgeTTSDockerSynthesizer extends AudioSynthesizer {
+class EdgeTTSDockerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
-    super();
-    this.serverUrl =
-      config.serverUrls?.edge_tts_docker || "http://localhost:8001";
-  }
-
-  async synthesize(text) {
-    console.log(`[EdgeTTSDockerSynthesizer] Synthesizing: "${text}"`);
-    console.log(`[EdgeTTSDockerSynthesizer] Server URL: ${this.serverUrl}`);
-
-    try {
-      const cleanedText = cleanText(text);
-
-      const response = await fetch(`${this.serverUrl}/synthesize/simple`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: cleanedText,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Docker Edge TTS Server error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const blob = await response.blob();
-
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error(`[EdgeTTSDockerSynthesizer] Error:`, error);
-      throw new Error(`Docker Edge TTS synthesis failed: ${error.message}`);
-    }
+    super(
+      config.serverUrls?.edge_tts_docker || "http://localhost:8001",
+      "/synthesize/simple",
+      "EdgeTTSDockerSynthesizer"
+    );
   }
 }
 
 // Google Cloud TTS Docker 実装
-class GoogleCloudTTSDockerSynthesizer extends AudioSynthesizer {
+class GoogleCloudTTSDockerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
-    super();
-    this.serverUrl =
-      config.serverUrls?.google_cloud_tts_docker || "http://localhost:8002";
-  }
-
-  async synthesize(text) {
-    console.log(`[GoogleCloudTTSDockerSynthesizer] Synthesizing: "${text}"`);
-    console.log(
-      `[GoogleCloudTTSDockerSynthesizer] Server URL: ${this.serverUrl}`
+    super(
+      config.serverUrls?.google_cloud_tts_docker || "http://localhost:8002",
+      "/synthesize/simple",
+      "GoogleCloudTTSDockerSynthesizer"
     );
-
-    try {
-      const cleanedText = cleanText(text);
-
-      const response = await fetch(`${this.serverUrl}/synthesize/simple`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: cleanedText,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Google Cloud TTS Docker error: ${response.status} ${response.statusText} ${errorText}`
-        );
-      }
-
-      const blob = await response.blob();
-
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error(`[GoogleCloudTTSDockerSynthesizer] Error:`, error);
-      throw new Error(
-        `Google Cloud TTS Docker synthesis failed: ${error.message}`
-      );
-    }
   }
 }
 
 // API Server実装（新しいAPIサーバーを使用）
-class APIServerSynthesizer extends AudioSynthesizer {
+class APIServerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
-    super();
-    this.serverUrl = config.serverUrls?.api_server || "http://localhost:8000";
-  }
-
-  async synthesize(text) {
-    console.log(`[APIServerSynthesizer] Synthesizing: "${text}"`);
-    console.log(`[APIServerSynthesizer] Server URL: ${this.serverUrl}`);
-
-    try {
-      const cleanedText = cleanText(text);
-
-      const response = await fetch(`${this.serverUrl}/synthesize`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: cleanedText,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `API Server error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const blob = await response.blob();
-
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error(`[APIServerSynthesizer] Error:`, error);
-      throw new Error(`API Server synthesis failed: ${error.message}`);
-    }
+    super(
+      config.serverUrls?.api_server || "http://localhost:8000",
+      "/synthesize",
+      "APIServerSynthesizer"
+    );
   }
 }
 
@@ -298,6 +197,16 @@ function cleanText(text) {
   // 連続する空白を1つに
   text = text.replace(/\s+/g, " ").trim();
   return text;
+}
+
+// BlobをData URLに変換するヘルパー関数
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (e) => reject(new Error("Failed to read blob"));
+    reader.readAsDataURL(blob);
+  });
 }
 
 // アイコン管理機能
