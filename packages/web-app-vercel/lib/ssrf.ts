@@ -36,8 +36,8 @@ export async function isSafeUrl(urlString: string): Promise<boolean> {
 
         // Use allowlist policy: only unicast addresses are allowed
         for (const { address } of addresses) {
-            const ip = ipaddr.parse(address);
-            if (ip.range() !== 'unicast') {
+            if (!isAddressSafe(address)) {
+                console.error(`SSRF Blocked: IP ${address} is not safe.`);
                 return false;
             }
         }
@@ -45,6 +45,28 @@ export async function isSafeUrl(urlString: string): Promise<boolean> {
         return true;
     } catch (error) {
         console.error('SSRF Check Error:', error);
+        return false;
+    }
+}
+
+/**
+ * Helper to validate a single IP address using ipaddr.js
+ */
+function isAddressSafe(address: string): boolean {
+    try {
+        let ip = ipaddr.parse(address);
+
+        // Convert IPv4-mapped IPv6 addresses to IPv4
+        if (ip.kind() === 'ipv6' && (ip as ipaddr.IPv6).isIPv4MappedAddress()) {
+            ip = (ip as ipaddr.IPv6).toIPv4Address();
+        }
+
+        const range = ip.range();
+
+        // Allow unicast only
+        // Note: ipaddr.js classifies public IPs as 'unicast'
+        return range === 'unicast';
+    } catch {
         return false;
     }
 }
@@ -63,32 +85,23 @@ export function safeLookup(
         if (err) return callback(err, '', 0);
 
         if (!addresses || (Array.isArray(addresses) && addresses.length === 0)) {
-             // Should not happen on success, but just in case
-             // Fallback to error or empty string if no addresses found
              const error = new Error(`DNS lookup for ${hostname} returned no addresses`);
              (error as any).code = 'ENOTFOUND';
              return callback(error as NodeJS.ErrnoException, '', 0);
         }
 
-        // Ensure addresses is an array (dns.lookup with all: true returns array of objects)
+        // Ensure addresses is an array
         const addrList = (Array.isArray(addresses) ? addresses : [addresses]) as { address: string; family: number }[];
 
         for (const { address } of addrList) {
-            try {
-                const ip = ipaddr.parse(address);
-                if (ip.range() !== 'unicast') {
-                    const error = new Error(`SSRF: Blocked access to non-unicast address ${address}`);
-                    (error as any).code = 'ENOTFOUND'; // Simulate DNS failure for blocked IPs
-                    return callback(error as NodeJS.ErrnoException, '', 0);
-                }
-            } catch (_e) {
-                 const error = new Error(`SSRF: Invalid IP ${address}`);
-                 (error as any).code = 'EINVAL';
-                 return callback(error as NodeJS.ErrnoException, '', 0);
+            if (!isAddressSafe(address)) {
+                const error = new Error(`SSRF: Blocked access to unsafe address ${address}`);
+                (error as any).code = 'ENOTFOUND'; // Simulate DNS failure for blocked IPs
+                return callback(error as NodeJS.ErrnoException, '', 0);
             }
         }
 
-        // If all addresses are safe, use the first one (as http.request expects a single address for the connection)
+        // If all addresses are safe, use the first one
         const first = addrList[0];
         callback(null, first.address, first.family);
     });
@@ -111,7 +124,11 @@ export function safeFetch(url: string, options: { signal?: AbortSignal, headers?
 
             const requestOptions = {
                 method: 'GET',
-                headers: options.headers,
+                headers: {
+                    ...options.headers,
+                    // Prevent server from sending compressed content which http.request doesn't handle automatically
+                    'Accept-Encoding': 'identity'
+                },
                 signal: options.signal,
                 lookup: safeLookup
             };
