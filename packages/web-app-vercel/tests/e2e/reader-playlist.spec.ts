@@ -39,12 +39,12 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.goto('/');
         await page.waitForSelector('a[data-testid="playlist-article"]', { state: 'visible' });
 
-        // Ensure the article we expect exists in the page; find the first
-        const first = page.locator('a[data-testid="playlist-article"]').first();
-        // Just verify it's one of our seeded articles
-        await expect(first).toBeVisible();
+        // Ensure the article we expect exists in the page; find the "Apple" article explicitly
+        // Using .first() previously picked up any article, including real URLs that failed extraction in CI.
+        const article = page.locator('a[data-testid="playlist-article"]').filter({ hasText: 'Apple' }).first();
+        await expect(article).toBeVisible();
 
-        await first.click();
+        await article.click();
 
         // Now page should navigate to /reader?url=... and initialize default playlist, showing prev/next
         await page.waitForSelector('[data-testid="audio-player-desktop"]', { state: 'visible' });
