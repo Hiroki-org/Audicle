@@ -1,5 +1,8 @@
 import { jest } from '@jest/globals';
 
+// Setup Mocks
+const mockAuthorize = jest.fn();
+
 // Mock dependencies
 jest.mock("next-auth", () => ({
     __esModule: true,
@@ -16,15 +19,28 @@ jest.mock("next-auth/providers/google", () => ({
     default: jest.fn(() => ({ id: "google", name: "Google", type: "oauth" })),
 }));
 
-jest.mock("next-auth/providers/credentials", () => ({
-    __esModule: true,
-    default: jest.fn((config: any) => ({
-        id: "test-credentials",
-        name: "Test Credentials",
-        type: "credentials",
-        ...config
-    })),
-}));
+// We need to capture the authorize function from config passed to CredentialsProvider
+jest.mock("next-auth/providers/credentials", () => {
+    return {
+        __esModule: true,
+        default: jest.fn((config: any) => {
+            if (config.id === 'test-credentials') {
+                // If it has authorize function, capture it for testing
+                if (config.authorize) {
+                    mockAuthorize.mockImplementation(config.authorize);
+                }
+                return {
+                    id: "test-credentials",
+                    name: "Test Credentials",
+                    type: "credentials",
+                    authorize: config.authorize, // Expose authorize
+                    ...config
+                };
+            }
+            return { id: "other", type: "credentials" };
+        })
+    };
+});
 
 jest.mock("../user-initialization", () => ({
     initializeNewUser: jest.fn().mockResolvedValue({ success: true }),
@@ -36,22 +52,24 @@ describe("Auth Security Configuration", () => {
     beforeEach(() => {
         jest.resetModules();
         process.env = { ...OLD_ENV };
-        // Reset mocks
+        mockAuthorize.mockReset();
+        // Clear module mocks
         require("next-auth").default.mockClear();
+        require("next-auth/providers/credentials").default.mockClear();
     });
 
     afterAll(() => {
         process.env = OLD_ENV;
     });
 
-    test("SECURITY FIX: CredentialsProvider is DISABLED when AUTH_ENV=test BUT NODE_ENV=production", async () => {
-        // Setup vulnerable state attempt
+    test("CredentialsProvider is ENABLED when AUTH_ENV=test (even in production)", async () => {
+        // Setup state where we want providers enabled for CI
         process.env.NODE_ENV = 'production';
         process.env.AUTH_ENV = 'test';
         process.env.GOOGLE_CLIENT_ID = 'mock-id';
         process.env.GOOGLE_CLIENT_SECRET = 'mock-secret';
 
-        const NextAuth = require("next-auth").default;
+        require("next-auth").default;
         await import("../auth");
 
         const config = NextAuth.mock.calls[0][0];
@@ -59,45 +77,97 @@ describe("Auth Security Configuration", () => {
 
         const hasCredentials = providers.some((p: any) => p.id === 'test-credentials');
 
-        // Should be disabled now
-        expect(hasCredentials).toBe(false);
-    });
-
-    test("FUNCTIONALITY: CredentialsProvider is ENABLED when AUTH_ENV=test AND NODE_ENV=test", async () => {
-        // Setup valid test state
-        process.env.NODE_ENV = 'test';
-        process.env.AUTH_ENV = 'test';
-        process.env.GOOGLE_CLIENT_ID = 'mock-id';
-        process.env.GOOGLE_CLIENT_SECRET = 'mock-secret';
-
-        const NextAuth = require("next-auth").default;
-        await import("../auth");
-
-        const config = NextAuth.mock.calls[0][0];
-        const providers = config.providers;
-
-        const hasCredentials = providers.some((p: any) => p.id === 'test-credentials');
-
-        // Should be enabled
+        // Should be enabled now (reverted behavior)
         expect(hasCredentials).toBe(true);
     });
 
-    test("FUNCTIONALITY: CredentialsProvider is ENABLED when AUTH_ENV=test AND NODE_ENV=development", async () => {
-        // Setup valid dev state
-        process.env.NODE_ENV = 'development';
+    test("SECURITY: authorize callback BLOCKS external requests in production", async () => {
+        process.env.NODE_ENV = 'production';
         process.env.AUTH_ENV = 'test';
-        process.env.GOOGLE_CLIENT_ID = 'mock-id';
-        process.env.GOOGLE_CLIENT_SECRET = 'mock-secret';
+        process.env.TEST_USER_EMAIL = 'test@example.com';
+        process.env.TEST_USER_PASSWORD = 'password';
 
-        const NextAuth = require("next-auth").default;
+        // Re-import to trigger setup
+        jest.resetModules();
+        require("next-auth").default;
         await import("../auth");
 
-        const config = NextAuth.mock.calls[0][0];
-        const providers = config.providers;
+        const credentials = {
+            email: 'test@example.com',
+            password: 'password'
+        };
 
-        const hasCredentials = providers.some((p: any) => p.id === 'test-credentials');
+        const mockRequest = {
+            headers: new Headers({
+                'host': 'evil-external.com'
+            })
+        };
 
-        // Should be enabled
-        expect(hasCredentials).toBe(true);
+        // Call the captured authorize function
+        // Note: mockAuthorize should have been called/set up by the import
+        const result = await mockAuthorize(credentials, mockRequest);
+
+        // Should be blocked (return null)
+        expect(result).toBeNull();
+    });
+
+    test("FUNCTIONALITY: authorize callback ALLOWS localhost requests in production (CI support)", async () => {
+        process.env.NODE_ENV = 'production';
+        process.env.AUTH_ENV = 'test';
+        process.env.TEST_USER_EMAIL = 'test@example.com';
+        process.env.TEST_USER_PASSWORD = 'password';
+
+        jest.resetModules();
+        require("next-auth").default;
+        await import("../auth");
+
+        const credentials = {
+            email: 'test@example.com',
+            password: 'password'
+        };
+
+        // Simulate localhost request (CI environment)
+        const mockRequest = {
+            headers: new Headers({
+                'host': 'localhost:3000'
+            })
+        };
+
+        const result = await mockAuthorize(credentials, mockRequest);
+
+        // Should be allowed
+        expect(result).toEqual({
+            id: 'test-user-id-123',
+            name: 'Test User',
+            email: 'test@example.com',
+        });
+    });
+
+    test("FUNCTIONALITY: authorize callback ALLOWS requests in development/test without host check", async () => {
+        process.env.NODE_ENV = 'development'; // Not production
+        process.env.AUTH_ENV = 'test';
+        process.env.TEST_USER_EMAIL = 'test@example.com';
+        process.env.TEST_USER_PASSWORD = 'password';
+
+        jest.resetModules();
+        require("next-auth").default;
+        await import("../auth");
+
+        const credentials = {
+            email: 'test@example.com',
+            password: 'password'
+        };
+
+        // Request host shouldn't matter here
+        const mockRequest = {
+            headers: new Headers({
+                'host': 'any-host.com'
+            })
+        };
+
+        const result = await mockAuthorize(credentials, mockRequest);
+
+        // Should succeed
+        expect(result).not.toBeNull();
     });
 });
