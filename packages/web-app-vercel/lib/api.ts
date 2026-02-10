@@ -8,6 +8,30 @@ import {
 import { logger } from "./logger";
 
 // ============================================================================
+// エラーハンドリングユーティリティ
+// ============================================================================
+
+/**
+ * APIエラーレスポンスからエラーメッセージを抽出する
+ * JSONレスポンスの場合は `error` フィールドを使用し、
+ * そうでない場合はデフォルトメッセージまたは元のテキストを返す
+ */
+export function parseApiErrorMessage(
+  errorText: string,
+  defaultMessage?: string
+): string {
+  try {
+    const errorJson = JSON.parse(errorText);
+    if (errorJson.error) {
+      return errorJson.error;
+    }
+  } catch {
+    // JSON parse failed
+  }
+  return defaultMessage || errorText;
+}
+
+// ============================================================================
 // Pending Map: 進行中のリクエストを管理（重複リクエスト対策）
 // ============================================================================
 
@@ -44,9 +68,10 @@ export async function extractContent(url: string): Promise<ExtractResponse> {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    logger.error(`抽出エラー: ${error}`);
-    throw new Error(`抽出に失敗しました: ${error}`);
+    const errorText = await response.text();
+    const errorMessage = parseApiErrorMessage(errorText);
+    logger.error(`抽出エラー: ${errorMessage}`);
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();
