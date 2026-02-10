@@ -101,9 +101,11 @@ export function safeLookup(
             }
         }
 
-        // If all addresses are safe, use the first one
-        const first = addrList[0];
-        callback(null, first.address, first.family);
+        // Prefer IPv4 to avoid connectivity issues in environments where IPv6 is present but broken (e.g. some CI)
+        const ipv4 = addrList.find(a => a.family === 4);
+        const selected = ipv4 || addrList[0];
+
+        callback(null, selected.address, selected.family);
     });
 }
 
