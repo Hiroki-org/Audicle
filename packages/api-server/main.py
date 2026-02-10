@@ -245,6 +245,8 @@ async def extract_content(request: ExtractRequest):
             status_code=500,
             detail="Failed to parse extraction result"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
