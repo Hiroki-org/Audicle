@@ -10,14 +10,19 @@ jest.mock('../logger', () => ({
   },
 }));
 
-// Mock global fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
-
 describe('synthesizeSpeech', () => {
+  const originalFetch = global.fetch;
+  const mockFetch = jest.fn();
   const mockBlob = new Blob(['audio data'], { type: 'audio/mpeg' });
-  // Default URL when env var is not set
   const EXPECTED_URL = 'http://localhost:8000/synthesize';
+
+  beforeAll(() => {
+    global.fetch = mockFetch;
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -57,7 +62,7 @@ describe('synthesizeSpeech', () => {
     }));
   });
 
-  it('throws error when API call fails', async () => {
+  it('throws error when API call fails (response not ok)', async () => {
     const errorMessage = 'Internal Server Error';
     mockFetch.mockResolvedValue({
       ok: false,
@@ -66,5 +71,14 @@ describe('synthesizeSpeech', () => {
 
     await expect(synthesizeSpeech('test')).rejects.toThrow(`音声合成に失敗しました: ${errorMessage}`);
     expect(logger.error).toHaveBeenCalledWith(`音声合成エラー: ${errorMessage}`);
+  });
+
+  it('throws error on network failure', async () => {
+    const networkError = new Error('Network error');
+    mockFetch.mockRejectedValue(networkError);
+
+    await expect(synthesizeSpeech('test')).rejects.toThrow(networkError);
+    // Since there's no try/catch in the implementation, logger.error won't be called for network errors
+    expect(logger.error).not.toHaveBeenCalled();
   });
 });
