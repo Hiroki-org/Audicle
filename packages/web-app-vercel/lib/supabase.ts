@@ -7,4 +7,8 @@ if ((!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_
     console.warn('Missing Supabase environment variables, using dummy values. This should only happen during build or test.')
 }
 
+if (process.env.NODE_ENV === 'test' && supabaseUrl.includes('example.supabase.co')) {
+    console.warn('⚠️  WARNING: Using dummy Supabase URL in test environment. API calls will fail.');
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)

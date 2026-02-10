@@ -8,6 +8,10 @@ dotenv.config({ path: path.resolve(__dirname, '.env.local') })
 // .env.test.localを読み込む（テスト専用の環境変数，優先される）
 dotenv.config({ path: path.resolve(__dirname, '.env.test.local') })
 
+console.log('[PLAYWRIGHT CONFIG] Loading config...');
+console.log('[PLAYWRIGHT CONFIG] NEXT_PUBLIC_SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log('[PLAYWRIGHT CONFIG] TEST_USER_EMAIL exists:', !!process.env.TEST_USER_EMAIL);
+
 export default defineConfig({
     testDir: './tests',
     fullyParallel: true,
@@ -77,6 +81,9 @@ export default defineConfig({
             NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || '',
             NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
             AUTH_ENV: process.env.AUTH_ENV || '',
+            // Ensure TEST_USER_EMAIL has a fallback to match auth.setup.ts and lib/auth.ts
+            TEST_USER_EMAIL: process.env.TEST_USER_EMAIL || 'test@example.com',
+            TEST_USER_PASSWORD: process.env.TEST_USER_PASSWORD || 'password',
             // Expose CI and test helpers to the Next.js dev server started by Playwright
             CI: process.env.CI || '',
             TEST_SESSION_TOKEN: process.env.TEST_SESSION_TOKEN || '',

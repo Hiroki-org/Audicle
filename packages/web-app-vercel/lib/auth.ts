@@ -43,9 +43,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         }
 
                         // テスト用の固定認証
+                        const expectedEmail = process.env.TEST_USER_EMAIL || 'test@example.com';
+                        const expectedPassword = process.env.TEST_USER_PASSWORD || 'password';
+
                         if (
-                            credentials?.email === process.env.TEST_USER_EMAIL &&
-                            credentials?.password === process.env.TEST_USER_PASSWORD
+                            credentials?.email === expectedEmail &&
+                            credentials?.password === expectedPassword
                         ) {
                             if (IS_DEBUG) {
                                 console.log('[AUTH DEBUG] Login SUCCESS')

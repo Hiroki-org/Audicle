@@ -48,8 +48,13 @@ setup('authenticate', async ({ page }) => {
     // Credentials Providerのフォームを探す
     await page.waitForSelector('input[type="email"]', { timeout: 10000 })
 
-    await page.fill('input[type="email"]', process.env.TEST_USER_EMAIL!)
-    await page.fill('input[type="password"]', process.env.TEST_USER_PASSWORD!)
+    const email = process.env.TEST_USER_EMAIL || 'test@example.com';
+    const password = process.env.TEST_USER_PASSWORD || 'password';
+
+    console.log(`[AUTH SETUP] Attempting login with email: ${email}`);
+
+    await page.fill('input[type="email"]', email)
+    await page.fill('input[type="password"]', password)
 
     // ログインボタンをクリック
     const loginButton = page.getByRole('button', { name: 'ログイン', exact: true })
