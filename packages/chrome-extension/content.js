@@ -941,46 +941,6 @@ function buildQueueWithNewRulesManager() {
   return { queue, info };
 }
 
-// レガシーシステムを使用したキュー構築
-function buildQueueWithLegacySystem() {
-  console.log("[LegacySystem] Building queue with legacy rules system");
-
-  const hostname = window.location.hostname;
-  let queue = [];
-  let info = { rule: "unknown", domain: hostname };
-
-  if (customRules[hostname]) {
-    console.log("[LegacySystem] Using custom rule for", hostname);
-    queue = buildQueueWithCustomRule(customRules[hostname]);
-    info.rule = "custom-" + hostname;
-    info.type = "site-specific";
-  }
-
-  if (queue.length === 0) {
-    try {
-      console.log("[LegacySystem] Trying Readability extraction");
-      queue = buildQueueWithReadability();
-      info.rule = "readability";
-      info.type = "library";
-    } catch (e) {
-      console.error("Readability extraction failed:", e);
-    }
-  }
-
-  if (queue.length === 0) {
-    console.log("[LegacySystem] Using fallback extraction");
-    queue = buildQueueWithFallback();
-    info.rule = "fallback";
-    info.type = "emergency";
-  }
-
-  info.queueLength = queue.length;
-  console.log(
-    `[LegacySystem] Built queue: ${queue.length} items using rule '${info.rule}'`
-  );
-
-  return { queue, info };
-}
 
 // 現在のページで使用可能なルール情報を取得
 function getCurrentPageRuleInfo() {
