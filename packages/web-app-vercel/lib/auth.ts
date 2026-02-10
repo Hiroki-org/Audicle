@@ -26,7 +26,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
         }),
         // テスト環境でのみ有効
-        ...(process.env.AUTH_ENV === 'test'
+        ...(process.env.NODE_ENV !== 'production' && process.env.AUTH_ENV === 'test'
             ? [
                 CredentialsProvider({
                     id: 'test-credentials',
@@ -68,7 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     callbacks: {
         async signIn({ user }) {
             // テスト用ユーザーはホワイトリストチェックをスキップ
-            if (process.env.AUTH_ENV === 'test' && user.id === 'test-user-id-123') {
+            if (process.env.NODE_ENV !== 'production' && process.env.AUTH_ENV === 'test' && user.id === 'test-user-id-123') {
                 if (IS_DEBUG) {
                     console.log('[AUTH DEBUG] Test user - skipping whitelist check')
                 }
