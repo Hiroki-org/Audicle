@@ -513,10 +513,10 @@ export default function ReaderPageClient() {
           }
         );
         // localStorageに記事が見つからない場合、サーバーから取得してstateにセット
-        fetchArticleAndSetState({ id: articleIdFromQuery });
+        fetchArticleAndSetState({ id: articleIdFromQuery, isPlaylistMode: !!playlistIdFromQuery });
       }
     }
-  }, [articleIdFromQuery, stop, fetchArticleAndSetState]);
+  }, [articleIdFromQuery, stop, fetchArticleAndSetState, playlistIdFromQuery]);
 
   // インデックスパラメータが変わったときに該当記事を読み込む
   useEffect(() => {
