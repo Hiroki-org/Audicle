@@ -69,7 +69,7 @@ describe("Auth Security Configuration", () => {
         process.env.GOOGLE_CLIENT_ID = 'mock-id';
         process.env.GOOGLE_CLIENT_SECRET = 'mock-secret';
 
-        require("next-auth").default;
+        const NextAuth = require("next-auth").default;
         await import("../auth");
 
         const config = NextAuth.mock.calls[0][0];
