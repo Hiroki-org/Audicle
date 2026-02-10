@@ -4,4 +4,3 @@ pydantic==2.4.2
 aiofiles==0.7.0
 requests==2.32.4
 google-cloud-texttospeech==2.16.3
-pytest==8.3.4
