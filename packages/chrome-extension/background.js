@@ -378,17 +378,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         config
       );
 
-      const promises = message.batch.map(async ({ index, text }) => {
-        try {
-          const audioDataUrl = await synthesizer.synthesize(text);
-          return { index, audioDataUrl };
-        } catch (error) {
-          console.error("Speech synthesis error for index", index, ":", error);
-          return { index, error: error.message };
-        }
-      });
-
-      const results = await Promise.all(promises);
+      const results = await limitConcurrency(
+        message.batch,
+        async ({ index, text }) => {
+          try {
+            const audioDataUrl = await synthesizer.synthesize(text);
+            return { index, audioDataUrl };
+          } catch (error) {
+            console.error("Speech synthesis error for index", index, ":", error);
+            return { index, error: error.message };
+          }
+        },
+        5 // Concurrency limit
+      );
       const audioDataUrls = results.filter((r) => r.audioDataUrl);
       sendResponse({ audioDataUrls });
     });
@@ -404,17 +406,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         config
       );
 
-      const promises = message.batch.map(async ({ index, text }) => {
-        try {
-          const audioDataUrl = await synthesizer.synthesize(text);
-          return { index, audioDataUrl };
-        } catch (error) {
-          console.error("Speech synthesis error for index", index, ":", error);
-          return { index, error: error.message };
-        }
-      });
-
-      const results = await Promise.all(promises);
+      const results = await limitConcurrency(
+        message.batch,
+        async ({ index, text }) => {
+          try {
+            const audioDataUrl = await synthesizer.synthesize(text);
+            return { index, audioDataUrl };
+          } catch (error) {
+            console.error("Speech synthesis error for index", index, ":", error);
+            return { index, error: error.message };
+          }
+        },
+        5 // Concurrency limit
+      );
       const audioDataUrls = results.filter((r) => r.audioDataUrl);
       sendResponse({ audioDataUrls });
     });
@@ -434,3 +438,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("Playback stopped - icon set to default");
   }
 });
+
+
+// Helper for concurrency control
+async function limitConcurrency(items, mapper, concurrency) {
+  const results = new Array(items.length);
+  const queue = items.map((item, index) => ({ item, index }));
+
+  const worker = async () => {
+    while (queue.length > 0) {
+      const { item, index } = queue.shift();
+      results[index] = await mapper(item);
+    }
+  };
+
+  const workers = Array(Math.min(concurrency, items.length))
+    .fill(null)
+    .map(() => worker());
+
+  await Promise.all(workers);
+  return results;
+}
