@@ -12,6 +12,9 @@ from typing import List
 import aiofiles
 from google.api_core.exceptions import GoogleAPICallError, RetryError
 from google.cloud import texttospeech
+import socket
+import ipaddress
+from urllib.parse import urlparse
 
 # ログ設定
 logging.basicConfig(level=logging.DEBUG)
@@ -194,6 +197,37 @@ async def _synthesize_to_bytes(text: str, voice: str) -> bytes:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {exc}")
 
 
+def validate_url(url: str):
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="Invalid URL scheme")
+
+    hostname = parsed.hostname
+    if not hostname:
+         raise HTTPException(status_code=400, detail="Invalid URL hostname")
+
+    try:
+        # Resolve hostname to IP addresses
+        addr_info = socket.getaddrinfo(hostname, None)
+        for family, type, proto, canonname, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            ip = ipaddress.ip_address(ip_str)
+
+            if (
+                ip.is_private or
+                ip.is_loopback or
+                ip.is_link_local or
+                ip.is_reserved or
+                ip.is_unspecified or
+                ip.is_multicast
+            ):
+                 raise HTTPException(status_code=400, detail=f"Access to private network is denied: {ip}")
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="Could not resolve hostname")
+    except ValueError:
+         raise HTTPException(status_code=400, detail="Invalid IP address resolved")
+
+
 @app.get("/")
 async def root():
     return {"message": "Audicle API Server is running", "version": "1.0.0"}
@@ -202,6 +236,8 @@ async def root():
 @app.post("/extract", response_model=ExtractResponse)
 async def extract_content(request: ExtractRequest):
     """URLから本文を抽出する"""
+    validate_url(request.url)
+
     try:
         # Node.jsスクリプトを実行してReadability.jsで本文抽出
         result = subprocess.run(
@@ -233,6 +269,9 @@ async def extract_content(request: ExtractRequest):
             detail="Failed to parse extraction result"
         )
     except Exception as e:
+        # Avoid re-wrapping HTTPException
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
