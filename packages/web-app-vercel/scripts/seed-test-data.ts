@@ -65,6 +65,11 @@ async function ensureTestUser() {
                     console.log(`   Found existing user ID: ${foundUser.id}`);
                     return foundUser.id;
                 }
+
+                // If we got fewer users than perPage, we're on the last page
+                if (listData.users.length < perPage) {
+                    break;
+                }
                 
                 // Safety break to prevent infinite loops if we have thousands of users (unlikely in test)
                 if (page > 20) {
