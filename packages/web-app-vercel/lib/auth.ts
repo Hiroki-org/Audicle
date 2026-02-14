@@ -48,7 +48,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                                 hostname = undefined
                             }
                             // Allow localhost (IPv4/IPv6)
-                            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+                            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
 
                             if (!isLocal) {
                                 console.warn('[AUTH SECURITY] Blocked non-local test login attempt from:', host)
