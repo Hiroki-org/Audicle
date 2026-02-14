@@ -1,24 +1,7 @@
-from main import _split_text, _merge_punctuation, MAX_TTS_BYTES
+from main import _split_text, MAX_TTS_BYTES
 
-class TestTextProcessing:
-    def test_merge_punctuation_basic(self):
-        sentences = ["Hello", "。", "World", "！"]
-        delimiters = {'。', '！'}
-        expected = ["Hello。", "World！"]
-        assert _merge_punctuation(sentences, delimiters) == expected
 
-    def test_merge_punctuation_multiple(self):
-        sentences = ["Hello", "。", "！", "World", "！", "？"]
-        delimiters = {'。', '！', '？'}
-        expected = ["Hello。！", "World！？"]
-        assert _merge_punctuation(sentences, delimiters) == expected
-
-    def test_merge_punctuation_no_punctuation(self):
-        sentences = ["Hello", "World"]
-        delimiters = {'。', '！'}
-        expected = ["Hello", "World"]
-        assert _merge_punctuation(sentences, delimiters) == expected
-
+class TestSplitText:
     def test_split_text_normal(self):
         text = "こんにちは。元気ですか？はい、元気です。"
         chunks = _split_text(text)
@@ -64,7 +47,6 @@ class TestTextProcessing:
     def test_split_text_multibyte(self):
         # Test multibyte character boundary
         # Japanese 'あ' is 3 bytes.
-        # Ensure we construct a length that is just below MAX_TTS_BYTES but not a multiple of 3
         # MAX_TTS_BYTES is 5000.
         # 5000 // 3 = 1666. 1666 * 3 = 4998 bytes.
 

@@ -64,8 +64,8 @@ test.describe('人気記事（認証済み）', () => {
             page.goto('/popular')
         ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
 
-        // Reactの状態更新とレンダリングを待つ
-        await page.waitForTimeout(2000);
+        // 記事が表示されるのを待つ。表示されない場合はタイムアウト後に継続し、後続の処理でスキップされる
+        await page.locator('[data-testid="article-card"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 
         const articles = page.locator('[data-testid="article-card"]');
         const count = await articles.count();

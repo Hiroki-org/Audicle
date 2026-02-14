@@ -1,9 +1,10 @@
 import sys
 import os
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 import subprocess
+import asyncio
 import json
 
 # Add parent directory to path to allow importing main
@@ -13,6 +14,14 @@ from main import app
 
 client = TestClient(app)
 
+def _make_mock_process(returncode=0, stdout=b"", stderr=b""):
+    """Helper to create a mock async subprocess process."""
+    mock_proc = AsyncMock()
+    mock_proc.returncode = returncode
+    mock_proc.communicate = AsyncMock(return_value=(stdout, stderr))
+    mock_proc.kill = MagicMock()
+    return mock_proc
+
 def test_extract_content_success():
     """Test successful content extraction."""
     mock_response = {
@@ -20,12 +29,12 @@ def test_extract_content_success():
         "chunks": ["Chunk 1", "Chunk 2"]
     }
 
-    with patch("subprocess.run") as mock_run:
-        mock_process = MagicMock()
-        mock_process.returncode = 0
-        mock_process.stdout = json.dumps(mock_response)
-        mock_run.return_value = mock_process
+    mock_proc = _make_mock_process(
+        returncode=0,
+        stdout=json.dumps(mock_response).encode("utf-8")
+    )
 
+    with patch("main.asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_proc) as mock_exec:
         response = client.post("/extract", json={"url": "http://example.com"})
 
         assert response.status_code == 200
@@ -33,21 +42,20 @@ def test_extract_content_success():
         assert data["title"] == "Test Title"
         assert data["chunks"] == ["Chunk 1", "Chunk 2"]
 
-        mock_run.assert_called_once()
-        args, kwargs = mock_run.call_args
-        assert args[0] == ["node", "readability_script.js", "http://example.com"]
-        assert kwargs["capture_output"] is True
-        assert kwargs["text"] is True
-        assert kwargs["timeout"] == 30
+        mock_exec.assert_called_once_with(
+            "node", "readability_script.js", "http://example.com",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
 
 def test_extract_content_failure_script_error():
     """Test handling of script failure (non-zero exit code)."""
-    with patch("subprocess.run") as mock_run:
-        mock_process = MagicMock()
-        mock_process.returncode = 1
-        mock_process.stderr = "Some script error"
-        mock_run.return_value = mock_process
+    mock_proc = _make_mock_process(
+        returncode=1,
+        stderr=b"Some script error"
+    )
 
+    with patch("main.asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_proc):
         response = client.post("/extract", json={"url": "http://example.com"})
 
         assert response.status_code == 400
@@ -56,22 +64,24 @@ def test_extract_content_failure_script_error():
 
 def test_extract_content_timeout():
     """Test handling of subprocess timeout."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd=["node"], timeout=30)
+    mock_proc = _make_mock_process()
+    mock_proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError())
 
-        response = client.post("/extract", json={"url": "http://example.com"})
+    with patch("main.asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_proc):
+        with patch("main.asyncio.wait_for", side_effect=asyncio.TimeoutError()):
+            response = client.post("/extract", json={"url": "http://example.com"})
 
-        assert response.status_code == 408
-        assert response.json()["detail"] == "Extraction timeout"
+            assert response.status_code == 408
+            assert response.json()["detail"] == "Extraction timeout"
 
 def test_extract_content_json_error():
     """Test handling of invalid JSON output from script."""
-    with patch("subprocess.run") as mock_run:
-        mock_process = MagicMock()
-        mock_process.returncode = 0
-        mock_process.stdout = "Invalid JSON"
-        mock_run.return_value = mock_process
+    mock_proc = _make_mock_process(
+        returncode=0,
+        stdout=b"Invalid JSON"
+    )
 
+    with patch("main.asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_proc):
         response = client.post("/extract", json={"url": "http://example.com"})
 
         assert response.status_code == 500
@@ -79,9 +89,7 @@ def test_extract_content_json_error():
 
 def test_extract_content_unexpected_error():
     """Test handling of unexpected exceptions."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.side_effect = Exception("Unexpected error")
-
+    with patch("main.asyncio.create_subprocess_exec", new_callable=AsyncMock, side_effect=Exception("Unexpected error")):
         response = client.post("/extract", json={"url": "http://example.com"})
 
         assert response.status_code == 500
