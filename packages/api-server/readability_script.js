@@ -41,25 +41,28 @@ function isPrivateIP(address) {
 }
 
 function safeLookup(hostname, options, callback) {
-  dns.lookup(hostname, options, (err, address, family) => {
+  // Always request all addresses to check for any unsafe IPs (e.g. DNS rebinding via multiple A records)
+  dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
     if (err) return callback(err);
 
-    // dns.lookup usually returns a string address unless all: true is set.
-    // However, if options.all is set, address is array.
-    // http.Agent calls lookup with family: 4 or 6.
-
-    let ipToCheck = address;
-    // Handle array case just in case
-    if (Array.isArray(address)) {
-        if (address.length > 0) ipToCheck = address[0].address;
-        else return callback(new Error("No address found"));
+    if (!addresses || (Array.isArray(addresses) && addresses.length === 0)) {
+        return callback(new Error("No address found"));
     }
 
-    if (isPrivateIP(ipToCheck)) {
-        return callback(new Error(`Access to private network is denied: ${ipToCheck}`));
+    // Ensure addresses is an array
+    const addrList = (Array.isArray(addresses) ? addresses : [addresses]);
+
+    for (const { address } of addrList) {
+        if (isPrivateIP(address)) {
+            return callback(new Error(`Access to private network is denied: ${address}`));
+        }
     }
 
-    callback(null, address, family);
+    // Prefer IPv4
+    const ipv4 = addrList.find(a => a.family === 4);
+    const selected = ipv4 || addrList[0];
+
+    callback(null, selected.address, selected.family);
   });
 }
 
@@ -110,7 +113,7 @@ async function fetchWithRedirects(initialUrl) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return response;
+    return { response, finalUrl: currentUrl };
   }
 
   throw new Error("Too many redirects");
@@ -118,10 +121,10 @@ async function fetchWithRedirects(initialUrl) {
 
 async function extractContent(url) {
   try {
-    const response = await fetchWithRedirects(url);
+    const { response, finalUrl } = await fetchWithRedirects(url);
     const html = await response.text();
 
-    const dom = new JSDOM(html, { url });
+    const dom = new JSDOM(html, { url: finalUrl });
     const doc = dom.window.document;
 
     const reader = new Readability(doc);

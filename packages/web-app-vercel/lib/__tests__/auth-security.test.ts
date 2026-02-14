@@ -69,7 +69,7 @@ describe("Auth Security Configuration", () => {
         process.env.GOOGLE_CLIENT_ID = 'mock-id';
         process.env.GOOGLE_CLIENT_SECRET = 'mock-secret';
 
-        require("next-auth").default;
+        const NextAuth = require("next-auth").default;
         await import("../auth");
 
         const config = NextAuth.mock.calls[0][0];
@@ -88,7 +88,6 @@ describe("Auth Security Configuration", () => {
         process.env.TEST_USER_PASSWORD = 'password';
 
         // Re-import to trigger setup
-        jest.resetModules();
         require("next-auth").default;
         await import("../auth");
 
@@ -117,7 +116,6 @@ describe("Auth Security Configuration", () => {
         process.env.TEST_USER_EMAIL = 'test@example.com';
         process.env.TEST_USER_PASSWORD = 'password';
 
-        jest.resetModules();
         require("next-auth").default;
         await import("../auth");
 
@@ -149,7 +147,6 @@ describe("Auth Security Configuration", () => {
         process.env.TEST_USER_EMAIL = 'test@example.com';
         process.env.TEST_USER_PASSWORD = 'password';
 
-        jest.resetModules();
         require("next-auth").default;
         await import("../auth");
 
@@ -169,5 +166,36 @@ describe("Auth Security Configuration", () => {
 
         // Should succeed
         expect(result).not.toBeNull();
+    });
+
+    test("FUNCTIONALITY: authorize callback ALLOWS [::1] requests in production (IPv6 loopback)", async () => {
+        process.env.NODE_ENV = 'production';
+        process.env.AUTH_ENV = 'test';
+        process.env.TEST_USER_EMAIL = 'test@example.com';
+        process.env.TEST_USER_PASSWORD = 'password';
+
+        require("next-auth").default;
+        await import("../auth");
+
+        const credentials = {
+            email: 'test@example.com',
+            password: 'password'
+        };
+
+        // Simulate IPv6 loopback request
+        const mockRequest = {
+            headers: new Headers({
+                'host': '[::1]:3000'
+            })
+        };
+
+        const result = await mockAuthorize(credentials, mockRequest);
+
+        // Should be allowed (IPv6 loopback)
+        expect(result).toEqual({
+            id: 'test-user-id-123',
+            name: 'Test User',
+            email: 'test@example.com',
+        });
     });
 });

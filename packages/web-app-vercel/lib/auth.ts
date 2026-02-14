@@ -40,9 +40,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         // This prevents external attackers from using the test backdoor even if AUTH_ENV=test is accidentally set
                         if (process.env.NODE_ENV === 'production') {
                             const host = req?.headers?.get('host')
-                            const hostname = host?.split(':')[0]
+                            // Use URL constructor for safe hostname extraction (handles IPv6 like [::1]:3000)
+                            let hostname: string | undefined
+                            try {
+                                hostname = host ? new URL(`http://${host}`).hostname : undefined
+                            } catch {
+                                hostname = undefined
+                            }
                             // Allow localhost (IPv4/IPv6)
-                            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+                            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
 
                             if (!isLocal) {
                                 console.warn('[AUTH SECURITY] Blocked non-local test login attempt from:', host)

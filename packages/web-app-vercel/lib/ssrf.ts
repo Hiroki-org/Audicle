@@ -150,7 +150,16 @@ export function safeFetch(url: string, options: { signal?: AbortSignal, headers?
                     text: () => {
                         return new Promise<string>((resolveText, rejectText) => {
                             const chunks: Buffer[] = [];
-                            res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+                            const MAX_RESPONSE_SIZE = 10 * 1024 * 1024; // 10MB
+                            let totalLength = 0;
+                            res.on('data', (chunk) => {
+                                totalLength += chunk.length;
+                                if (totalLength > MAX_RESPONSE_SIZE) {
+                                    res.destroy(new Error(`Response size exceeds maximum allowed size of ${MAX_RESPONSE_SIZE} bytes`));
+                                    return;
+                                }
+                                chunks.push(Buffer.from(chunk));
+                            });
                             res.on('end', () => resolveText(Buffer.concat(chunks).toString('utf-8')));
                             res.on('error', rejectText);
                         });
