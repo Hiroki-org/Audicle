@@ -126,7 +126,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Navigate to playlist
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
-        await page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'デフォルトプレイリスト' }).first().click();
+        await page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'ソートテスト用プレイリスト' }).first().click();
 
         // Wait for navigation to playlist detail page
         await page.waitForURL(/\/playlists\/.+/);
@@ -142,7 +142,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         } catch (e) {
             console.log('Sort selector not visible, identifying cause...');
             if (await emptyMessage.isVisible()) {
-                throw new Error('Test caught: Playlist IS EMPTY. Seeding issue or wrong user/playlist.');
+                throw new Error('Test caught: Playlist IS EMPTY. Seeding failed for sort test playlist.');
             }
             if (await errorMessage.isVisible()) {
                 throw new Error('Test caught: Playlist LOAD FAILED. API error.');

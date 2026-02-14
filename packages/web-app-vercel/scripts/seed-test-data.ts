@@ -383,6 +383,50 @@ async function seedTestData() {
     }
     console.log("✓ プレイリストアイテムを追加しました");
 
+    // 7. ソートテスト用プレイリストの作成
+    console.log("7. ソートテスト用プレイリストを作成中...");
+
+    await supabase
+        .from("playlists")
+        .delete()
+        .eq("owner_email", TEST_USER_EMAIL)
+        .eq("name", "ソートテスト用プレイリスト");
+
+    const { data: sortTestPlaylist, error: sortPlaylistError } = await supabase
+        .from("playlists")
+        .insert({
+            owner_email: TEST_USER_EMAIL,
+            name: "ソートテスト用プレイリスト",
+            description: "ソート順序の確認用プレイリスト",
+            is_default: false,
+            visibility: "private",
+        })
+        .select()
+        .single();
+
+    if (sortPlaylistError || !sortTestPlaylist) {
+        console.error("ソートテスト用プレイリストの作成に失敗:", sortPlaylistError);
+        process.exit(1);
+    }
+    console.log("✓ ソートテスト用プレイリストを作成しました");
+
+    // 8. ソートテスト用プレイリストにアイテムを追加
+    console.log("8. ソートテスト用プレイリストにアイテムを追加中...");
+    for (let i = 0; i < 3 && i < createdArticles.length; i += 1) {
+        const article = createdArticles[i];
+        const { error: itemError } = await supabase.from("playlist_items").insert({
+            playlist_id: sortTestPlaylist.id,
+            article_id: article.id,
+            position: i,
+        });
+
+        if (itemError) {
+            console.error("ソートテスト用プレイリストアイテムの追加に失敗:", itemError);
+            process.exit(1);
+        }
+    }
+    console.log("✓ ソートテスト用プレイリストアイテムを追加しました");
+
     console.log("\n✅ テストデータの投入が完了しました！");
     console.log(`   - ユーザー: ${TEST_USER_EMAIL} (ID: ${TEST_USER_ID})`);
     console.log(`   - 記事: ${createdArticles.length}件`);
