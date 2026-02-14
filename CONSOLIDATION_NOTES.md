@@ -2,12 +2,12 @@
 
 This PR consolidates the following dead code removal PRs:
 
-| Original PR | Title | Files Changed |
-|---|---|---|
-| #503 | Remove unused `handlePresetClick` | `packages/web-app-vercel/components/PlaybackSpeedDial.tsx` |
-| #502 | Remove unused `fullBatchFetch` function | `packages/chrome-extension/content.js` |
-| #501 | Remove duplicate `buildQueueWithLegacySystem` | `packages/chrome-extension/content.js` |
-| #499 | Remove unused `fullBatchFetch` listener | `packages/chrome-extension/background.js`, `packages/chrome-extension/content.js` |
+| Original PR | Title                                         | Files Changed                                                                                           |
+| ----------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| #503        | Remove unused `handlePresetClick`             | `packages/web-app-vercel/components/PlaybackSpeedDial.tsx`, `packages/web-app-vercel/package-lock.json` |
+| #502        | Remove unused `fullBatchFetch` function       | `packages/chrome-extension/content.js`                                                                  |
+| #501        | Remove duplicate `buildQueueWithLegacySystem` | `packages/chrome-extension/content.js`, `packages/web-app-vercel/package-lock.json`                     |
+| #499        | Remove unused `fullBatchFetch` listener       | `packages/chrome-extension/background.js`, `packages/chrome-extension/content.js`                       |
 
 ## Notes
 
