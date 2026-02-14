@@ -2,6 +2,30 @@ import { test, expect } from '@playwright/test';
 import { clearLocalStorage } from '../helpers/testSetup';
 
 test.describe('Reader - プレイリスト関連のナビゲーション', () => {
+    test.beforeEach(async ({ page }) => {
+        // Mock /api/extract to return deterministic content based on URL query
+        await page.route('**/api/extract', async route => {
+            const request = route.request();
+            const postData = request.postDataJSON();
+            const url = postData.url;
+
+            let title = 'Example Domain';
+            if (url.includes('id=apple')) title = 'Apple';
+            else if (url.includes('id=banana')) title = 'Banana';
+            else if (url.includes('id=cherry')) title = 'Cherry';
+
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    title: title,
+                    content: `<p>Content for ${title}</p>`,
+                    textLength: 100
+                })
+            });
+        });
+    });
+
     test('プレイリスト詳細 -> リーダーにプレイリストクエリが含まれ、前へ/次へボタンが表示される', async ({ page }) => {
         // Navigate to playlists list
         await page.goto('/playlists');
@@ -30,7 +54,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await expect(prev).toBeVisible();
         await expect(next).toBeVisible();
 
-        // Verify title is Apple
+        // Verify title is "Apple" (mocked)
         await expect(page.getByTestId('article-title')).toContainText('Apple');
     });
 
@@ -54,10 +78,8 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await expect(next).toBeVisible();
     });
 
-    // NOTE: This test is temporarily skipped because the reader extracts content from URLs,
-    // which overwrites the seeded DB title with actual page title ('Example Domain').
-    // The playlist navigation feature itself works, but title assertions fail.
-    test.skip('プレイリスト内の前へ/次へ遷移が正しくナビゲートする', async ({ page }) => {
+    // Tests are now unskipped as we mock the extraction
+    test('プレイリスト内の前へ/次へ遷移が正しくナビゲートする', async ({ page }) => {
         // Navigate to playlists list
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
@@ -100,9 +122,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await expect(page.getByTestId('article-title')).toContainText('Banana');
     });
 
-    // NOTE: This test is temporarily skipped for the same reason as above -
-    // extracted page titles don't match seeded DB titles.
-    test.skip('前へ/次へナビゲーションでプレイリストのソート順が尊重される', async ({ page }) => {
+    test('前へ/次へナビゲーションでプレイリストのソート順が尊重される', async ({ page }) => {
         await clearLocalStorage(page);
 
         // Navigate to playlist

@@ -55,8 +55,8 @@ test.describe('人気記事（認証済み）', () => {
 
         // Mock /api/synthesize - Return JSON with base64-encoded audio
         await page.route('**/api/synthesize', async route => {
-            // Minimal valid silent MP3 file (base64-encoded)
-            const validAudioBase64 = '//uQxAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==';
+            // Minimal valid 1-sample WAV file (base64-encoded)
+            const validAudioBase64 = 'UklGRi4AAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
@@ -116,13 +116,8 @@ test.describe('人気記事（認証済み）', () => {
         });
 
         // gotoとwaitForResponseを同時に実行（gotoの後だとレスポンスを逃す可能性がある）
-        await Promise.all([
-            page.waitForResponse(
-                resp => resp.url().includes('/api/stats/popular') && resp.status() === 200,
-                { timeout: 15000 }
-            ),
-            page.goto('/popular')
-        ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
+        // gotoでページ読み込み
+        await page.goto('/popular');
 
         // 記事カードが表示されるまで待機（timeout付き）
         // データがない場合はスキップするため、まずはコンテナやヘッダーの表示を確認
@@ -162,13 +157,8 @@ test.describe('人気記事（認証済み）', () => {
         });
 
         // gotoとwaitForResponseを同時に実行
-        await Promise.all([
-            page.waitForResponse(
-                resp => resp.url().includes('/api/stats/popular') && resp.status() === 200,
-                { timeout: 15000 }
-            ),
-            page.goto('/popular')
-        ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
+        // gotoでページ読み込み
+        await page.goto('/popular');
 
         // 記事カードが表示されるまで待機
         const articles = page.locator('[data-testid="article-card"]');
@@ -203,13 +193,8 @@ test.describe('人気記事（認証済み）', () => {
         });
 
         // gotoとwaitForResponseを同時に実行
-        await Promise.all([
-            page.waitForResponse(
-                resp => resp.url().includes('/api/stats/popular') && resp.status() === 200,
-                { timeout: 15000 }
-            ),
-            page.goto('/popular')
-        ]).catch(e => console.log('[DEBUG] Promise.all error:', e));
+        // gotoでページ読み込み
+        await page.goto('/popular');
 
         // 記事カードが表示されるまで待機
         const articles = page.locator('[data-testid="article-card"]');
