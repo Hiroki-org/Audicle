@@ -126,7 +126,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Navigate to playlist
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
-        await page.locator('a[data-testid="playlist-item"]').first().click();
+        await page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'デフォルトプレイリスト' }).first().click();
 
         // Wait for navigation to playlist detail page
         await page.waitForURL(/\/playlists\/.+/);
