@@ -32,7 +32,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
 
         // Click the Default Playlist (explicitly find by text)
-        const defaultPlaylist = page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'デフォルトプレイリスト' }).first();
+        const defaultPlaylist = page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'ソートテスト用プレイリスト' }).first();
         await expect(defaultPlaylist).toBeVisible();
         await defaultPlaylist.click();
 
@@ -85,7 +85,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
 
         // Click the Default Playlist
-        await page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'デフォルトプレイリスト' }).first().click();
+        await page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'ソートテスト用プレイリスト' }).first().click();
 
         // Wait for articles
         await page.waitForSelector('a[data-testid="playlist-article"]', { state: 'visible' });
