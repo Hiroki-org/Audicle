@@ -35,20 +35,45 @@ async function ensureTestUser() {
 
     if (error) {
         // If user already exists, we try to find their ID
-        if (error.status === 422 || error.message?.includes("already registered")) {
-            console.log("   User already exists. Fetching ID...");
-            const { data: listData, error: listError } = await supabase.auth.admin.listUsers();
-            if (listError) {
-                // If we can't list users (e.g. permission issues), we might fail.
-                // But with service role key we should be able to.
-                throw new Error(`Failed to list users to find existing one: ${listError.message}`);
+        const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
+        
+        if (isAlreadyRegistered) {
+            console.log("   User already exists. Fetching ID by listing users...");
+            
+            // Pagination handling to find user
+            let page = 1;
+            const perPage = 50;
+            let foundUser = null;
+            
+            while (!foundUser) {
+                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                    page: page,
+                    perPage: perPage
+                });
+                
+                if (listError) {
+                    throw new Error(`Failed to list users to find existing one: ${listError.message}`);
+                }
+                
+                if (!listData.users || listData.users.length === 0) {
+                    break; // No more users
+                }
+                
+                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+                
+                if (foundUser) {
+                    console.log(`   Found existing user ID: ${foundUser.id}`);
+                    return foundUser.id;
+                }
+                
+                // Safety break to prevent infinite loops if we have thousands of users (unlikely in test)
+                if (page > 20) {
+                    break; 
+                }
+                page++;
             }
-            const found = listData.users.find(u => u.email === TEST_USER_EMAIL);
-            if (found) {
-                console.log(`   Found existing user ID: ${found.id}`);
-                return found.id;
-            }
-            throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list`);
+            
+            throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
         }
         throw error;
     }
@@ -207,6 +232,7 @@ async function seedTestData() {
             .from("articles")
             .select()
             .eq("url", article.url)
+            .eq("owner_email", article.owner_email) // Add owner_email check
             .single();
 
         if (existing) {
