@@ -108,7 +108,7 @@ async function seedTestData() {
         // 抽出処理が成功するように、実際に存在するURL（example.comのルート）を使用し、クエリパラメータで識別する
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=apple",
+            url: "https://example.com/?id=apple", // root is 200 OK
             title: "Apple",
             thumbnail_url: "https://via.placeholder.com/300",
         },
@@ -124,34 +124,34 @@ async function seedTestData() {
             title: "Cherry",
             thumbnail_url: "https://via.placeholder.com/300",
         },
-        // その他の記事
+        // その他の記事 (example.com/xxx returns 404, so use query params or root)
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/article-1",
+            url: "https://example.com/?id=article-1",
             title: "テスト記事1",
             thumbnail_url: "https://via.placeholder.com/300",
         },
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/article-2",
+            url: "https://example.com/?id=article-2",
             title: "テスト記事2",
             thumbnail_url: "https://via.placeholder.com/300",
         },
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/popular-1",
+            url: "https://example.com/?id=popular-1",
             title: "人気記事1 - TypeScript入門",
             thumbnail_url: "https://via.placeholder.com/300",
         },
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/popular-2",
+            url: "https://example.com/?id=popular-2",
             title: "人気記事2 - Next.js完全ガイド",
             thumbnail_url: "https://via.placeholder.com/300",
         },
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/popular-3",
+            url: "https://example.com/?id=popular-3",
             title: "人気記事3 - Supabase実践",
             thumbnail_url: "https://via.placeholder.com/300",
         },
