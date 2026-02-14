@@ -123,8 +123,6 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
     });
 
     test('前へ/次へナビゲーションでプレイリストのソート順が尊重される', async ({ page }) => {
-        await clearLocalStorage(page);
-
         // Navigate to playlist
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
