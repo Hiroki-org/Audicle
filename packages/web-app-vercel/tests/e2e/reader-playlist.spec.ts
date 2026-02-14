@@ -6,13 +6,24 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Mock /api/extract to return deterministic content based on URL query
         await page.route('**/api/extract', async route => {
             const request = route.request();
-            const postData = request.postDataJSON();
-            const url = postData.url;
+            let targetUrl = '';
+            try {
+                const postData = request.postDataJSON();
+                targetUrl = postData?.url || '';
+            } catch {
+                targetUrl = '';
+            }
 
             let title = 'Example Domain';
-            if (url.includes('id=apple')) title = 'Apple';
-            else if (url.includes('id=banana')) title = 'Banana';
-            else if (url.includes('id=cherry')) title = 'Cherry';
+            try {
+                const parsed = new URL(targetUrl);
+                const id = parsed.searchParams.get('id');
+                if (id === 'apple') title = 'Apple';
+                else if (id === 'banana') title = 'Banana';
+                else if (id === 'cherry') title = 'Cherry';
+            } catch {
+                // URL parse failed, use default title
+            }
 
             await route.fulfill({
                 status: 200,

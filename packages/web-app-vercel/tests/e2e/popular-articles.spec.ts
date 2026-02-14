@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from '@playwright/test';
+import { validAudioBase64 } from '../helpers/testData';
 
 // 認証済みテスト用
 test.describe('人気記事（認証済み）', () => {
@@ -55,8 +56,7 @@ test.describe('人気記事（認証済み）', () => {
 
         // Mock /api/synthesize - Return JSON with base64-encoded audio
         await page.route('**/api/synthesize', async route => {
-            // Minimal valid 1-sample WAV file (base64-encoded)
-            const validAudioBase64 = 'UklGRi4AAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+            // Use shared validAudioBase64 from testData.ts
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
@@ -115,8 +115,7 @@ test.describe('人気記事（認証済み）', () => {
             }
         });
 
-        // gotoとwaitForResponseを同時に実行（gotoの後だとレスポンスを逃す可能性がある）
-        // gotoでページ読み込み
+        // ページ読み込み（APIルートはbeforeEachでモック済み）
         await page.goto('/popular');
 
         // 記事カードが表示されるまで待機（timeout付き）
@@ -156,8 +155,7 @@ test.describe('人気記事（認証済み）', () => {
             }
         });
 
-        // gotoとwaitForResponseを同時に実行
-        // gotoでページ読み込み
+        // ページ読み込み（APIルートはbeforeEachでモック済み）
         await page.goto('/popular');
 
         // 記事カードが表示されるまで待機
@@ -192,8 +190,7 @@ test.describe('人気記事（認証済み）', () => {
             };
         });
 
-        // gotoとwaitForResponseを同時に実行
-        // gotoでページ読み込み
+        // ページ読み込み（APIルートはbeforeEachでモック済み）
         await page.goto('/popular');
 
         // 記事カードが表示されるまで待機
