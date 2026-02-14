@@ -144,6 +144,21 @@ export async function POST(request: NextRequest) {
     }
 }
 
+// Configure undici agent for custom fetch behavior
+// In test/CI environments, we might need to ignore SSL errors for internal services or proxies
+import { Agent, setGlobalDispatcher, getGlobalDispatcher } from 'undici';
+
+// Initialize global dispatcher if needed (safe to call multiple times)
+// This ensures fetch uses our custom agent settings
+if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
+    const agent = new Agent({
+        connect: {
+            rejectUnauthorized: false
+        }
+    });
+    setGlobalDispatcher(agent);
+}
+
 /**
  * タイムアウト付きでURLをフェッチ
  * Vercelのサーバーレス関数は10秒制限があるため、8秒に設定
@@ -159,6 +174,7 @@ async function fetchWithTimeout(url: string, timeout: number = 8000): Promise<st
 
     try {
         while (redirectCount < maxRedirects) {
+            // Use standard fetch (which now respects global dispatcher in Node 18+)
             const response = await fetch(currentUrl, {
                 signal: controller.signal,
                 redirect: 'manual', // 自動リダイレクトを無効化
@@ -166,6 +182,8 @@ async function fetchWithTimeout(url: string, timeout: number = 8000): Promise<st
                     'User-Agent':
                         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 },
+                // @ts-ignore - duplex is needed for some fetch implementations but not in standard type
+                duplex: 'half', 
             });
 
             // 認証が必要なサイトの場合は専用エラーをスロー
