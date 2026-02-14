@@ -19,10 +19,72 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const TEST_USER_ID = "test-user-id-123";
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
+const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
+
+async function ensureTestUser() {
+    console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
+    // Try to create user
+    const { data, error } = await supabase.auth.admin.createUser({
+        email: TEST_USER_EMAIL,
+        password: TEST_USER_PASSWORD,
+        email_confirm: true
+    });
+
+    if (error) {
+        // If user already exists, we try to find their ID
+        const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
+        
+        if (isAlreadyRegistered) {
+            console.log("   User already exists. Fetching ID by listing users...");
+            
+            // Pagination handling to find user
+            let page = 1;
+            const perPage = 50;
+            let foundUser = null;
+            
+            while (!foundUser) {
+                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                    page: page,
+                    perPage: perPage
+                });
+                
+                if (listError) {
+                    throw new Error(`Failed to list users to find existing one: ${listError.message}`);
+                }
+                
+                if (!listData.users || listData.users.length === 0) {
+                    break; // No more users
+                }
+                
+                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+                
+                if (foundUser) {
+                    console.log(`   Found existing user ID: ${foundUser.id}`);
+                    return foundUser.id;
+                }
+
+                // If we got fewer users than perPage, we're on the last page
+                if (listData.users.length < perPage) {
+                    break;
+                }
+                
+                // Safety break to prevent infinite loops if we have thousands of users (unlikely in test)
+                if (page > 20) {
+                    break; 
+                }
+                page++;
+            }
+            
+            throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
+        }
+        throw error;
+    }
+    console.log(`   Created new user ID: ${data.user.id}`);
+    return data.user.id;
+}
 
 async function runMigrations() {
     console.log("マイグレーションを実行中...");
@@ -79,6 +141,9 @@ async function runMigrations() {
 async function seedTestData() {
     console.log("テストデータの投入を開始します...");
 
+    // 0. ユーザーIDの確保
+    const TEST_USER_ID = await ensureTestUser();
+    
     // マイグレーションを先に実行
     await runMigrations();
 
@@ -172,6 +237,7 @@ async function seedTestData() {
             .from("articles")
             .select()
             .eq("url", article.url)
+            .eq("owner_email", article.owner_email) // Add owner_email check
             .single();
 
         if (existing) {
@@ -261,6 +327,7 @@ async function seedTestData() {
                     cached_chunks: ["chunk-1", "chunk-2"],
                     completed_playback: true,
                     read_count: 5 + i,
+                    last_accessed: new Date().toISOString(),
                 },
                 { onConflict: "article_url,voice" }
             );
@@ -317,7 +384,7 @@ async function seedTestData() {
     console.log("✓ プレイリストアイテムを追加しました");
 
     console.log("\n✅ テストデータの投入が完了しました！");
-    console.log(`   - ユーザー: ${TEST_USER_EMAIL}`);
+    console.log(`   - ユーザー: ${TEST_USER_EMAIL} (ID: ${TEST_USER_ID})`);
     console.log(`   - 記事: ${createdArticles.length}件`);
     console.log(`   - 人気記事: ${popularArticles.length}件`);
     console.log("   - プレイリスト: 1件（3記事含む）");
