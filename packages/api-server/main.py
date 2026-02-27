@@ -8,7 +8,7 @@ import json
 import os
 import logging
 import re
-from typing import List
+from typing import List, Pattern
 import aiofiles
 from google.api_core.exceptions import GoogleAPICallError, RetryError
 from google.cloud import texttospeech
@@ -78,8 +78,11 @@ MAX_TTS_BYTES = 5000
 # This prevents hitting Google Cloud TTS API rate limits
 MAX_CONCURRENT_TTS_REQUESTS = int(os.getenv("MAX_CONCURRENT_TTS_REQUESTS", "10"))
 
+# Pre-compiled regex patterns for text splitting
+SENTENCE_SPLIT_REGEX = re.compile(r'([。！？\n])')
+COMMA_SPLIT_REGEX = re.compile(r'(、)')
 
-def _chunk_text(text: str, limit: int, separators: List[str]) -> List[str]:
+def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     """
     Recursively splits text into chunks smaller than `limit` bytes using `separators`.
 
@@ -118,7 +121,8 @@ def _chunk_text(text: str, limit: int, separators: List[str]) -> List[str]:
 
     # Split text. Regex should capture delimiters so they are included in the list.
     # e.g., re.split(r'([。])', "A。B") -> ["A", "。", "B"]
-    parts = [s for s in re.split(sep_pattern, text) if s]
+    # Use compiled pattern split
+    parts = [s for s in sep_pattern.split(text) if s]
 
     # Merge punctuation/delimiters back to the previous sentence
     merged_parts = []
@@ -127,13 +131,13 @@ def _chunk_text(text: str, limit: int, separators: List[str]) -> List[str]:
         current = parts[i]
 
         # Check if next part matches the separator pattern (is a delimiter)
-        if i + 1 < len(parts) and re.fullmatch(sep_pattern, parts[i+1]):
+        if i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
              current += parts[i+1]
              i += 1
 
              # Handle consecutive delimiters (e.g., "Hello!!!")
              # Keep appending as long as they match the pattern
-             while i + 1 < len(parts) and re.fullmatch(sep_pattern, parts[i+1]):
+             while i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
                  current += parts[i+1]
                  i += 1
 
@@ -171,7 +175,7 @@ def _chunk_text(text: str, limit: int, separators: List[str]) -> List[str]:
 def _split_text(text: str) -> List[str]:
     """テキストをGoogle Cloud TTS APIの制限内に分割する"""
     # First split by major punctuation, then by comma if needed, then force split
-    return _chunk_text(text, MAX_TTS_BYTES, [r'([。！？\n])', r'(、)'])
+    return _chunk_text(text, MAX_TTS_BYTES, [SENTENCE_SPLIT_REGEX, COMMA_SPLIT_REGEX])
 
 
 async def _synthesize_to_bytes(text: str, voice: str) -> bytes:
