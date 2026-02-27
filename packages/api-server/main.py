@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import asyncio
 import subprocess
 import json
@@ -56,13 +56,21 @@ def _get_client() -> texttospeech.TextToSpeechClient:
 
 
 # Request models
+MAX_TEXT_LENGTH = 50000
+MAX_URL_LENGTH = 2048
+MAX_VOICE_NAME_LENGTH = 100
+
+
 class ExtractRequest(BaseModel):
-    url: str
+    url: str = Field(..., max_length=MAX_URL_LENGTH)
 
 
 class SynthesizeRequest(BaseModel):
-    text: str
-    voice: str = os.getenv("DEFAULT_VOICE", "ja-JP-Neural2-B")
+    text: str = Field(..., max_length=MAX_TEXT_LENGTH)
+    voice: str = Field(
+        default_factory=lambda: os.getenv("DEFAULT_VOICE", "ja-JP-Neural2-B"),
+        max_length=MAX_VOICE_NAME_LENGTH
+    )
 
 
 # Response models
