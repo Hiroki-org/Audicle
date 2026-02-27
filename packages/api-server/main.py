@@ -78,6 +78,9 @@ MAX_TTS_BYTES = 5000
 # This prevents hitting Google Cloud TTS API rate limits
 MAX_CONCURRENT_TTS_REQUESTS = int(os.getenv("MAX_CONCURRENT_TTS_REQUESTS", "10"))
 
+# Semaphore for controlling TTS API concurrency
+_tts_semaphore = None
+
 
 def _chunk_text(text: str, limit: int, separators: List[str]) -> List[str]:
     """
@@ -277,27 +280,17 @@ async def synthesize_speech(request: SynthesizeRequest):
         text_chunks = _split_text(request.text)
         logger.info("Split text into %d chunks", len(text_chunks))
 
-        # Create a semaphore to limit concurrent API requests
-        # This prevents hitting Google Cloud TTS API rate limits
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT_TTS_REQUESTS)
-
-        async def synthesize_chunk_with_logging(chunk: str, index: int) -> bytes:
-            """Wrapper function to add logging and concurrency control"""
-            async with semaphore:
-                logger.info("Synthesizing chunk %d/%d", index + 1, len(text_chunks))
-                result = await _synthesize_to_bytes(chunk, request.voice)
-                logger.debug("Chunk %d/%d completed", index + 1, len(text_chunks))
-                return result
-
         logger.info("Synthesizing %d chunks in parallel", len(text_chunks))
 
         # Limit concurrency to avoid thread pool exhaustion
         # Default to 5 concurrent requests
-        max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
-        semaphore = asyncio.Semaphore(max_concurrency)
+        global _tts_semaphore
+        if _tts_semaphore is None:
+            max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
+            _tts_semaphore = asyncio.Semaphore(max_concurrency)
 
         async def _synthesize_with_semaphore(chunk_text: str, voice_name: str):
-            async with semaphore:
+            async with _tts_semaphore:
                 return await _synthesize_to_bytes(chunk_text, voice_name)
 
         tasks = [
