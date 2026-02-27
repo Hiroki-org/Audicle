@@ -277,18 +277,6 @@ async def synthesize_speech(request: SynthesizeRequest):
         text_chunks = _split_text(request.text)
         logger.info("Split text into %d chunks", len(text_chunks))
 
-        # Create a semaphore to limit concurrent API requests
-        # This prevents hitting Google Cloud TTS API rate limits
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT_TTS_REQUESTS)
-
-        async def synthesize_chunk_with_logging(chunk: str, index: int) -> bytes:
-            """Wrapper function to add logging and concurrency control"""
-            async with semaphore:
-                logger.info("Synthesizing chunk %d/%d", index + 1, len(text_chunks))
-                result = await _synthesize_to_bytes(chunk, request.voice)
-                logger.debug("Chunk %d/%d completed", index + 1, len(text_chunks))
-                return result
-
         logger.info("Synthesizing %d chunks in parallel", len(text_chunks))
 
         # Limit concurrency to avoid thread pool exhaustion
@@ -296,13 +284,16 @@ async def synthesize_speech(request: SynthesizeRequest):
         max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
         semaphore = asyncio.Semaphore(max_concurrency)
 
-        async def _synthesize_with_semaphore(chunk_text: str, voice_name: str):
+        async def _synthesize_chunk(chunk_text: str, voice_name: str, index: int, total: int) -> bytes:
             async with semaphore:
-                return await _synthesize_to_bytes(chunk_text, voice_name)
+                logger.info("Synthesizing chunk %d/%d", index + 1, total)
+                result = await _synthesize_to_bytes(chunk_text, voice_name)
+                logger.debug("Chunk %d/%d completed", index + 1, total)
+                return result
 
         tasks = [
-            _synthesize_with_semaphore(chunk, request.voice)
-            for chunk in text_chunks
+            _synthesize_chunk(chunk, request.voice, i, len(text_chunks))
+            for i, chunk in enumerate(text_chunks)
         ]
 
         # Use return_exceptions=True so we can log all failures and provide
