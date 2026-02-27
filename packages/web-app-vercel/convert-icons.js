@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { createCanvas, loadImage } = require("canvas");
+const { createCanvas } = require("canvas");
 
 // SVGをPNGに変換する関数
 async function convertSvgToPng(svgPath, pngPath, size) {
