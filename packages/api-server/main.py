@@ -289,13 +289,16 @@ async def synthesize_speech(request: SynthesizeRequest):
             max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
             _tts_semaphore = asyncio.Semaphore(max_concurrency)
 
-        async def _synthesize_with_semaphore(chunk_text: str, voice_name: str):
+        async def _synthesize_chunk(chunk_text: str, voice_name: str, index: int, total: int) -> bytes:
             async with _tts_semaphore:
-                return await _synthesize_to_bytes(chunk_text, voice_name)
+                logger.info("Synthesizing chunk %d/%d", index + 1, total)
+                result = await _synthesize_to_bytes(chunk_text, voice_name)
+                logger.debug("Chunk %d/%d completed", index + 1, total)
+                return result
 
         tasks = [
-            _synthesize_with_semaphore(chunk, request.voice)
-            for chunk in text_chunks
+            _synthesize_chunk(chunk, request.voice, i, len(text_chunks))
+            for i, chunk in enumerate(text_chunks)
         ]
 
         # Use return_exceptions=True so we can log all failures and provide
