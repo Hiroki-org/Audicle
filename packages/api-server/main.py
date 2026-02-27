@@ -12,6 +12,9 @@ from typing import List
 import aiofiles
 from google.api_core.exceptions import GoogleAPICallError, RetryError
 from google.cloud import texttospeech
+import ipaddress
+import urllib.parse
+import socket
 
 # ログ設定
 logging.basicConfig(level=logging.DEBUG)
@@ -77,6 +80,45 @@ MAX_TTS_BYTES = 5000
 # Maximum number of concurrent TTS API requests
 # This prevents hitting Google Cloud TTS API rate limits
 MAX_CONCURRENT_TTS_REQUESTS = int(os.getenv("MAX_CONCURRENT_TTS_REQUESTS", "10"))
+
+async def validate_url(url: str):
+    """
+    Validates the URL to prevent SSRF and other security issues.
+    Ensures scheme is http/https and hostname does not resolve to private/local IP.
+    """
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid URL format")
+
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="Invalid URL scheme. Only http and https are allowed.")
+
+    hostname = parsed.hostname
+    if not hostname:
+         raise HTTPException(status_code=400, detail="Invalid URL: missing hostname")
+
+    try:
+        # Resolve hostname to IP address asynchronously to avoid blocking event loop
+        loop = asyncio.get_running_loop()
+        # getaddrinfo returns a list of (family, type, proto, canonname, sockaddr) tuples
+        # sockaddr is (address, port) for IPv4 and (address, port, flowinfo, scopeid) for IPv6
+        addr_info = await loop.getaddrinfo(hostname, None)
+
+        for family, _, _, _, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            ip = ipaddress.ip_address(ip_str)
+
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+                 raise HTTPException(status_code=400, detail=f"Private or local IP addresses are not allowed: {ip_str}")
+
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="Could not resolve hostname")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("URL validation error: %s", e)
+        raise HTTPException(status_code=400, detail="URL validation failed")
 
 
 def _chunk_text(text: str, limit: int, separators: List[str]) -> List[str]:
@@ -221,6 +263,10 @@ async def root():
 @app.post("/extract", response_model=ExtractResponse)
 async def extract_content(request: ExtractRequest):
     """URLから本文を抽出する"""
+
+    # URLのバリデーションを実行 (SSRF対策)
+    await validate_url(request.url)
+
     try:
         # Node.jsスクリプトを実行してReadability.jsで本文抽出
         proc = await asyncio.create_subprocess_exec(
@@ -261,6 +307,9 @@ async def extract_content(request: ExtractRequest):
             detail="Failed to parse extraction result"
         )
     except Exception as e:
+        # HTTPExceptionはそのまま再送出
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
