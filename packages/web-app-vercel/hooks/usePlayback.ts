@@ -181,7 +181,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       }) => void;
     }).setPositionState;
 
-    if (!setPositionState) return;
+    if (!setPositionState || typeof setPositionState !== "function") return;
     const audio = audioRef.current;
     if (!audio) return;
 
