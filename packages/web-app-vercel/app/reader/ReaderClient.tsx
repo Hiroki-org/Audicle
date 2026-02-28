@@ -34,6 +34,9 @@ import {
   ListPlus,
   ExternalLink,
   Download,
+  Repeat,
+  Repeat1,
+  Shuffle,
 } from "lucide-react";
 
 function convertParagraphsToChunks(htmlContent: string): {
@@ -74,6 +77,8 @@ export default function ReaderPageClient() {
     initializeFromPlaylist,
     canMovePrevious,
     canMoveNext,
+    toggleRepeatMode,
+    toggleShuffle,
   } = usePlaylistPlayback();
 
   const [url, setUrl] = useState("");
@@ -159,8 +164,12 @@ export default function ReaderPageClient() {
 
   const handleArticleEnd = useCallback(() => {
     if (isPlaylistMode && playlistState.isPlaylistMode) {
-      // プレイリストの最後の記事の場合は完了画面を表示
-      if (currentPlaylistIndex >= playlistState.totalCount - 1) {
+      // リピートoff + 最後の記事 → 完了画面
+      if (
+        playlistState.repeatMode === "off" &&
+        currentPlaylistIndex >= playlistState.totalCount - 1 &&
+        !playlistState.shuffle
+      ) {
         setShowCompletionScreen(true);
         logger.info("プレイリスト完了", {
           playlistId: playlistState.playlistId,
@@ -169,10 +178,12 @@ export default function ReaderPageClient() {
         return;
       }
 
-      // そうでなければ次の記事へ進む
+      // onArticleEndがrepeatMode/shuffleに応じて適切に処理する
       logger.info("次の記事へ進む", {
         currentIndex: currentPlaylistIndex,
         totalCount: playlistState.totalCount,
+        repeatMode: playlistState.repeatMode,
+        shuffle: playlistState.shuffle,
       });
       onArticleEnd();
     }
@@ -181,6 +192,8 @@ export default function ReaderPageClient() {
     playlistState.isPlaylistMode,
     playlistState.totalCount,
     playlistState.playlistId,
+    playlistState.repeatMode,
+    playlistState.shuffle,
     currentPlaylistIndex,
     onArticleEnd,
   ]);
@@ -975,6 +988,22 @@ export default function ReaderPageClient() {
                   <div className="flex items-center gap-3 sm:gap-4">
                     {playlistState.isPlaylistMode && (
                       <button
+                        onClick={toggleShuffle}
+                        className={`p-2 rounded-full transition-colors ${
+                          playlistState.shuffle
+                            ? "text-green-500 hover:bg-green-500/10"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                        data-testid="desktop-shuffle-button"
+                        title={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+                        aria-label={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+                      >
+                        <Shuffle className="size-5" />
+                      </button>
+                    )}
+
+                    {playlistState.isPlaylistMode && (
+                      <button
                         onClick={() => {
                           if (isPlaylistContextReady && canMovePrevious) {
                             navigateToPlaylistItem(
@@ -1034,6 +1063,38 @@ export default function ReaderPageClient() {
                         aria-label="次の記事"
                       >
                         <SkipForward className="size-5" />
+                      </button>
+                    )}
+
+                    {playlistState.isPlaylistMode && (
+                      <button
+                        onClick={toggleRepeatMode}
+                        className={`p-2 rounded-full transition-colors ${
+                          playlistState.repeatMode !== "off"
+                            ? "text-green-500 hover:bg-green-500/10"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                        data-testid="desktop-repeat-button"
+                        title={
+                          playlistState.repeatMode === "off"
+                            ? "リピート: オフ"
+                            : playlistState.repeatMode === "one"
+                              ? "リピート: 1曲"
+                              : "リピート: 全曲"
+                        }
+                        aria-label={
+                          playlistState.repeatMode === "off"
+                            ? "リピート: オフ"
+                            : playlistState.repeatMode === "one"
+                              ? "リピート: 1曲"
+                              : "リピート: 全曲"
+                        }
+                      >
+                        {playlistState.repeatMode === "one" ? (
+                          <Repeat1 className="size-5" />
+                        ) : (
+                          <Repeat className="size-5" />
+                        )}
                       </button>
                     )}
                   </div>
@@ -1149,6 +1210,22 @@ export default function ReaderPageClient() {
               {/* Prev - Play - Next (center aligned) */}
               {playlistState.isPlaylistMode && (
                 <button
+                  onClick={toggleShuffle}
+                  className={`p-2 rounded-full transition-colors ${
+                    playlistState.shuffle
+                      ? "text-green-500 hover:bg-green-500/10"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                  data-testid="mobile-shuffle-button"
+                  title={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+                  aria-label={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+                >
+                  <Shuffle className="size-4" />
+                </button>
+              )}
+
+              {playlistState.isPlaylistMode && (
+                <button
                   onClick={() => {
                     if (isPlaylistContextReady && canMovePrevious) {
                       navigateToPlaylistItem(
@@ -1206,6 +1283,38 @@ export default function ReaderPageClient() {
                   aria-label="次の記事"
                 >
                   <SkipForward className="size-5" />
+                </button>
+              )}
+
+              {playlistState.isPlaylistMode && (
+                <button
+                  onClick={toggleRepeatMode}
+                  className={`p-2 rounded-full transition-colors ${
+                    playlistState.repeatMode !== "off"
+                      ? "text-green-500 hover:bg-green-500/10"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                  data-testid="mobile-repeat-button"
+                  title={
+                    playlistState.repeatMode === "off"
+                      ? "リピート: オフ"
+                      : playlistState.repeatMode === "one"
+                        ? "リピート: 1曲"
+                        : "リピート: 全曲"
+                  }
+                  aria-label={
+                    playlistState.repeatMode === "off"
+                      ? "リピート: オフ"
+                      : playlistState.repeatMode === "one"
+                        ? "リピート: 1曲"
+                        : "リピート: 全曲"
+                  }
+                >
+                  {playlistState.repeatMode === "one" ? (
+                    <Repeat1 className="size-4" />
+                  ) : (
+                    <Repeat className="size-4" />
+                  )}
                 </button>
               )}
             </div>
