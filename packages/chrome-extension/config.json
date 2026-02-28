@@ -8,6 +8,7 @@
   "requestCooldown": 500,
   "jumpBatchSize": 3,
   "initialBatchSize": 5,
+  "debug": false,
   "serverUrls": {
     "edge_tts": "http://localhost:8001",
     "edge_tts_docker": "http://localhost:8001",

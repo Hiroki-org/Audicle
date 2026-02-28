@@ -26,6 +26,13 @@ let chunkSize = 200; // 200文字ごとに分割（0にすると分割なし）
 
 // 設定
 let config = null;
+let isDebug = false;
+
+function debugLog(...args) {
+  if (isDebug) {
+    console.log(...args);
+  }
+}
 
 async function loadConfig() {
   try {
@@ -37,6 +44,7 @@ async function loadConfig() {
     batchSize = config.batchSize || 3;
     chunkSize = config.chunkSize || 200;
     requestCooldown = config.requestCooldown || 500;
+    isDebug = config.debug || false;
   } catch (error) {
     console.error("Failed to load config:", error);
     config = {
@@ -48,6 +56,7 @@ async function loadConfig() {
       chunkSize: 200,
       requestCooldown: 500,
       jumpBatchSize: 3,
+      debug: false,
     };
     // fallbackでも定数を更新
     prefetchAhead = config.prefetchAhead;
@@ -55,6 +64,7 @@ async function loadConfig() {
     batchSize = config.batchSize;
     chunkSize = config.chunkSize;
     requestCooldown = config.requestCooldown;
+    isDebug = config.debug;
   }
 }
 
@@ -78,7 +88,7 @@ let isProcessingRequests = false; // リクエスト処理中フラグ
 // **レート制限管理関数**
 function addToRequestQueue(requestData, callback) {
   requestQueue.push({ requestData, callback });
-  console.log(
+  debugLog(
     `[Rate Limit] Added request to queue. Queue length: ${requestQueue.length}`
   );
   processRequestQueue();
@@ -100,7 +110,7 @@ function processRequestQueue() {
       const { requestData, callback } = requestQueue.shift();
       lastRequestTime = Date.now();
 
-      console.log(
+      debugLog(
         `[Rate Limit] Processing request. Remaining in queue: ${requestQueue.length}`
       );
 
@@ -119,7 +129,7 @@ function processRequestQueue() {
 
 // **順次音声合成リクエスト関数**
 function requestAudioSequentially(startIndex, endIndex, callback) {
-  console.log(
+  debugLog(
     `[Sequential Request] Starting from index ${startIndex} to ${
       endIndex || playbackQueue.length - 1
     }`
@@ -139,14 +149,14 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
   }
 
   if (requests.length === 0) {
-    console.log(
+    debugLog(
       `[Sequential Request] All items ${startIndex}-${actualEndIndex} already cached`
     );
     callback();
     return;
   }
 
-  console.log(`[Sequential Request] Queuing ${requests.length} requests`);
+  debugLog(`[Sequential Request] Queuing ${requests.length} requests`);
   let completedRequests = 0;
 
   // 各リクエストを順次キューに追加
@@ -159,14 +169,14 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
     addToRequestQueue(requestData, (response) => {
       if (response && response.audioDataUrl) {
         audioCache.set(request.index, response.audioDataUrl);
-        console.log(
+        debugLog(
           `[Sequential Request] Cached audio for index: ${request.index}`
         );
       }
 
       completedRequests++;
       if (completedRequests === requests.length) {
-        console.log(
+        debugLog(
           `[Sequential Request] Completed all ${requests.length} requests`
         );
         callback();
@@ -258,12 +268,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       audioPlayer.pause();
       isPlaying = false;
       notifyPlaybackStopped();
-      console.log("Playback paused");
+      debugLog("Playback paused");
       sendResponse({ isPlaying: false });
     } else if (playbackQueue.length > 0) {
       // 再開
       playQueue();
-      console.log("Playback resumed");
+      debugLog("Playback resumed");
       sendResponse({ isPlaying: true });
     } else {
       sendResponse({ isPlaying: false });
@@ -273,13 +283,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // 再生速度のリアルタイム更新
   if (message.command === "updatePlaybackRate") {
     audioPlayer.playbackRate = message.rate;
-    console.log("Playback rate updated to:", message.rate);
+    debugLog("Playback rate updated to:", message.rate);
   }
 });
 
 // audio の再生終了を受け取り、キューの次へ進める
 audioPlayer.addEventListener("ended", () => {
-  console.log(
+  debugLog(
     "Audio ended, current queueIndex:",
     queueIndex,
     "queue length:",
@@ -288,10 +298,10 @@ audioPlayer.addEventListener("ended", () => {
   retryCount = 0; // リトライカウンターをリセット
   queueIndex += 1;
   if (queueIndex < playbackQueue.length) {
-    console.log("Moving to next item, new queueIndex:", queueIndex);
+    debugLog("Moving to next item, new queueIndex:", queueIndex);
     playQueue();
   } else {
-    console.log("Queue finished");
+    debugLog("Queue finished");
     isPlaying = false;
     notifyPlaybackStopped();
     // キュー終了時にハイライト解除
@@ -306,12 +316,12 @@ audioPlayer.addEventListener("error", (e) => {
   console.error("Audio error:", e);
   if (retryCount < maxRetries) {
     retryCount++;
-    console.log(
+    debugLog(
       `Retrying playback for index ${queueIndex}, attempt ${retryCount}`
     );
     setTimeout(() => playQueue(), 3000); // 3秒遅延してリトライ
   } else {
-    console.log(`Max retries reached for index ${queueIndex}, skipping`);
+    debugLog(`Max retries reached for index ${queueIndex}, skipping`);
     retryCount = 0;
     isPlaying = false;
     notifyPlaybackStopped();
@@ -355,7 +365,7 @@ function loadCurrentUrlState(callback) {
       invalidKeys.forEach((k) => delete urlStates[k]);
       // 保存してクリーンアップ
       chrome.storage.local.set({ urlStates });
-      console.log("content: cleaned up invalid urlStates keys:", invalidKeys);
+      debugLog("content: cleaned up invalid urlStates keys:", invalidKeys);
     }
 
     // ホスト名が取得できない場合はグローバルのenabledを使う
@@ -567,7 +577,7 @@ function updateHighlight(paragraphId) {
           block: "center", // 画面中央に配置
           inline: "nearest",
         });
-        console.log(
+        debugLog(
           "updateHighlight: Auto-scrolled to paragraphId:",
           paragraphId
         );
@@ -615,7 +625,7 @@ function handleClick(event) {
   event.preventDefault();
   event.stopPropagation();
 
-  console.log(
+  debugLog(
     "handleClick: Clicked element:",
     target,
     "ID:",
@@ -628,7 +638,7 @@ function handleClick(event) {
   if (isPlaying && playbackQueue.length > 0) {
     const clickedId = parseInt(target.dataset.audicleId);
     if (!isNaN(clickedId)) {
-      console.log(
+      debugLog(
         "handleClick: Searching for paragraphId:",
         clickedId,
         "in queue of",
@@ -651,7 +661,7 @@ function handleClick(event) {
       });
 
       if (bestIndex !== -1) {
-        console.log(
+        debugLog(
           "handleClick: Found at index:",
           bestIndex,
           "for ID:",
@@ -685,7 +695,7 @@ function handleClick(event) {
         }
 
         if (jumpBatch.length > 0) {
-          console.log(
+          debugLog(
             `handleClick: Requesting ${jumpBatch.length} items from jump position using sequential requests`
           );
 
@@ -701,7 +711,7 @@ function handleClick(event) {
                   bestIndex + JUMP_BATCH_SIZE,
                   null,
                   () => {
-                    console.log("handleClick: Background loading completed");
+                    debugLog("handleClick: Background loading completed");
                   }
                 );
               }
@@ -712,7 +722,7 @@ function handleClick(event) {
           // バックグラウンドで残りを読み込み
           if (bestIndex + JUMP_BATCH_SIZE < playbackQueue.length) {
             requestAudioSequentially(bestIndex + JUMP_BATCH_SIZE, null, () => {
-              console.log("handleClick: Background loading completed");
+              debugLog("handleClick: Background loading completed");
             });
           }
         }
@@ -723,7 +733,7 @@ function handleClick(event) {
           "not found in current queue"
         );
         // デバッグ: キューの最初の5項目を表示
-        console.log(
+        debugLog(
           "Queue sample:",
           playbackQueue.slice(0, 5).map((item) => ({
             id: item.paragraphId,
@@ -747,7 +757,7 @@ function handleClick(event) {
   try {
     // 新しいルール管理システムを優先使用
     if (window.ExtractionRulesManager) {
-      console.log("handleClick: Using new integrated rules system");
+      debugLog("handleClick: Using new integrated rules system");
       const result = buildQueueWithNewRulesManager();
       queue = result.queue;
       extractionInfo = result.info;
@@ -776,22 +786,22 @@ function handleClick(event) {
 
   // 可観測性: 採用されたルール情報をログ出力
   if (extractionInfo) {
-    console.log(
+    debugLog(
       `[🎯 Extraction Result] Rule: ${extractionInfo.rule}, Blocks: ${
         extractionInfo.queueLength || queue.length
       }, Domain: ${extractionInfo.domain}`
     );
     if (extractionInfo.priority) {
-      console.log(
+      debugLog(
         `[📊 Rule Info] Priority: ${extractionInfo.priority}, Type: ${extractionInfo.type}`
       );
     }
     if (extractionInfo.fallbackReason) {
-      console.log(`[⚠️  Fallback] Reason: ${extractionInfo.fallbackReason}`);
+      debugLog(`[⚠️  Fallback] Reason: ${extractionInfo.fallbackReason}`);
     }
   }
 
-  console.log("handleClick: Built queue length:", queue.length);
+  debugLog("handleClick: Built queue length:", queue.length);
 
   // キューが構築できた場合は再生開始
   if (queue.length > 0) {
@@ -809,7 +819,7 @@ function handleClick(event) {
 
       if (startIndex !== -1) {
         queueIndex = startIndex;
-        console.log(
+        debugLog(
           "handleClick: Starting at index:",
           startIndex,
           "for ID:",
@@ -833,7 +843,7 @@ function handleClick(event) {
 
 // 新しいルール管理システムを使用したキュー構築（統合版）
 function buildQueueWithNewRulesManager() {
-  console.log("[NewRulesManager] Building queue with integrated rules system");
+  debugLog("[NewRulesManager] Building queue with integrated rules system");
 
   const manager = new window.ExtractionRulesManager();
   const hostname = window.location.hostname;
@@ -845,7 +855,7 @@ function buildQueueWithNewRulesManager() {
     throw new Error("No applicable rule found for this page");
   }
 
-  console.log(
+  debugLog(
     `[NewRulesManager] Using rule: ${rule.id} (${rule.type}, priority: ${rule.priority})`
   );
 
@@ -868,7 +878,7 @@ function buildQueueWithNewRulesManager() {
     // デバッグ: 要素の処理順序を確認
     const tagName = element ? element.tagName.toLowerCase() : "unknown";
     const textPreview = text ? text.substring(0, 30) + "..." : "no text";
-    console.log(
+    debugLog(
       `[NewRulesManager] Processing block ${blockIndex}: ${tagName} (id: ${paragraphId}) - "${textPreview}"`
     );
 
@@ -925,7 +935,7 @@ function buildQueueWithNewRulesManager() {
     queueLength: queue.length,
   };
 
-  console.log(
+  debugLog(
     `[NewRulesManager] Successfully built queue: ${queue.length} chunks from ${extraction.length} blocks using rule '${rule.id}'`
   );
 
@@ -934,22 +944,22 @@ function buildQueueWithNewRulesManager() {
 
 // レガシーシステムを使用したキュー構築
 function buildQueueWithLegacySystem() {
-  console.log("[LegacySystem] Building queue with legacy rules system");
+  debugLog("[LegacySystem] Building queue with legacy rules system");
 
   const hostname = window.location.hostname;
   let queue = [];
   let info = { rule: "unknown", domain: hostname };
 
   if (customRules[hostname]) {
-    console.log("[LegacySystem] Using custom rule for", hostname);
+    debugLog(`[LegacySystem] Using custom rule for ${hostname}`);
     queue = buildQueueWithCustomRule(customRules[hostname]);
-    info.rule = "custom-" + hostname;
+    info.rule = `custom-${hostname}`;
     info.type = "site-specific";
   }
 
   if (queue.length === 0) {
     try {
-      console.log("[LegacySystem] Trying Readability extraction");
+      debugLog("[LegacySystem] Trying Readability extraction");
       queue = buildQueueWithReadability();
       info.rule = "readability";
       info.type = "library";
@@ -959,14 +969,14 @@ function buildQueueWithLegacySystem() {
   }
 
   if (queue.length === 0) {
-    console.log("[LegacySystem] Using fallback extraction");
+    debugLog("[LegacySystem] Using fallback extraction");
     queue = buildQueueWithFallback();
     info.rule = "fallback";
     info.type = "emergency";
   }
 
   info.queueLength = queue.length;
-  console.log(
+  debugLog(
     `[LegacySystem] Built queue: ${queue.length} items using rule '${info.rule}'`
   );
 
@@ -1014,7 +1024,7 @@ function getCurrentPageRuleInfo() {
   // Readability利用可能性
   ruleInfo.readabilityAvailable = typeof window.Readability !== "undefined";
 
-  console.log("[\ud83d\udd0d Page Rule Info]", ruleInfo);
+  debugLog("[\ud83d\udd0d Page Rule Info]", ruleInfo);
   return ruleInfo;
 }
 
@@ -1029,17 +1039,17 @@ document.addEventListener("DOMContentLoaded", () => {
   window.getCurrentPageRuleInfo = getCurrentPageRuleInfo;
 
   // システム状態をログ出力
-  console.log("[🚀 Audicle Initialized]");
-  console.log(
+  debugLog("[🚀 Audicle Initialized]");
+  debugLog(
     "- New Rules Manager:",
     window.ExtractionRulesManager ? "✅ Available" : "❌ Not loaded"
   );
-  console.log(
+  debugLog(
     "- Legacy Rules:",
     Object.keys(customRules).length,
     "site-specific rules"
   );
-  console.log(
+  debugLog(
     "- Readability.js:",
     window.Readability ? "✅ Available" : "⏳ Will load dynamically"
   );
@@ -1049,80 +1059,35 @@ document.addEventListener("DOMContentLoaded", () => {
     const ruleInfo = getCurrentPageRuleInfo();
 
     if (ruleInfo.activeRule) {
-      console.log(
+      debugLog(
         `[📋 Current Page Rule] ${ruleInfo.activeRule.id} (${ruleInfo.activeRule.system} system, priority: ${ruleInfo.activeRule.priority})`
       );
     } else if (ruleInfo.legacyRule) {
-      console.log(
+      debugLog(
         `[📋 Current Page Rule] ${ruleInfo.legacyRule.id} (legacy system)`
       );
     } else if (ruleInfo.readabilityAvailable) {
-      console.log("[📋 Current Page Rule] Readability.js (fallback)");
+      debugLog("[📋 Current Page Rule] Readability.js (fallback)");
     } else {
-      console.log(
+      debugLog(
         "[📋 Current Page Rule] Emergency fallback (basic text extraction)"
       );
     }
 
-    console.log(`[🌐 Page Info] ${ruleInfo.hostname}`);
+    debugLog(`[🌐 Page Info] ${ruleInfo.hostname}`);
   }, 500);
 });
 
-// レガシーシステムでのキュー構築（既存動作保護）
-function buildQueueWithLegacySystem() {
-  console.log("[LegacySystem] Using legacy extraction system");
-
-  const hostname = window.location.hostname;
-  let queue = [];
-  let usedRule = "none";
-
-  // 既存のカスタムルール
-  if (customRules[hostname]) {
-    console.log(`[LegacySystem] Using custom rule for ${hostname}`);
-    queue = buildQueueWithCustomRule(customRules[hostname]);
-    usedRule = `custom-${hostname}`;
-  }
-
-  // Readability.js
-  if (queue.length === 0) {
-    try {
-      console.log("[LegacySystem] Trying Readability extraction");
-      queue = buildQueueWithReadability();
-      usedRule = "readability";
-    } catch (e) {
-      console.warn("Readability extraction failed:", e);
-    }
-  }
-
-  // フォールバック
-  if (queue.length === 0) {
-    console.log("[LegacySystem] Using fallback extraction");
-    queue = buildQueueWithFallback();
-    usedRule = "fallback";
-  }
-
-  return {
-    queue: queue,
-    info: {
-      rule: usedRule,
-      type: "legacy",
-      priority: "unknown",
-      queueLength: queue.length,
-      domain: hostname,
-    },
-  };
-}
-
 // 新しいルールマネージャーを使用したキュー構築
 function buildQueueWithRulesManager() {
-  console.log("[RulesManager] Building queue with new rules manager");
+  debugLog("[RulesManager] Building queue with new rules manager");
 
   // ルールマネージャーのインスタンスを作成
   const rulesManager = new window.ExtractionRulesManager();
 
   // 適用可能なルールを取得
   const applicableRules = rulesManager.getApplicableRules();
-  console.log(
+  debugLog(
     "[RulesManager] Found applicable rules:",
     applicableRules.map((r) => `${r.name} (priority: ${r.priority})`)
   );
@@ -1130,7 +1095,7 @@ function buildQueueWithRulesManager() {
   // 優先順位に従って順次試行
   for (const rule of applicableRules) {
     try {
-      console.log(`[RulesManager] Trying rule: ${rule.name}`);
+      debugLog(`[RulesManager] Trying rule: ${rule.name}`);
 
       // Readabilityライブラリが必要な場合は事前に注入
       if (rule.extractStrategy.requiresLibrary) {
@@ -1147,7 +1112,7 @@ function buildQueueWithRulesManager() {
       const blocks = rulesManager.extractContent(rule);
 
       if (blocks && blocks.length > 0) {
-        console.log(
+        debugLog(
           `[RulesManager] ✅ Successfully extracted ${blocks.length} blocks with rule: ${rule.name}`
         );
 
@@ -1166,7 +1131,7 @@ function buildQueueWithRulesManager() {
 
 // 新しいブロック形式を既存のキュー形式に変換
 function convertBlocksToQueue(blocks) {
-  console.log(
+  debugLog(
     `[RulesManager] Converting ${blocks.length} blocks to queue format`
   );
 
@@ -1205,7 +1170,7 @@ function convertBlocksToQueue(blocks) {
     applyClickableStyles(task.element, task.id, palette);
   });
 
-  console.log(`[RulesManager] Converted to ${queue.length} queue chunks`);
+  debugLog(`[RulesManager] Converted to ${queue.length} queue chunks`);
   return queue;
 }
 
@@ -1223,7 +1188,7 @@ function buildQueueWithCustomRule(rule) {
   const queue = [];
   let paragraphId = 0;
 
-  console.log(
+  debugLog(
     "buildQueueWithCustomRule: Processing",
     allElements.length,
     "elements"
@@ -1236,7 +1201,7 @@ function buildQueueWithCustomRule(rule) {
     const text = (el.textContent || "").trim();
     if (shouldUseElementForPlayback(el, text)) {
       styleTasks.push({ element: el, id: paragraphId });
-      console.log(
+      debugLog(
         "buildQueueWithCustomRule: Added element",
         tagName,
         "ID:",
@@ -1264,7 +1229,7 @@ function buildQueueWithCustomRule(rule) {
     applyClickableStyles(task.element, task.id, palette);
   });
 
-  console.log(
+  debugLog(
     "buildQueueWithCustomRule: Built queue with",
     queue.length,
     "chunks"
@@ -1347,7 +1312,7 @@ function playQueue() {
     return;
   }
 
-  console.log(
+  debugLog(
     "playQueue: Playing item at index:",
     queueIndex,
     "text length:",
@@ -1366,7 +1331,7 @@ function playQueue() {
   // まずキャッシュをチェック。あれば即座に再生、なければ通常の play 要求を送る
   const cached = audioCache.get(queueIndex);
   if (cached) {
-    console.log("playQueue: Using cached audio for index:", queueIndex);
+    debugLog("playQueue: Using cached audio for index:", queueIndex);
     isPlaying = true;
     notifyPlaybackStarted();
     // 既に取得済みの dataUrl をセットして再生
@@ -1380,7 +1345,7 @@ function playQueue() {
     );
     audioPlayer.src = cached;
   } else {
-    console.log(
+    debugLog(
       "playQueue: No cached audio for index:",
       queueIndex,
       "Cache size:",
@@ -1389,10 +1354,10 @@ function playQueue() {
     // 全フェッチ済みのはずなので、エラー扱い
     retryCount++;
     if (retryCount < maxRetries) {
-      console.log("playQueue: Retrying in 3s, attempt:", retryCount);
+      debugLog("playQueue: Retrying in 3s, attempt:", retryCount);
       setTimeout(() => playQueue(), 3000);
     } else {
-      console.log(
+      debugLog(
         `playQueue: Max retries reached for index ${queueIndex}, skipping`
       );
       retryCount = 0;
@@ -1523,7 +1488,7 @@ function progressiveFetch(callback) {
   }
 
   if (initialBatch.length === 0) {
-    console.log(
+    debugLog(
       "progressiveFetch: Initial batch already cached, starting playback"
     );
     callback();
@@ -1532,7 +1497,7 @@ function progressiveFetch(callback) {
     return;
   }
 
-  console.log(
+  debugLog(
     `progressiveFetch: Starting sequential fetch of initial batch (${initialBatch.length} items) for immediate playback`
   );
 
@@ -1541,14 +1506,14 @@ function progressiveFetch(callback) {
     startIndex,
     startIndex + INITIAL_BATCH_SIZE - 1,
     () => {
-      console.log("progressiveFetch: Initial batch ready, starting playback");
+      debugLog("progressiveFetch: Initial batch ready, starting playback");
       callback();
 
       // バックグラウンドで残りを順次読み込み（上から順番）
       if (startIndex + INITIAL_BATCH_SIZE < playbackQueue.length) {
-        console.log("progressiveFetch: Starting background sequential loading");
+        debugLog("progressiveFetch: Starting background sequential loading");
         requestAudioSequentially(startIndex + INITIAL_BATCH_SIZE, null, () => {
-          console.log("progressiveFetch: All background loading completed");
+          debugLog("progressiveFetch: All background loading completed");
         });
       }
     }
@@ -1577,14 +1542,14 @@ function fetchRemainingInBackground(priorityStartIndex) {
     }
   }
 
-  console.log(
+  debugLog(
     `fetchRemainingInBackground: Queued background loading from index ${priorityStartIndex}`
   );
 }
 
 // 全体的なバッチ取得（必要に応じて順次リクエストに変更）
 function fullBatchFetch(callback) {
-  console.log("fullBatchFetch: Starting full sequential loading");
+  debugLog("fullBatchFetch: Starting full sequential loading");
 
   // 全ての未キャッシュ項目を順次キューに追加
   for (let i = 0; i < playbackQueue.length; i++) {
