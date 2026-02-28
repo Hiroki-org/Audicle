@@ -34,7 +34,18 @@ import {
   ListPlus,
   ExternalLink,
   Download,
+  Repeat,
+  Repeat1,
+  Shuffle,
 } from "lucide-react";
+import type { RepeatMode } from "@/contexts/PlaylistPlaybackContext";
+
+// リピートモードのラベルマップ
+const repeatModeLabels: Record<RepeatMode, string> = {
+  off: "リピート: オフ",
+  one: "リピート: 1曲",
+  all: "リピート: 全曲",
+};
 
 function convertParagraphsToChunks(htmlContent: string): {
   chunks: Chunk[];
@@ -74,6 +85,8 @@ export default function ReaderPageClient() {
     initializeFromPlaylist,
     canMovePrevious,
     canMoveNext,
+    toggleRepeatMode,
+    toggleShuffle,
   } = usePlaylistPlayback();
 
   const [url, setUrl] = useState("");
@@ -159,20 +172,35 @@ export default function ReaderPageClient() {
 
   const handleArticleEnd = useCallback(() => {
     if (isPlaylistMode && playlistState.isPlaylistMode) {
-      // プレイリストの最後の記事の場合は完了画面を表示
-      if (currentPlaylistIndex >= playlistState.totalCount - 1) {
-        setShowCompletionScreen(true);
-        logger.info("プレイリスト完了", {
-          playlistId: playlistState.playlistId,
-          totalCount: playlistState.totalCount,
-        });
-        return;
+      // リピートoff時の完了判定
+      if (playlistState.repeatMode === "off") {
+        let isAtEnd = false;
+        if (playlistState.shuffle) {
+          // シャッフルモード: シャッフルキューの最後かどうか確認
+          const shuffledIndices = playlistState.shuffledIndices;
+          const currentShufflePos = shuffledIndices.indexOf(currentPlaylistIndex);
+          isAtEnd = currentShufflePos >= shuffledIndices.length - 1;
+        } else {
+          isAtEnd = currentPlaylistIndex >= playlistState.totalCount - 1;
+        }
+
+        if (isAtEnd) {
+          setShowCompletionScreen(true);
+          logger.info("プレイリスト完了", {
+            playlistId: playlistState.playlistId,
+            totalCount: playlistState.totalCount,
+            shuffle: playlistState.shuffle,
+          });
+          return;
+        }
       }
 
-      // そうでなければ次の記事へ進む
+      // onArticleEndがrepeatMode/shuffleに応じて適切に処理する
       logger.info("次の記事へ進む", {
         currentIndex: currentPlaylistIndex,
         totalCount: playlistState.totalCount,
+        repeatMode: playlistState.repeatMode,
+        shuffle: playlistState.shuffle,
       });
       onArticleEnd();
     }
@@ -181,6 +209,9 @@ export default function ReaderPageClient() {
     playlistState.isPlaylistMode,
     playlistState.totalCount,
     playlistState.playlistId,
+    playlistState.repeatMode,
+    playlistState.shuffle,
+    playlistState.shuffledIndices,
     currentPlaylistIndex,
     onArticleEnd,
   ]);
@@ -975,6 +1006,22 @@ export default function ReaderPageClient() {
                   <div className="flex items-center gap-3 sm:gap-4">
                     {playlistState.isPlaylistMode && (
                       <button
+                        onClick={toggleShuffle}
+                        className={`p-2 rounded-full transition-colors ${
+                          playlistState.shuffle
+                            ? "text-green-500 hover:bg-green-500/10"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                        data-testid="desktop-shuffle-button"
+                        title={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+                        aria-label={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+                      >
+                        <Shuffle className="size-5" />
+                      </button>
+                    )}
+
+                    {playlistState.isPlaylistMode && (
+                      <button
                         onClick={() => {
                           if (isPlaylistContextReady && canMovePrevious) {
                             navigateToPlaylistItem(
@@ -1034,6 +1081,26 @@ export default function ReaderPageClient() {
                         aria-label="次の記事"
                       >
                         <SkipForward className="size-5" />
+                      </button>
+                    )}
+
+                    {playlistState.isPlaylistMode && (
+                      <button
+                        onClick={toggleRepeatMode}
+                        className={`p-2 rounded-full transition-colors ${
+                          playlistState.repeatMode !== "off"
+                            ? "text-green-500 hover:bg-green-500/10"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                        data-testid="desktop-repeat-button"
+                        title={repeatModeLabels[playlistState.repeatMode]}
+                        aria-label={repeatModeLabels[playlistState.repeatMode]}
+                      >
+                        {playlistState.repeatMode === "one" ? (
+                          <Repeat1 className="size-5" />
+                        ) : (
+                          <Repeat className="size-5" />
+                        )}
                       </button>
                     )}
                   </div>
@@ -1149,6 +1216,22 @@ export default function ReaderPageClient() {
               {/* Prev - Play - Next (center aligned) */}
               {playlistState.isPlaylistMode && (
                 <button
+                  onClick={toggleShuffle}
+                  className={`p-2 rounded-full transition-colors ${
+                    playlistState.shuffle
+                      ? "text-green-500 hover:bg-green-500/10"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                  data-testid="mobile-shuffle-button"
+                  title={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+                  aria-label={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+                >
+                  <Shuffle className="size-4" />
+                </button>
+              )}
+
+              {playlistState.isPlaylistMode && (
+                <button
                   onClick={() => {
                     if (isPlaylistContextReady && canMovePrevious) {
                       navigateToPlaylistItem(
@@ -1206,6 +1289,26 @@ export default function ReaderPageClient() {
                   aria-label="次の記事"
                 >
                   <SkipForward className="size-5" />
+                </button>
+              )}
+
+              {playlistState.isPlaylistMode && (
+                <button
+                  onClick={toggleRepeatMode}
+                  className={`p-2 rounded-full transition-colors ${
+                    playlistState.repeatMode !== "off"
+                      ? "text-green-500 hover:bg-green-500/10"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                  data-testid="mobile-repeat-button"
+                  title={repeatModeLabels[playlistState.repeatMode]}
+                  aria-label={repeatModeLabels[playlistState.repeatMode]}
+                >
+                  {playlistState.repeatMode === "one" ? (
+                    <Repeat1 className="size-4" />
+                  ) : (
+                    <Repeat className="size-4" />
+                  )}
                 </button>
               )}
             </div>
