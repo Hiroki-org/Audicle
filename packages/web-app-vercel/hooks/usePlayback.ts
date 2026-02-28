@@ -200,7 +200,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
         : undefined;
 
     try {
-      setPositionState({ duration, position, playbackRate });
+      setPositionState.call(mediaSession, { duration, position, playbackRate });
     } catch (error) {
       // Safari/PWA など実装差分があり得るため、握りつぶさずログだけ残す
       logger.warn('Failed to set Media Session position state', error);

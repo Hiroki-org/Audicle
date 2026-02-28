@@ -138,7 +138,7 @@ export function useMediaSession({
         : undefined;
 
     try {
-      setPositionState({ duration, position, playbackRate });
+      setPositionState.call(mediaSession, { duration, position, playbackRate });
     } catch (error) {
       logger.warn("Failed to set Media Session position state", error);
     }

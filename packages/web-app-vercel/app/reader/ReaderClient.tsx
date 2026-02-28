@@ -171,7 +171,8 @@ export default function ReaderPageClient() {
   } = useAudioPlayback();
 
   const handleArticleEnd = useCallback(() => {
-    if (isPlaylistMode && playlistState.isPlaylistMode) {
+    // プレイリストモード時の処理
+    if (playlistState.isPlaylistMode) {
       // リピートoff時の完了判定
       if (playlistState.repeatMode === "off") {
         let isAtEnd = false;
@@ -203,9 +204,12 @@ export default function ReaderPageClient() {
         shuffle: playlistState.shuffle,
       });
       onArticleEnd();
+      return;
     }
+
+    // プレイリストモードでない未分類再生時は何もしない
+    logger.info("handleArticleEnd: プレイリストモードではないためスキップ");
   }, [
-    isPlaylistMode,
     playlistState.isPlaylistMode,
     playlistState.totalCount,
     playlistState.playlistId,
