@@ -76,7 +76,7 @@ export function useMediaSession({
   const hasSetPositionState = (
     session: MediaSession
   ): session is MediaSession & { setPositionState: (state: PositionState) => void } =>
-    "setPositionState" in session;
+    typeof (session as unknown as Record<string, unknown>).setPositionState === "function";
 
   // コールバック関数の参照を保持（再レンダリングによる再登録を防ぐ）
   const onPlayRef = useRef(onPlay);
@@ -138,7 +138,7 @@ export function useMediaSession({
         : undefined;
 
     try {
-      setPositionState({ duration, position, playbackRate });
+      setPositionState.call(mediaSession, { duration, position, playbackRate });
     } catch (error) {
       logger.warn("Failed to set Media Session position state", error);
     }
