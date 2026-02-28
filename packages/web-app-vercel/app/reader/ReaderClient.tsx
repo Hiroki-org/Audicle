@@ -171,6 +171,16 @@ export default function ReaderPageClient() {
   } = useAudioPlayback();
 
   const handleArticleEnd = useCallback(() => {
+    logger.info("handleArticleEnd 呼び出し", {
+      isPlaylistMode: playlistState.isPlaylistMode,
+      repeatMode: playlistState.repeatMode,
+      shuffle: playlistState.shuffle,
+      currentIndex: currentPlaylistIndex,
+      totalCount: playlistState.totalCount,
+      shuffledIndicesLength: playlistState.shuffledIndices.length,
+      playlistId: playlistState.playlistId,
+    });
+
     // プレイリストモード時の処理
     if (playlistState.isPlaylistMode) {
       // リピートoff時の完了判定
