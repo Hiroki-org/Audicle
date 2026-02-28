@@ -67,9 +67,6 @@ function scrollElementIntoView(
                 left: 0,
             });
 
-            console.log(
-                `[useAutoScroll] コンテナ内スクロール: chunkId=${chunkId}, scrollTop=${Math.round(scrollTop)}`
-            );
         } else {
             // windowをスクロール対象とする場合
             // scrollIntoViewを使用（Chrome拡張版と同等）
@@ -79,9 +76,6 @@ function scrollElementIntoView(
                 inline: "nearest",
             });
 
-            console.log(
-                `[useAutoScroll] ウィンドウスクロール: chunkId=${chunkId}`
-            );
         }
     } catch (error) {
         console.warn(`[useAutoScroll] スクロール失敗:`, error);
