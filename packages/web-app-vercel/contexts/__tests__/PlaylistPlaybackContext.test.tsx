@@ -4,7 +4,6 @@ import {
   PlaylistPlaybackProvider,
   usePlaylistPlayback,
   generateShuffledIndices,
-  type RepeatMode,
   type PlaylistPlaybackContextType,
 } from "@/contexts/PlaylistPlaybackContext";
 

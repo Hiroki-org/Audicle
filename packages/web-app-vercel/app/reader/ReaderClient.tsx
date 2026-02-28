@@ -38,6 +38,14 @@ import {
   Repeat1,
   Shuffle,
 } from "lucide-react";
+import type { RepeatMode } from "@/contexts/PlaylistPlaybackContext";
+
+// リピートモードのラベルマップ
+const repeatModeLabels: Record<RepeatMode, string> = {
+  off: "リピート: オフ",
+  one: "リピート: 1曲",
+  all: "リピート: 全曲",
+};
 
 function convertParagraphsToChunks(htmlContent: string): {
   chunks: Chunk[];
@@ -164,18 +172,27 @@ export default function ReaderPageClient() {
 
   const handleArticleEnd = useCallback(() => {
     if (isPlaylistMode && playlistState.isPlaylistMode) {
-      // リピートoff + 最後の記事 → 完了画面
-      if (
-        playlistState.repeatMode === "off" &&
-        currentPlaylistIndex >= playlistState.totalCount - 1 &&
-        !playlistState.shuffle
-      ) {
-        setShowCompletionScreen(true);
-        logger.info("プレイリスト完了", {
-          playlistId: playlistState.playlistId,
-          totalCount: playlistState.totalCount,
-        });
-        return;
+      // リピートoff時の完了判定
+      if (playlistState.repeatMode === "off") {
+        let isAtEnd = false;
+        if (playlistState.shuffle) {
+          // シャッフルモード: シャッフルキューの最後かどうか確認
+          const shuffledIndices = playlistState.shuffledIndices;
+          const currentShufflePos = shuffledIndices.indexOf(currentPlaylistIndex);
+          isAtEnd = currentShufflePos >= shuffledIndices.length - 1;
+        } else {
+          isAtEnd = currentPlaylistIndex >= playlistState.totalCount - 1;
+        }
+
+        if (isAtEnd) {
+          setShowCompletionScreen(true);
+          logger.info("プレイリスト完了", {
+            playlistId: playlistState.playlistId,
+            totalCount: playlistState.totalCount,
+            shuffle: playlistState.shuffle,
+          });
+          return;
+        }
       }
 
       // onArticleEndがrepeatMode/shuffleに応じて適切に処理する
@@ -194,6 +211,7 @@ export default function ReaderPageClient() {
     playlistState.playlistId,
     playlistState.repeatMode,
     playlistState.shuffle,
+    playlistState.shuffledIndices,
     currentPlaylistIndex,
     onArticleEnd,
   ]);
@@ -1075,20 +1093,8 @@ export default function ReaderPageClient() {
                             : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                         }`}
                         data-testid="desktop-repeat-button"
-                        title={
-                          playlistState.repeatMode === "off"
-                            ? "リピート: オフ"
-                            : playlistState.repeatMode === "one"
-                              ? "リピート: 1曲"
-                              : "リピート: 全曲"
-                        }
-                        aria-label={
-                          playlistState.repeatMode === "off"
-                            ? "リピート: オフ"
-                            : playlistState.repeatMode === "one"
-                              ? "リピート: 1曲"
-                              : "リピート: 全曲"
-                        }
+                        title={repeatModeLabels[playlistState.repeatMode]}
+                        aria-label={repeatModeLabels[playlistState.repeatMode]}
                       >
                         {playlistState.repeatMode === "one" ? (
                           <Repeat1 className="size-5" />
@@ -1295,20 +1301,8 @@ export default function ReaderPageClient() {
                       : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                   }`}
                   data-testid="mobile-repeat-button"
-                  title={
-                    playlistState.repeatMode === "off"
-                      ? "リピート: オフ"
-                      : playlistState.repeatMode === "one"
-                        ? "リピート: 1曲"
-                        : "リピート: 全曲"
-                  }
-                  aria-label={
-                    playlistState.repeatMode === "off"
-                      ? "リピート: オフ"
-                      : playlistState.repeatMode === "one"
-                        ? "リピート: 1曲"
-                        : "リピート: 全曲"
-                  }
+                  title={repeatModeLabels[playlistState.repeatMode]}
+                  aria-label={repeatModeLabels[playlistState.repeatMode]}
                 >
                   {playlistState.repeatMode === "one" ? (
                     <Repeat1 className="size-4" />

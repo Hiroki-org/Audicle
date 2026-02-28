@@ -182,6 +182,19 @@ export function PlaylistPlaybackProvider({
   const router = useRouter();
   const [state, setState] = useState<PlaylistPlaybackState>(() => {
     const saved = loadPlaybackState();
+    // バリデーション付きでrepeatMode/shuffle/shuffledIndicesを復元
+    const validRepeatModes: RepeatMode[] = ["off", "one", "all"];
+    const rawRepeatMode = (saved as PlaylistPlaybackState | null)?.repeatMode;
+    const repeatMode: RepeatMode = rawRepeatMode && validRepeatModes.includes(rawRepeatMode)
+      ? rawRepeatMode
+      : "off";
+    const rawShuffle = (saved as PlaylistPlaybackState | null)?.shuffle;
+    const shuffle = typeof rawShuffle === "boolean" ? rawShuffle : false;
+    const rawShuffledIndices = (saved as PlaylistPlaybackState | null)?.shuffledIndices;
+    const shuffledIndices = Array.isArray(rawShuffledIndices)
+      ? rawShuffledIndices.filter((v): v is number => typeof v === "number")
+      : [];
+
     return {
       playlistId: saved?.playlistId || null,
       playlistName: saved?.playlistName || null,
@@ -192,9 +205,9 @@ export function PlaylistPlaybackProvider({
       sortField: saved?.sortField || null,
       sortOrder: saved?.sortOrder || null,
       sortKey: saved?.sortKey || null,
-      repeatMode: (saved as PlaylistPlaybackState | null)?.repeatMode || "off",
-      shuffle: (saved as PlaylistPlaybackState | null)?.shuffle || false,
-      shuffledIndices: (saved as PlaylistPlaybackState | null)?.shuffledIndices || [],
+      repeatMode,
+      shuffle,
+      shuffledIndices,
     };
   });
 
@@ -272,7 +285,7 @@ export function PlaylistPlaybackProvider({
    * シャッフルモードで次のインデックスを取得するヘルパー
    */
   const getNextShuffleIndex = useCallback((prevState: PlaylistPlaybackState): number | null => {
-    const { shuffledIndices, currentIndex, items } = prevState;
+    const { shuffledIndices, currentIndex } = prevState;
     if (shuffledIndices.length === 0) return null;
     const currentShufflePos = shuffledIndices.indexOf(currentIndex);
     if (currentShufflePos === -1) {
@@ -436,8 +449,12 @@ export function PlaylistPlaybackProvider({
         // シャッフルモード
         const prev = getPrevShuffleIndex(prevState);
         if (prev === null) {
-          // 先頭: wrap-around
-          prevIndex = (prevState.currentIndex - 1 + prevState.items.length) % prevState.items.length;
+          // 先頭: シャッフルキューの最後へ wrap-around
+          if (prevState.shuffledIndices.length > 0) {
+            prevIndex = prevState.shuffledIndices[prevState.shuffledIndices.length - 1];
+          } else {
+            prevIndex = (prevState.currentIndex - 1 + prevState.items.length) % prevState.items.length;
+          }
         } else {
           prevIndex = prev;
         }
