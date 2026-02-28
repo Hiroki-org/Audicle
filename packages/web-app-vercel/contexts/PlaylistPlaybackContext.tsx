@@ -790,6 +790,9 @@ export function PlaylistPlaybackProvider({
               return {
                 ...prev,
                 currentIndex: index,
+                sortField,
+                sortOrder,
+                sortKey: savedSortOption || "position",
                 shuffledIndices: prev.shuffle
                   ? generateShuffledIndices(prev.items.length, index)
                   : prev.shuffledIndices,
