@@ -766,6 +766,40 @@ export function PlaylistPlaybackProvider({
             playlistId,
             status: res.status,
           });
+
+          // API失敗時: localStorageの状態がこのプレイリストの有効なデータを持っているか確認
+          // 持っていれば、プレイリストモードを維持（古いアイテムでフォールバック）
+          setState((prev) => {
+            if (
+              prev.isPlaylistMode &&
+              prev.playlistId === playlistId &&
+              prev.items.length > 0
+            ) {
+              logger.info(
+                "API失敗: localStorageのキャッシュデータでプレイリストモードを維持",
+                {
+                  playlistId,
+                  cachedItemsCount: prev.items.length,
+                  currentIndex: startIndex,
+                }
+              );
+              const index = Math.max(
+                0,
+                Math.min(startIndex, prev.items.length - 1)
+              );
+              return {
+                ...prev,
+                currentIndex: index,
+                sortField,
+                sortOrder,
+                sortKey: savedSortOption || "position",
+                shuffledIndices: prev.shuffle
+                  ? generateShuffledIndices(prev.items.length, index)
+                  : prev.shuffledIndices,
+              };
+            }
+            return prev;
+          });
           return;
         }
 
