@@ -71,14 +71,14 @@ jobs:
           find . -name "user.json" 2>/dev/null || echo "user.json not found"
       - name: Upload auth state
         if: success()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-auth-state
           # Use workspace absolute path (not affected by defaults working-directory)
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/user.json
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: auth-test-results
@@ -104,7 +104,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Download auth state
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
@@ -116,7 +116,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: npx playwright test tests/e2e/playlist.spec.ts
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playlist-test-results
@@ -142,7 +142,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Download auth state
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
@@ -154,7 +154,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: npx playwright test tests/e2e/popular-articles.spec.ts
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: popular-test-results
@@ -180,7 +180,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Download auth state
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
@@ -192,7 +192,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: npx playwright test tests/e2e/article-playback.spec.ts
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: article-test-results
@@ -223,7 +223,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: npx playwright test tests/e2e/theme-fouc.spec.ts --project=theme-fouc
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: theme-fouc-test-results
