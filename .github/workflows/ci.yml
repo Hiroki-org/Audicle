@@ -199,7 +199,7 @@ jobs:
           ls -la packages/web-app-vercel/.next 2>/dev/null || echo "packages/web-app-vercel/.next not found"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: next-build
           path: ${{ github.workspace }}/packages/web-app-vercel/.next
@@ -240,7 +240,7 @@ jobs:
           NEXTAUTH_URL: http://localhost:3000
           NODE_ENV: test
       - name: Upload auth state
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-auth-state
           # Upload the actual auth file to mirror e2e-test.yml and avoid empty directory uploads
@@ -277,13 +277,13 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
 
       - name: Download auth state
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
 
       - name: Download build
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: next-build
           path: ./packages/web-app-vercel/.next
@@ -300,7 +300,7 @@ jobs:
 
       - name: Upload e2e test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.browser }}-${{ matrix.shard }}
           path: packages/web-app-vercel/playwright-report/

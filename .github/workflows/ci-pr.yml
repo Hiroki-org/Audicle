@@ -179,7 +179,7 @@ jobs:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXT_PUBLIC_AUTH_ENV: test
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: next-build
           path: packages/web-app-vercel/.next
@@ -227,12 +227,12 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: packages/web-app-vercel
       - name: Download auth state (if available)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
       - name: Download build
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: next-build
           path: packages/web-app-vercel/.next
@@ -295,7 +295,7 @@ jobs:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: theme-fouc-test-results
@@ -338,7 +338,7 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: packages/web-app-vercel
       - name: Download build
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: next-build
           path: packages/web-app-vercel/.next
@@ -366,7 +366,7 @@ jobs:
             echo "❌ user.json not found"
           fi
       - name: Upload auth state
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-auth-state
           # Upload the actual auth file (explicit file path) — safer than directory upload
