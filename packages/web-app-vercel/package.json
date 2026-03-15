@@ -52,7 +52,7 @@
     "react-hot-toast": "^2.6.0",
     "serwist": "^10.0.0-preview.14",
     "tailwind-merge": "^3.4.0",
-    "undici": "^7.22.0",
+    "undici": "^7.24.1",
     "use-debounce": "^10.1.0"
   },
   "devDependencies": {
