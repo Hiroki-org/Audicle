@@ -12,6 +12,7 @@ interface CacheEntry {
 const CACHE_PREFIX = "audio_";
 const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24時間
 const DEFAULT_VOICE = "ja-JP-Wavenet-B";
+const MAX_CACHE_SIZE = 50; // キャッシュする最大アイテム数
 
 class AudioCache {
   private cache = new Map<string, CacheEntry>();
@@ -42,6 +43,11 @@ class AudioCache {
       const age = Date.now() - cached.timestamp;
       if (age < CACHE_EXPIRY) {
         logger.cache("HIT", `${text.substring(0, 30)}...`);
+
+        // LRU戦略: アクセスされたアイテムを最後に移動して最新にする
+        this.cache.delete(key);
+        this.cache.set(key, cached);
+
         return cached.url;
       } else {
         // 期限切れのキャッシュを削除
@@ -53,6 +59,15 @@ class AudioCache {
     logger.cache("MISS", `${text.substring(0, 30)}...`);
     const blob = await synthesizeSpeech(text, voice);
     const url = URL.createObjectURL(blob);
+
+    // キャッシュサイズ制限の確認 (LRU)
+    if (this.cache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey) {
+        logger.cache("EVICT", `LRU evicting ${oldestKey}`);
+        this.revoke(oldestKey);
+      }
+    }
 
     this.cache.set(key, {
       blob,
