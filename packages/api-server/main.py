@@ -281,7 +281,7 @@ async def synthesize_speech(request: SynthesizeRequest):
         logger.info("Synthesizing text: %s...", request.text[:100])
         logger.info("Using voice: %s", request.voice)
 
-        text_chunks = _split_text(request.text)
+        text_chunks = await asyncio.to_thread(_split_text, request.text)
         logger.info("Split text into %d chunks", len(text_chunks))
 
         logger.info("Synthesizing %d chunks in parallel", len(text_chunks))
