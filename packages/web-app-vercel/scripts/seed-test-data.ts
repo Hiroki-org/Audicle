@@ -232,11 +232,13 @@ async function seedTestData() {
     }
     const urls = articles.map(a => a.url);
 
-    // 既存の記事を一括検索
+    const emails = Array.from(new Set(articles.map(a => a.owner_email)));
+    // 既存の記事を一括検索 (urlとowner_emailでフィルタ)
     const { data: existingData, error: selectError } = await supabase
         .from("articles")
         .select()
-        .in("url", urls);
+        .in("url", urls)
+        .in("owner_email", emails);
 
     if (selectError) {
         console.error("記事の検索に失敗:", selectError);
@@ -285,7 +287,7 @@ async function seedTestData() {
         }
         if (created) {
             for (const c of created) {
-                createdArticlesMap.set(c.url, c as Article);
+                createdArticlesMap.set(c.owner_email + "||" + c.url, c as Article);
             }
         }
     }
@@ -310,17 +312,21 @@ async function seedTestData() {
                 console.error("記事の更新に失敗:", updateError);
                 process.exit(1);
             }
-            if (updated) createdArticlesMap.set(updated.url, updated as Article);
+            if (updated) createdArticlesMap.set(updated.owner_email + "||" + updated.url, updated as Article);
         }
     }
 
     // 元の配列の順序を維持して結果を構築
     const createdArticles: Article[] = [];
+    const addedKeys = new Set<string>();
+
     for (const article of articles) {
-        const created = createdArticlesMap.get(article.url);
-        // 同じ owner_email + url の重複を防ぐ
-        if (created && !createdArticles.some(a => a.owner_email === article.owner_email && a.url === article.url)) {
+        const key = article.owner_email + "||" + article.url;
+        const created = createdArticlesMap.get(key);
+        // 重複を防ぐ (O(1)のSetでチェック)
+        if (created && !addedKeys.has(key)) {
             createdArticles.push(created);
+            addedKeys.add(key);
         }
     }
 
