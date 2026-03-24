@@ -28,7 +28,7 @@ if cors_origins_env:
         raise ValueError("CORS_ALLOWED_ORIGINS に '*' は使用できません。allow_credentials=True と組み合わせると起動に失敗します。")
 
 if not allow_origins:
-    logger.warning("CORS_ALLOWED_ORIGINS が設定されていないか、有効なオリジンがありません。CORSは許可されません。")
+    raise ValueError("CORS_ALLOWED_ORIGINS 環境変数が設定されていないか、有効なオリジンがありません。フロントエンドからのアクセスを許可するために、有効なオリジンを指定してください。")
 
 logger.info("CORS許可オリジン: %s", allow_origins)
 
