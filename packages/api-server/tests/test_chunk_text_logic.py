@@ -2,13 +2,9 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 import os
+import re
 
 # Mock external dependencies
-sys.modules["aiofiles"] = MagicMock()
-sys.modules["fastapi"] = MagicMock()
-sys.modules["fastapi.responses"] = MagicMock()
-sys.modules["fastapi.middleware.cors"] = MagicMock()
-sys.modules["pydantic"] = MagicMock()
 sys.modules["google.api_core.exceptions"] = MagicMock()
 sys.modules["google.cloud"] = MagicMock()
 sys.modules["google.cloud.texttospeech"] = MagicMock()
@@ -25,7 +21,7 @@ class TestChunkTextLogic(unittest.TestCase):
         """Test that text smaller than limit returns as is."""
         text = "Hello world"
         limit = 50
-        chunks = _chunk_text(text, limit, [r'(\s)'])
+        chunks = _chunk_text(text, limit, [re.compile(r'(\s)')])
         self.assertEqual(chunks, ["Hello world"])
 
     def test_delimiter_merging(self):
@@ -33,7 +29,7 @@ class TestChunkTextLogic(unittest.TestCase):
         text = "Hello. World."
         limit = 7 # Force split. "Hello." is 6 bytes. " World." is 7 bytes.
         # Split by period
-        chunks = _chunk_text(text, limit, [r'([.])'])
+        chunks = _chunk_text(text, limit, [re.compile(r'([.])')])
         # Expect ["Hello.", " World."]
         self.assertEqual(chunks, ["Hello.", " World."])
 
@@ -46,7 +42,7 @@ class TestChunkTextLogic(unittest.TestCase):
 
         text = "Part1,Part2. Part3,Part4."
         limit = 12
-        separators = [r'([.])', r'([,])']
+        separators = [re.compile(r'([.])'), re.compile(r'([,])')]
 
         chunks = _chunk_text(text, limit, separators)
 
@@ -85,7 +81,7 @@ class TestChunkTextLogic(unittest.TestCase):
 
         text = "a.b.c.d."
         limit = 4
-        chunks = _chunk_text(text, limit, [r'([.])'])
+        chunks = _chunk_text(text, limit, [re.compile(r'([.])')])
         self.assertEqual(chunks, ["a.b.", "c.d."])
 
 if __name__ == '__main__':
