@@ -109,6 +109,14 @@ async function handleShareTarget(
     userEmail: string,
     baseUrl: string
 ): Promise<NextResponse> {
+    // 構造化ログ: 共有操作の開始
+    console.info(JSON.stringify({
+        action: 'share_target_start',
+        user_id: userEmail,
+        timestamp: new Date().toISOString(),
+        url: sharedUrl,
+        has_title: !!sharedTitle
+    }))
 
     try {
         // デフォルトプレイリストを取得または作成
@@ -215,8 +223,24 @@ async function handleShareTarget(
                 console.error('Error calling add_playlist_item_at_end:', rpcError)
                 throw new Error('プレイリストへの追加に失敗しました')
             }
+
+            console.info(JSON.stringify({
+                action: 'playlist_item_added',
+                user_id: userEmail,
+                timestamp: new Date().toISOString(),
+                item_position: rpcResult?.item_position,
+                already_exists: rpcResult?.already_exists
+            }))
         }
+
         // 成功：成功ページへリダイレクト
+        console.info(JSON.stringify({
+            action: 'share_target_success',
+            user_id: userEmail,
+            timestamp: new Date().toISOString(),
+            article_id: article.id,
+            playlist_id: playlistId
+        }))
 
         const successUrl = new URL('/share-target/success', baseUrl)
         successUrl.searchParams.set('title', sharedTitle || article.title)
@@ -224,6 +248,13 @@ async function handleShareTarget(
 
     } catch (error) {
         console.error('Error in share-target:', error)
+        console.error(JSON.stringify({
+            action: 'share_target_error',
+            user_id: userEmail,
+            timestamp: new Date().toISOString(),
+            error_type: error instanceof Error ? error.constructor.name : 'unknown',
+            error_message: error instanceof Error ? error.message : String(error)
+        }))
 
         return NextResponse.redirect(
             new URL(`/share-target/error?message=${encodeURIComponent('記事の追加に失敗しました')}`, baseUrl)
