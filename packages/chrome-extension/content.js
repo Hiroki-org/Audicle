@@ -11,6 +11,7 @@ let playbackQueue = [];
 let queueIndex = 0;
 // prefetch cache: queueIndex -> audioDataUrl
 let audioCache = new Map();
+let uncachedItems = new Set();
 // 先読みするチャンク数
 let prefetchAhead = 2;
 
@@ -140,7 +141,7 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
 
   // リクエストする項目を準備
   for (let i = startIndex; i <= actualEndIndex; i++) {
-    if (!audioCache.has(i)) {
+    if (uncachedItems.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
         requests.push({ index: i, text: item.text });
@@ -169,6 +170,7 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
     addToRequestQueue(requestData, (response) => {
       if (response && response.audioDataUrl) {
         audioCache.set(request.index, response.audioDataUrl);
+        uncachedItems.delete(request.index);
         debugLog(
           `[Sequential Request] Cached audio for index: ${request.index}`
         );
@@ -307,6 +309,7 @@ audioPlayer.addEventListener("ended", () => {
     // キュー終了時にハイライト解除
     updateHighlight(null);
     playbackQueue = [];
+    uncachedItems.clear();
     queueIndex = 0;
   }
 });
@@ -331,6 +334,7 @@ audioPlayer.addEventListener("error", (e) => {
     } else {
       updateHighlight(null);
       playbackQueue = [];
+    uncachedItems.clear();
       queueIndex = 0;
     }
   }
@@ -547,6 +551,7 @@ function cleanupPage() {
   removeStyles();
   // 再生キューのリセット
   playbackQueue = [];
+    uncachedItems.clear();
   queueIndex = 0;
   // audioCacheはクリアせず残す（一時停止用）
   retryCount = 0;
@@ -686,7 +691,7 @@ function handleClick(event) {
           i < Math.min(bestIndex + JUMP_BATCH_SIZE, playbackQueue.length);
           i++
         ) {
-          if (!audioCache.has(i)) {
+          if (uncachedItems.has(i)) {
             const item = playbackQueue[i];
             if (item && item.text) {
               jumpBatch.push({ index: i, text: item.text });
@@ -806,6 +811,12 @@ function handleClick(event) {
   // キューが構築できた場合は再生開始
   if (queue.length > 0) {
     playbackQueue = queue;
+    uncachedItems = new Set();
+    for (let i = 0; i < queue.length; i++) {
+      if (!audioCache.has(i)) {
+        uncachedItems.add(i);
+      }
+    }
     const clickedId = parseInt(target.dataset.audicleId);
     if (!isNaN(clickedId)) {
       // 同じparagraphIdを持つ複数のチャンクがある場合、最初のものを選択
@@ -1369,6 +1380,7 @@ function playQueue() {
       } else {
         updateHighlight(null);
         playbackQueue = [];
+    uncachedItems.clear();
         queueIndex = 0;
       }
     }
@@ -1385,7 +1397,7 @@ function prefetchNext(startIndex) {
     i < Math.min(playbackQueue.length, startIndex + prefetchAhead);
     i++
   ) {
-    if (audioCache.has(i)) continue;
+    if (!uncachedItems.has(i)) continue;
     const item = playbackQueue[i];
     if (!item || !item.text) continue;
     // background に fetch 要求を送り、sendResponse で audioDataUrl を受け取る
@@ -1395,6 +1407,7 @@ function prefetchNext(startIndex) {
         (response) => {
           if (response && response.audioDataUrl) {
             audioCache.set(i, response.audioDataUrl);
+            uncachedItems.delete(i);
           }
         }
       );
@@ -1410,7 +1423,7 @@ function fetchBatch(startIndex) {
     i < Math.min(playbackQueue.length, startIndex + batchSize);
     i++
   ) {
-    if (!audioCache.has(i)) {
+    if (uncachedItems.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
         batch.push({ index: i, text: item.text });
@@ -1426,6 +1439,7 @@ function fetchBatch(startIndex) {
     if (response && response.audioDataUrls) {
       response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
         audioCache.set(index, audioDataUrl);
+              uncachedItems.delete(index);
       });
     }
     playFromCache(startIndex);
@@ -1435,17 +1449,12 @@ function fetchBatch(startIndex) {
 // バッチでプリフェッチ
 function prefetchBatch(startIndex) {
   const batch = [];
-  for (
-    let i = startIndex;
-    i < Math.min(playbackQueue.length, startIndex + prefetchAhead * batchSize);
-    i += batchSize
-  ) {
-    for (let j = i; j < Math.min(playbackQueue.length, i + batchSize); j++) {
-      if (!audioCache.has(j)) {
-        const item = playbackQueue[j];
-        if (item && item.text) {
-          batch.push({ index: j, text: item.text });
-        }
+  const endIndex = Math.min(playbackQueue.length, startIndex + prefetchAhead * batchSize);
+  for (const j of uncachedItems) {
+    if (j >= startIndex && j < endIndex) {
+      const item = playbackQueue[j];
+      if (item && item.text) {
+        batch.push({ index: j, text: item.text });
       }
     }
   }
@@ -1457,6 +1466,7 @@ function prefetchBatch(startIndex) {
           if (response && response.audioDataUrls) {
             response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
               audioCache.set(index, audioDataUrl);
+              uncachedItems.delete(index);
             });
           }
         }
@@ -1474,12 +1484,9 @@ function progressiveFetch(callback) {
   const initialBatch = [];
   const startIndex = queueIndex;
 
-  for (
-    let i = startIndex;
-    i < Math.min(startIndex + INITIAL_BATCH_SIZE, playbackQueue.length);
-    i++
-  ) {
-    if (!audioCache.has(i)) {
+  const endIndex = Math.min(startIndex + INITIAL_BATCH_SIZE, playbackQueue.length);
+  for (const i of uncachedItems) {
+    if (i >= startIndex && i < endIndex) {
       const item = playbackQueue[i];
       if (item && item.text) {
         initialBatch.push({ index: i, text: item.text });
@@ -1523,21 +1530,31 @@ function progressiveFetch(callback) {
 // バックグラウンドで残りの音声を読み込み（前後両方向、順次リクエスト）
 function fetchRemainingInBackground(priorityStartIndex) {
   // 前方向（priorityStartIndex以降）を優先で順次リクエストキューに追加
-  for (let i = priorityStartIndex; i < playbackQueue.length; i++) {
-    if (!audioCache.has(i)) {
+  for (const i of uncachedItems) {
+    if (i >= priorityStartIndex) {
       const item = playbackQueue[i];
       if (item && item.text) {
-        addToRequestQueue({ index: i, text: item.text });
+        addToRequestQueue({ command: "fetch", index: i, text: item.text }, (response) => {
+          if (response && response.audioDataUrl) {
+            audioCache.set(i, response.audioDataUrl);
+            uncachedItems.delete(i);
+          }
+        });
       }
     }
   }
 
   // 後方向（queueIndexより前）を後回しでキューに追加
-  for (let i = 0; i < queueIndex; i++) {
-    if (!audioCache.has(i)) {
+  for (const i of uncachedItems) {
+    if (i < queueIndex) {
       const item = playbackQueue[i];
       if (item && item.text) {
-        addToRequestQueue({ index: i, text: item.text });
+        addToRequestQueue({ command: "fetch", index: i, text: item.text }, (response) => {
+          if (response && response.audioDataUrl) {
+            audioCache.set(i, response.audioDataUrl);
+            uncachedItems.delete(i);
+          }
+        });
       }
     }
   }
@@ -1552,12 +1569,15 @@ function fullBatchFetch(callback) {
   debugLog("fullBatchFetch: Starting full sequential loading");
 
   // 全ての未キャッシュ項目を順次キューに追加
-  for (let i = 0; i < playbackQueue.length; i++) {
-    if (!audioCache.has(i)) {
-      const item = playbackQueue[i];
-      if (item && item.text) {
-        addToRequestQueue({ index: i, text: item.text });
-      }
+  for (const i of uncachedItems) {
+    const item = playbackQueue[i];
+    if (item && item.text) {
+      addToRequestQueue({ command: "fetch", index: i, text: item.text }, (response) => {
+          if (response && response.audioDataUrl) {
+            audioCache.set(i, response.audioDataUrl);
+            uncachedItems.delete(i);
+          }
+        });
     }
   }
 
