@@ -217,14 +217,12 @@ async function handleShareTarget(
         }
 
         // 成功：成功ページへリダイレクト
-
         const successUrl = new URL('/share-target/success', baseUrl)
         successUrl.searchParams.set('title', sharedTitle || article.title)
         return NextResponse.redirect(successUrl)
 
     } catch (error) {
         console.error('Error in share-target:', error)
-
         return NextResponse.redirect(
             new URL(`/share-target/error?message=${encodeURIComponent('記事の追加に失敗しました')}`, baseUrl)
         )
