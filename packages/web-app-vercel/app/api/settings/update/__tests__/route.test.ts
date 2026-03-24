@@ -148,6 +148,26 @@ describe('PUT /api/settings/update', () => {
         expect(body.success).toBe(false);
     });
 
+    it('returns 200 for empty body updating only user_id (optional fields omitted)', async () => {
+        const req = createMockRequest({});
+        const res = await PUT(req);
+        const body = await (res as any).json();
+
+        expect(res.status).toBe(200);
+        expect(body.success).toBe(true);
+        expect(body.message).toBe('Settings updated successfully');
+        expect(body.data).not.toBeNull();
+
+        // Verify Supabase was called with only user_id
+        expect(supabase.from).toHaveBeenCalledWith('user_settings');
+        expect(mockUpsert).toHaveBeenCalledWith(
+            { user_id: 'user-123' },
+            { onConflict: 'user_id' }
+        );
+        expect(mockSelect).toHaveBeenCalled();
+        expect(mockSingle).toHaveBeenCalled();
+    });
+
     it('returns 200 and updates settings on success', async () => {
         const req = createMockRequest({
             playback_speed: 1.5,
@@ -159,7 +179,8 @@ describe('PUT /api/settings/update', () => {
         expect(res.status).toBe(200);
         expect(body.success).toBe(true);
         expect(body.message).toBe('Settings updated successfully');
-        expect(body.data).toBeDefined();
+        expect(body.data).not.toBeNull();
+        expect(body.data).toHaveProperty('playback_speed', 1.5);
 
         // Verify Supabase was called with correct data
         expect(supabase.from).toHaveBeenCalledWith('user_settings');
@@ -171,6 +192,8 @@ describe('PUT /api/settings/update', () => {
             },
             { onConflict: 'user_id' }
         );
+        expect(mockSelect).toHaveBeenCalled();
+        expect(mockSingle).toHaveBeenCalled();
     });
 
     it('returns 500 when Supabase update fails', async () => {
