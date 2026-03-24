@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Home from '../page';
 import { useRouter } from 'next/navigation';
 import { articleStorage } from '@/lib/storage';
@@ -30,9 +31,12 @@ describe('Home Component', () => {
     push: jest.fn(),
   };
 
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    user = userEvent.setup();
   });
 
   afterEach(() => {
@@ -48,13 +52,13 @@ describe('Home Component', () => {
     expect(screen.getByText('「+ 新しい記事を読む」から記事を追加してください')).toBeInTheDocument();
   });
 
-  it('navigates to reader when "新しい記事を読む" is clicked', () => {
+  it('navigates to reader when "新しい記事を読む" is clicked', async () => {
     (articleStorage.getAll as jest.Mock).mockReturnValue([]);
 
     render(<Home />);
 
     const addButton = screen.getByText('+ 新しい記事を読む');
-    fireEvent.click(addButton);
+    await user.click(addButton);
 
     expect(mockRouter.push).toHaveBeenCalledWith('/reader');
   });
@@ -88,7 +92,7 @@ describe('Home Component', () => {
     expect(screen.getByText('5 チャンク')).toBeInTheDocument();
   });
 
-  it('navigates to article reader when an article is clicked', () => {
+  it('navigates to article reader when an article is clicked', async () => {
     const mockArticles = [
       {
         id: '1',
@@ -103,12 +107,12 @@ describe('Home Component', () => {
     render(<Home />);
 
     const articleTitle = screen.getByText('Test Article 1');
-    fireEvent.click(articleTitle);
+    await user.click(articleTitle);
 
     expect(mockRouter.push).toHaveBeenCalledWith('/reader?url=https%3A%2F%2Fexample.com%2F1');
   });
 
-  it('deletes an article when confirm is accepted', () => {
+  it('deletes an article when confirm is accepted', async () => {
     const mockArticles = [
       {
         id: '1',
@@ -126,7 +130,7 @@ describe('Home Component', () => {
     render(<Home />);
 
     const deleteButton = screen.getByText('削除');
-    fireEvent.click(deleteButton);
+    await user.click(deleteButton);
 
     expect(window.confirm).toHaveBeenCalledWith('「Test Article 1」を削除しますか?');
     expect(articleStorage.remove).toHaveBeenCalledWith('1');
@@ -134,7 +138,7 @@ describe('Home Component', () => {
     expect(screen.queryByText('Test Article 1')).not.toBeInTheDocument();
   });
 
-  it('does not delete an article when confirm is rejected', () => {
+  it('does not delete an article when confirm is rejected', async () => {
     const mockArticles = [
       {
         id: '1',
@@ -152,7 +156,7 @@ describe('Home Component', () => {
     render(<Home />);
 
     const deleteButton = screen.getByText('削除');
-    fireEvent.click(deleteButton);
+    await user.click(deleteButton);
 
     expect(window.confirm).toHaveBeenCalledWith('「Test Article 1」を削除しますか?');
     expect(articleStorage.remove).not.toHaveBeenCalled();
@@ -180,7 +184,9 @@ describe('Home Component', () => {
     (articleStorage.getAll as jest.Mock).mockReturnValue(mockArticles);
 
     // Dispatch storage event
-    fireEvent(window, new Event('storage'));
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage'));
+    });
 
     // The component should update
     expect(screen.getByText('Test Article 1')).toBeInTheDocument();
