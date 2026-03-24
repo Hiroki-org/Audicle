@@ -288,7 +288,6 @@ async def synthesize_speech(request: SynthesizeRequest):
         logger.info("Synthesizing %d chunks in parallel", len(text_chunks))
 
         # Limit concurrency to avoid thread pool exhaustion
-        # Default to 5 concurrent requests
         global _tts_semaphore
         if _tts_semaphore is None:
             _tts_semaphore = asyncio.Semaphore(TTS_MAX_CONCURRENCY)
