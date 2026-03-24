@@ -2,6 +2,7 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 sys.modules["aiofiles"] = MagicMock()
+sys.modules["aiofiles.os"] = MagicMock()
 import os
 
 # Mock external dependencies
