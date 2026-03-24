@@ -21,7 +21,7 @@ defaults:
 
 jobs:
   triage:
-    runs-on: "ubuntu-slim"
+    runs-on: "ubuntu-latest"
     timeout-minutes: 7
     permissions:
       contents: "read"

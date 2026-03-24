@@ -10,7 +10,7 @@ concurrency:
 jobs:
   unit-tests:
     name: Unit Tests
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6.0.2

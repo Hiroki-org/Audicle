@@ -70,7 +70,7 @@ defaults:
 
 jobs:
   triage:
-    runs-on: "ubuntu-slim"
+    runs-on: "ubuntu-latest"
     timeout-minutes: 7
     outputs:
       available_labels: "${{ steps.get_labels.outputs.available_labels }}"
@@ -238,7 +238,7 @@ jobs:
             core.setOutput('triaged_issues', triagedIssues);
 
   label:
-    runs-on: "ubuntu-slim"
+    runs-on: "ubuntu-latest"
     needs:
       - "triage"
     permissions:
