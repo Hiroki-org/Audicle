@@ -2,31 +2,6 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import type { PlaylistWithItems } from "@/types/playlist";
 
-// リトライヘルパー関数
-async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: number = 3, delay: number = 1000): Promise<T> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            const response = await fetchFn();
-            if (!response.ok) {
-                throw new Error("プレイリストの取得に失敗しました");
-            }
-            return response.json() as Promise<T>;
-        } catch (error) {
-            if (attempt === maxRetries) {
-                throw error;
-            }
-            // ECONNRESET などのネットワークエラー時はリトライ
-            if (error instanceof Error && (error.message.includes('ECONNRESET') || error.message.includes('aborted') || error.message.includes('fetch'))) {
-                console.warn(`Fetch attempt ${attempt} failed, retrying in ${delay}ms:`, error.message);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                throw error; // ネットワークエラー以外は即座に投げる
-            }
-        }
-    }
-    throw new Error('Max retries exceeded');
-}
-
 /**
  * プレイリスト一覧を取得
  */
@@ -37,9 +12,15 @@ export function usePlaylists() {
     return useQuery({
         queryKey: ["playlists", userEmail],
         queryFn: async () => {
-            return retryFetch<PlaylistWithItems[]>(() => fetch("/api/playlists"));
+            const response = await fetch("/api/playlists");
+            if (!response.ok) {
+                throw new Error("プレイリストの取得に失敗しました");
+            }
+            return response.json() as Promise<PlaylistWithItems[]>;
         },
         enabled: !!userEmail,
+        retry: 3,
+        retryDelay: 1000,
     });
 }
 
@@ -53,9 +34,15 @@ export function usePlaylistDetail(playlistId: string) {
     return useQuery({
         queryKey: ["playlists", userEmail, playlistId],
         queryFn: async () => {
-            return retryFetch<PlaylistWithItems>(() => fetch(`/api/playlists/${playlistId}`));
+            const response = await fetch(`/api/playlists/${playlistId}`);
+            if (!response.ok) {
+                throw new Error("プレイリスト詳細の取得に失敗しました");
+            }
+            return response.json() as Promise<PlaylistWithItems>;
         },
         enabled: !!playlistId && !!userEmail,
+        retry: 3,
+        retryDelay: 1000,
     });
 }
 
