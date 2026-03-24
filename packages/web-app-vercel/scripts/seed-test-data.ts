@@ -380,6 +380,10 @@ async function seedTestData() {
 
     // 6. プレイリストアイテムの追加（3件）
     console.log("6. プレイリストアイテムを追加中...");
+
+    // 既存のアイテムを削除して重複を避ける
+    await supabase.from("playlist_items").delete().eq("playlist_id", defaultPlaylist.id);
+
     for (let i = 0; i < 3 && i < createdArticles.length; i += 1) {
         const article = createdArticles[i];
         const { error: itemError } = await supabase.from("playlist_items").insert({
