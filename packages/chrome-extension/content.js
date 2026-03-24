@@ -88,7 +88,7 @@ let requestQueue = []; // 待機中のリクエストキュー
 let isProcessingRequests = false; // リクエスト処理中フラグ
 
 // **レート制限管理関数**
-function addToRequestQueue(requestData, callback) {
+function addToRequestQueue(requestData, callback = () => {}) {
   requestQueue.push({ requestData, callback });
   debugLog(
     `[Rate Limit] Added request to queue. Queue length: ${requestQueue.length}`,
@@ -1534,22 +1534,39 @@ function progressiveFetch(callback) {
 
 // バックグラウンドで残りの音声を読み込み（前後両方向、順次リクエスト）
 function fetchRemainingInBackground(priorityStartIndex) {
+  const queuedIndices = new Set();
+
+  const handleResponse = (index) => (response) => {
+    if (response && response.audioDataUrl) {
+      audioCache.set(index, response.audioDataUrl);
+      unCachedIndices.delete(index);
+    }
+  };
+
   // 前方向（priorityStartIndex以降）を優先で順次リクエストキューに追加
   for (const i of unCachedIndices) {
-    if (i >= priorityStartIndex) {
+    if (i >= priorityStartIndex && !queuedIndices.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
-        addToRequestQueue({ index: i, text: item.text });
+        queuedIndices.add(i);
+        addToRequestQueue(
+          { command: "fetch", text: item.text },
+          handleResponse(i),
+        );
       }
     }
   }
 
   // 後方向（queueIndexより前）を後回しでキューに追加
   for (const i of unCachedIndices) {
-    if (i < queueIndex) {
+    if (i < queueIndex && !queuedIndices.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
-        addToRequestQueue({ index: i, text: item.text });
+        queuedIndices.add(i);
+        addToRequestQueue(
+          { command: "fetch", text: item.text },
+          handleResponse(i),
+        );
       }
     }
   }
@@ -1563,11 +1580,21 @@ function fetchRemainingInBackground(priorityStartIndex) {
 function fullBatchFetch(callback) {
   debugLog("fullBatchFetch: Starting full sequential loading");
 
+  const handleResponse = (index) => (response) => {
+    if (response && response.audioDataUrl) {
+      audioCache.set(index, response.audioDataUrl);
+      unCachedIndices.delete(index);
+    }
+  };
+
   // 全ての未キャッシュ項目を順次キューに追加
   for (const i of unCachedIndices) {
     const item = playbackQueue[i];
     if (item && item.text) {
-      addToRequestQueue({ index: i, text: item.text });
+      addToRequestQueue(
+        { command: "fetch", text: item.text },
+        handleResponse(i),
+      );
     }
   }
 
