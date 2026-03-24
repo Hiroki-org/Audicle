@@ -14,19 +14,18 @@ export function usePlaylists() {
         queryFn: async () => {
             const response = await fetch("/api/playlists");
             if (!response.ok) {
-                if (response.status >= 400 && response.status < 500) {
-                    const errorData = await response.json().catch(() => ({}));
-                    const err = new Error(errorData.error || "プレイリストの取得に失敗しました");
-                    (err as any).status = response.status;
-                    throw err;
-                }
-                throw new Error("プレイリストの取得に失敗しました");
+                const errorData = await response.json().catch(() => ({}));
+                const err = new Error(errorData.error || "プレイリストの取得に失敗しました");
+                (err as any).status = response.status;
+                throw err;
             }
             return response.json() as Promise<PlaylistWithItems[]>;
         },
         enabled: !!userEmail,
         retry: (failureCount, error: any) => {
-            if (error.status && error.status >= 400 && error.status < 500) return false;
+            // Only retry on network errors (e.g., fetch failed, ECONNRESET, aborted)
+            // If the server responded with an HTTP status (even 5xx), do not retry
+            if (error.status !== undefined) return false;
             return failureCount < 3;
         },
         retryDelay: 1000,
@@ -45,19 +44,18 @@ export function usePlaylistDetail(playlistId: string) {
         queryFn: async () => {
             const response = await fetch(`/api/playlists/${playlistId}`);
             if (!response.ok) {
-                if (response.status >= 400 && response.status < 500) {
-                    const errorData = await response.json().catch(() => ({}));
-                    const err = new Error(errorData.error || "プレイリスト詳細の取得に失敗しました");
-                    (err as any).status = response.status;
-                    throw err;
-                }
-                throw new Error("プレイリスト詳細の取得に失敗しました");
+                const errorData = await response.json().catch(() => ({}));
+                const err = new Error(errorData.error || "プレイリスト詳細の取得に失敗しました");
+                (err as any).status = response.status;
+                throw err;
             }
             return response.json() as Promise<PlaylistWithItems>;
         },
         enabled: !!playlistId && !!userEmail,
         retry: (failureCount, error: any) => {
-            if (error.status && error.status >= 400 && error.status < 500) return false;
+            // Only retry on network errors (e.g., fetch failed, ECONNRESET, aborted)
+            // If the server responded with an HTTP status (even 5xx), do not retry
+            if (error.status !== undefined) return false;
             return failureCount < 3;
         },
         retryDelay: 1000,
