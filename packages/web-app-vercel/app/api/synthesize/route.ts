@@ -150,8 +150,6 @@ function getTTSClient(): TextToSpeechClient | null {
         try {
             const unescaped = credentialsJson.replace(/\\n/g, '\n').replace(/^"|"$/g, '');
             credentials = tryParseJson(unescaped);
-            if (credentials) {
-            }
         } catch (_) { void _; }
     }
 
@@ -160,8 +158,6 @@ function getTTSClient(): TextToSpeechClient | null {
         try {
             const decoded = Buffer.from(credentialsJson, 'base64').toString('utf8');
             credentials = tryParseJson(decoded);
-            if (credentials) {
-            }
         } catch {
             // ignore decode errors
         }
