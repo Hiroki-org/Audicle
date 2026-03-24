@@ -286,6 +286,7 @@ async function seedTestData() {
     const fixedAccessCounts = [15, 20, 25];
 
     if (popularArticles.length > 0) {
+        const now = new Date().toISOString();
         const statsData = popularArticles.map((article, i) => {
             const articleHash = createHash("sha256").update(article.url).digest("hex");
             return {
@@ -297,7 +298,7 @@ async function seedTestData() {
                 unique_users: 10,
                 cache_hit_rate: 0.85,
                 is_fully_cached: true,
-                last_accessed_at: new Date().toISOString(),
+                last_accessed_at: now,
             };
         });
 
@@ -317,13 +318,14 @@ async function seedTestData() {
     // 4. 音声キャッシュインデックス
     console.log("4. 音声キャッシュインデックスを作成中...");
     if (popularArticles.length > 0) {
+        const now = new Date().toISOString();
         const cacheData = popularArticles.map((article, i) => ({
             article_url: article.url,
             voice: "ja-JP",
             cached_chunks: ["chunk-1", "chunk-2"],
             completed_playback: true,
             read_count: 5 + i,
-            last_accessed: new Date().toISOString(),
+            last_accessed: now,
         }));
 
         const { error: cacheError } = await supabase
@@ -366,14 +368,11 @@ async function seedTestData() {
 
     // 6. プレイリストアイテムの追加（3件）
     console.log("6. プレイリストアイテムを追加中...");
-    const defaultPlaylistItems = [];
-    for (let i = 0; i < 3 && i < createdArticles.length; i += 1) {
-        defaultPlaylistItems.push({
-            playlist_id: defaultPlaylist.id,
-            article_id: createdArticles[i].id,
-            position: i,
-        });
-    }
+    const defaultPlaylistItems = createdArticles.slice(0, 3).map((article, i) => ({
+        playlist_id: defaultPlaylist.id,
+        article_id: article.id,
+        position: i,
+    }));
 
     if (defaultPlaylistItems.length > 0) {
         const { error: itemError } = await supabase.from("playlist_items").insert(defaultPlaylistItems);
@@ -414,14 +413,11 @@ async function seedTestData() {
 
     // 8. ソートテスト用プレイリストにアイテムを追加
     console.log("8. ソートテスト用プレイリストにアイテムを追加中...");
-    const sortTestPlaylistItems = [];
-    for (let i = 0; i < 3 && i < createdArticles.length; i += 1) {
-        sortTestPlaylistItems.push({
-            playlist_id: sortTestPlaylist.id,
-            article_id: createdArticles[i].id,
-            position: i,
-        });
-    }
+    const sortTestPlaylistItems = createdArticles.slice(0, 3).map((article, i) => ({
+        playlist_id: sortTestPlaylist.id,
+        article_id: article.id,
+        position: i,
+    }));
 
     if (sortTestPlaylistItems.length > 0) {
         const { error: itemError } = await supabase.from("playlist_items").insert(sortTestPlaylistItems);
