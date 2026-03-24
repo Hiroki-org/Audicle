@@ -20,13 +20,17 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from main import _chunk_text
 
+SPACE_SPLIT_REGEX = re.compile(r"(\\s)")
+PERIOD_SPLIT_REGEX = re.compile(r"([.])")
+COMMA_SPLIT_REGEX = re.compile(r"([,])")
+
 class TestChunkTextLogic(unittest.TestCase):
 
     def test_basic_no_split(self):
         """Test that text smaller than limit returns as is."""
         text = "Hello world"
         limit = 50
-        chunks = _chunk_text(text, limit, [re.compile(r'(\s)')])
+        chunks = _chunk_text(text, limit, [SPACE_SPLIT_REGEX])
         self.assertEqual(chunks, ["Hello world"])
 
     def test_delimiter_merging(self):
@@ -34,7 +38,7 @@ class TestChunkTextLogic(unittest.TestCase):
         text = "Hello. World."
         limit = 7 # Force split. "Hello." is 6 bytes. " World." is 7 bytes.
         # Split by period
-        chunks = _chunk_text(text, limit, [re.compile(r'([.])')])
+        chunks = _chunk_text(text, limit, [PERIOD_SPLIT_REGEX])
         # Expect ["Hello.", " World."]
         self.assertEqual(chunks, ["Hello.", " World."])
 
@@ -47,7 +51,7 @@ class TestChunkTextLogic(unittest.TestCase):
 
         text = "Part1,Part2. Part3,Part4."
         limit = 12
-        separators = [re.compile(r'([.])'), re.compile(r'([,])')]
+        separators = [PERIOD_SPLIT_REGEX, COMMA_SPLIT_REGEX]
 
         chunks = _chunk_text(text, limit, separators)
 
@@ -86,7 +90,7 @@ class TestChunkTextLogic(unittest.TestCase):
 
         text = "a.b.c.d."
         limit = 4
-        chunks = _chunk_text(text, limit, [re.compile(r'([.])')])
+        chunks = _chunk_text(text, limit, [PERIOD_SPLIT_REGEX])
         self.assertEqual(chunks, ["a.b.", "c.d."])
 
 if __name__ == '__main__':

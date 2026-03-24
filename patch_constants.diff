@@ -1,0 +1,44 @@
+--- packages/api-server/tests/test_chunk_text_logic.py
++++ packages/api-server/tests/test_chunk_text_logic.py
+@@ -21,6 +21,11 @@
+
+ from main import _chunk_text
+
++# Pre-compiled regex patterns for tests
++SPACE_SPLIT_REGEX = re.compile(r'(\s)')
++PERIOD_SPLIT_REGEX = re.compile(r'([.])')
++COMMA_SPLIT_REGEX = re.compile(r'([,])')
++
+ class TestChunkTextLogic(unittest.TestCase):
+
+     def test_basic_no_split(self):
+@@ -28,7 +33,7 @@
+         text = "Hello world"
+         limit = 50
+-        chunks = _chunk_text(text, limit, [re.compile(r'(\s)')])
++        chunks = _chunk_text(text, limit, [SPACE_SPLIT_REGEX])
+         self.assertEqual(chunks, ["Hello world"])
+
+     def test_delimiter_merging(self):
+@@ -37,7 +42,7 @@
+         limit = 7 # Force split. "Hello." is 6 bytes. " World." is 7 bytes.
+         # Split by period
+-        chunks = _chunk_text(text, limit, [re.compile(r'([.])')])
++        chunks = _chunk_text(text, limit, [PERIOD_SPLIT_REGEX])
+         # Expect ["Hello.", " World."]
+         self.assertEqual(chunks, ["Hello.", " World."])
+
+@@ -52,7 +57,7 @@
+         text = "Part1,Part2. Part3,Part4."
+         limit = 12
+-        separators = [re.compile(r'([.])'), re.compile(r'([,])')]
++        separators = [PERIOD_SPLIT_REGEX, COMMA_SPLIT_REGEX]
+
+         chunks = _chunk_text(text, limit, separators)
+
+@@ -90,7 +95,7 @@
+         text = "a.b.c.d."
+         limit = 4
+-        chunks = _chunk_text(text, limit, [re.compile(r'([.])')])
++        chunks = _chunk_text(text, limit, [PERIOD_SPLIT_REGEX])
+         self.assertEqual(chunks, ["a.b.", "c.d."])
