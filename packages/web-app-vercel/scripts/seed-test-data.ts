@@ -245,25 +245,25 @@ async function seedTestData() {
 
     const existingArticles = existingData || [];
 
-    // URLをキーにした既存記事のマップを作成 (owner_emailもチェック)
+    // (owner_email, url)をキーにした既存記事のマップを作成
     const existingMap = new Map();
     for (const existing of existingArticles) {
-        existingMap.set(existing.url, existing);
+        existingMap.set(existing.owner_email + "||" + existing.url, existing);
     }
 
     const toInsert: typeof articles = [];
     const toUpdate: typeof articles = [];
 
-    // 重複するURLを避けるためにSetを使用
-    const processedUrls = new Set();
+    // 重複を避けるためのSet (owner_email + url)
+    const processedKeys = new Set();
 
     for (const article of articles) {
-        if (processedUrls.has(article.url)) continue;
-        processedUrls.add(article.url);
+        const key = article.owner_email + "||" + article.url;
+        if (processedKeys.has(key)) continue;
+        processedKeys.add(key);
 
-        const existing = existingMap.get(article.url);
-        // DB上のowner_emailと一致するか確認
-        if (existing && existing.owner_email === article.owner_email) {
+        const existing = existingMap.get(key);
+        if (existing) {
             toUpdate.push(article);
         } else {
             toInsert.push(article);
@@ -292,7 +292,8 @@ async function seedTestData() {
 
     // 既存記事を更新
     for (const article of toUpdate) {
-        const existing = existingMap.get(article.url);
+        const key = article.owner_email + "||" + article.url;
+        const existing = existingMap.get(key);
         if (existing) {
             const { data: updated, error: updateError } = await supabase
                 .from("articles")
@@ -317,7 +318,8 @@ async function seedTestData() {
     const createdArticles: Article[] = [];
     for (const article of articles) {
         const created = createdArticlesMap.get(article.url);
-        if (created && !createdArticles.some(a => a.url === article.url)) { // 重複挿入防止
+        // 同じ owner_email + url の重複を防ぐ
+        if (created && !createdArticles.some(a => a.owner_email === article.owner_email && a.url === article.url)) {
             createdArticles.push(created);
         }
     }
