@@ -103,6 +103,12 @@ function calculateArticleHash(chunks: string[]): string {
     return calculateTextHash(content, 0).substring(0, 16);
 }
 
+
+// System-level logger for use outside the POST handler
+const systemLog = (level: 'info' | 'warn' | 'error', message: string, data: Record<string, unknown> = {}) => {
+    console[level](JSON.stringify({ level, message, ...data }));
+};
+
 // Google Cloud TTS クライアント
 let ttsCLient: TextToSpeechClient | null = null;
 
@@ -115,7 +121,7 @@ function getTTSClient(): TextToSpeechClient | null {
     const googleKeyFileEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     if (googleKeyFileEnv && fs.existsSync(googleKeyFileEnv)) {
         ttsCLient = new TextToSpeechClient({ keyFilename: googleKeyFileEnv });
-        console.log('[INFO] GOOGLE_APPLICATION_CREDENTIALS used as keyFilename');
+        systemLog('info', 'GOOGLE_APPLICATION_CREDENTIALS used as keyFilename');
         return ttsCLient;
     }
 
@@ -124,7 +130,7 @@ function getTTSClient(): TextToSpeechClient | null {
         // In test environments or CI, return null to allow fallback behavior
         // (the caller will synthesize a dummy buffer).
         if (process.env.NODE_ENV !== 'production' || process.env.CI === 'true' || process.env.TEST_SESSION_TOKEN) {
-            console.log('[INFO] GOOGLE_APPLICATION_CREDENTIALS_JSON not set, using fallback for test environment');
+            systemLog('info', 'GOOGLE_APPLICATION_CREDENTIALS_JSON not set, using fallback for test environment');
             return null;
         }
         throw new Error('GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set');
@@ -153,7 +159,7 @@ function getTTSClient(): TextToSpeechClient | null {
             const unescaped = credentialsJson.replace(/\\n/g, '\n').replace(/^"|"$/g, '');
             credentials = tryParseJson(unescaped);
             if (credentials) {
-                console.log('[INFO] GOOGLE_APPLICATION_CREDENTIALS_JSON was loaded from an escaped JSON string');
+                systemLog('info', 'GOOGLE_APPLICATION_CREDENTIALS_JSON was loaded from an escaped JSON string');
             }
         } catch (_) { void _; }
     }
@@ -164,7 +170,7 @@ function getTTSClient(): TextToSpeechClient | null {
             const decoded = Buffer.from(credentialsJson, 'base64').toString('utf8');
             credentials = tryParseJson(decoded);
             if (credentials) {
-                console.log('[INFO] GOOGLE_APPLICATION_CREDENTIALS_JSON was loaded from base64');
+                systemLog('info', 'GOOGLE_APPLICATION_CREDENTIALS_JSON was loaded from base64');
             }
         } catch {
             // ignore decode errors
@@ -177,7 +183,7 @@ function getTTSClient(): TextToSpeechClient | null {
             const trimmed = credentialsJson.trim();
             if ((trimmed.startsWith('/') || trimmed.endsWith('.json') || trimmed.includes('.json')) && fs.existsSync(trimmed)) {
                 ttsCLient = new TextToSpeechClient({ keyFilename: trimmed });
-                console.log('[INFO] GOOGLE_APPLICATION_CREDENTIALS_JSON used as keyFilename');
+                systemLog('info', 'GOOGLE_APPLICATION_CREDENTIALS_JSON used as keyFilename');
                 return ttsCLient;
             }
         } catch (_e) {
@@ -206,7 +212,7 @@ async function synthesizeToBuffer(text: string, voice: string, speakingRate: num
 
     // Fallback for test environments without credentials
     if (!client) {
-        console.log('[INFO] Using fallback dummy audio buffer for test environment');
+        systemLog('info', 'Using fallback dummy audio buffer for test environment');
         // Return a minimal MP3 buffer (silence) for testing
         // This is a very small MP3 frame that represents silence
         const dummyMp3Buffer = Buffer.from([
