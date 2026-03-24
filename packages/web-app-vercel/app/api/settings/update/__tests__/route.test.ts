@@ -1,19 +1,23 @@
 // Supabase mock
+const mockUpsert = jest.fn().mockReturnThis();
+const mockSelect = jest.fn().mockReturnThis();
+const mockSingle = jest.fn().mockResolvedValue({
+    data: {
+        user_id: 'test-user-id',
+        playback_speed: 1.5,
+        voice_model: 'en-US-Wavenet-C',
+        language: 'en-US',
+        color_theme: 'purple',
+    },
+    error: null,
+});
+
 jest.mock('@/lib/supabase', () => ({
     supabase: {
         from: jest.fn(() => ({
-            upsert: jest.fn().mockReturnThis(),
-            select: jest.fn().mockReturnThis(),
-            single: jest.fn().mockResolvedValue({
-                data: {
-                    user_id: 'test-user-id',
-                    playback_speed: 1.5,
-                    voice_model: 'en-US-Wavenet-C',
-                    language: 'en-US',
-                    color_theme: 'purple',
-                },
-                error: null,
-            }),
+            upsert: mockUpsert,
+            select: mockSelect,
+            single: mockSingle,
         })),
     },
 }));
@@ -41,7 +45,26 @@ describe('PUT /api/settings/update', () => {
     });
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        jest.resetAllMocks();
+
+        // Reset default mock implementations for Supabase chain
+        mockUpsert.mockReturnThis();
+        mockSelect.mockReturnThis();
+        mockSingle.mockResolvedValue({
+            data: {
+                user_id: 'test-user-id',
+                playback_speed: 1.5,
+                voice_model: 'en-US-Wavenet-C',
+                language: 'en-US',
+                color_theme: 'purple',
+            },
+            error: null,
+        });
+        (supabase.from as jest.Mock).mockReturnValue({
+            upsert: mockUpsert,
+            select: mockSelect,
+            single: mockSingle,
+        });
     });
 
     const mockRequest = (body: any) => {
@@ -73,10 +96,22 @@ describe('PUT /api/settings/update', () => {
         expect(data).toEqual({ error: 'Unauthorized', success: false });
     });
 
-    it('returns 400 for invalid playback_speed', async () => {
+    it('returns 400 for invalid playback_speed (too high)', async () => {
         (auth as jest.Mock).mockResolvedValue({ user: { id: 'test-user-id' } });
 
         const request = mockRequest({ playback_speed: 5.0 }); // invalid
+        const response = await PUT(request);
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.success).toBe(false);
+        expect(data.error).toContain('Invalid playback_speed');
+    });
+
+    it('returns 400 for invalid playback_speed (too low)', async () => {
+        (auth as jest.Mock).mockResolvedValue({ user: { id: 'test-user-id' } });
+
+        const request = mockRequest({ playback_speed: 0.1 }); // invalid
         const response = await PUT(request);
 
         expect(response.status).toBe(400);
@@ -137,12 +172,7 @@ describe('PUT /api/settings/update', () => {
     it('returns 500 if Supabase upsert fails', async () => {
         (auth as jest.Mock).mockResolvedValue({ user: { id: 'test-user-id' } });
 
-        const mockSingle = jest.fn().mockResolvedValue({ data: null, error: new Error('DB Error') });
-        (supabase.from as jest.Mock).mockImplementationOnce(() => ({
-            upsert: jest.fn().mockReturnThis(),
-            select: jest.fn().mockReturnThis(),
-            single: mockSingle,
-        }));
+        mockSingle.mockResolvedValueOnce({ data: null, error: new Error('DB Error') });
 
         const request = mockRequest({ playback_speed: 1.5 });
         const response = await PUT(request);
@@ -178,13 +208,28 @@ describe('PUT /api/settings/update', () => {
 
         // Verify Supabase was called correctly
         expect(supabase.from).toHaveBeenCalledWith('user_settings');
-        // We get the mocked upsert chain, check its upsert call via the mock itself
-        // Because of the nested mockReturnThis structure, we need to inspect the mock chain
-        // A simple check is that supabase.from was called
+        expect(mockUpsert).toHaveBeenCalledWith(
+            {
+                user_id: 'test-user-id',
+                playback_speed: 1.5,
+                voice_model: 'en-US-Wavenet-C',
+                language: 'en-US',
+                color_theme: 'purple',
+            },
+            { onConflict: 'user_id' }
+        );
     });
 
     it('handles partial updates', async () => {
         (auth as jest.Mock).mockResolvedValue({ user: { id: 'test-user-id' } });
+
+        mockSingle.mockResolvedValueOnce({
+            data: {
+                user_id: 'test-user-id',
+                color_theme: 'orange',
+            },
+            error: null,
+        });
 
         const request = mockRequest({
             color_theme: 'orange',
@@ -194,6 +239,15 @@ describe('PUT /api/settings/update', () => {
         expect(response.status).toBe(200);
         const data = await response.json();
         expect(data.success).toBe(true);
+        expect(data.data.color_theme).toBe('orange');
+
+        expect(mockUpsert).toHaveBeenCalledWith(
+            {
+                user_id: 'test-user-id',
+                color_theme: 'orange',
+            },
+            { onConflict: 'user_id' }
+        );
     });
 
     it('returns 500 if an unexpected exception occurs', async () => {
