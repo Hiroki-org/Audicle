@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 
 export default async function ProfilePage() {
-
   const session = await auth();
 
   if (!session) {
