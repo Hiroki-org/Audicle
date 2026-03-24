@@ -342,23 +342,35 @@ async function seedTestData() {
     // 5. デフォルトプレイリストの作成
     console.log("5. デフォルトプレイリストを作成中...");
 
-    await supabase
+    // First, check if it already exists
+    const { data: existingPlaylist } = await supabase
         .from("playlists")
-        .delete()
+        .select("id")
         .eq("owner_email", TEST_USER_EMAIL)
-        .eq("is_default", true);
-
-    const { data: defaultPlaylist, error: playlistError } = await supabase
-        .from("playlists")
-        .insert({
-            owner_email: TEST_USER_EMAIL,
-            name: "デフォルトプレイリスト",
-            description: "テスト用デフォルトプレイリスト",
-            is_default: true,
-            visibility: "private",
-        })
-        .select()
+        .eq("is_default", true)
         .single();
+
+    let defaultPlaylist = null;
+    let playlistError = null;
+
+    if (existingPlaylist) {
+        console.log("✓ 既存のデフォルトプレイリストを使用します");
+        defaultPlaylist = existingPlaylist;
+    } else {
+        const result = await supabase
+            .from("playlists")
+            .insert({
+                owner_email: TEST_USER_EMAIL,
+                name: "デフォルトプレイリスト",
+                description: "テスト用デフォルトプレイリスト",
+                is_default: true,
+                visibility: "private",
+            })
+            .select()
+            .single();
+        defaultPlaylist = result.data;
+        playlistError = result.error;
+    }
 
     if (playlistError || !defaultPlaylist) {
         console.error("プレイリストの作成に失敗:", playlistError);
