@@ -339,7 +339,7 @@ export async function POST(request: NextRequest) {
     const requestId = randomUUID();
     // biome-ignore lint/suspicious/noExplicitAny: The data payload for structured logging can accept any object shape.
     const log = (level: 'info' | 'warn' | 'error', message: string, data: Record<string, unknown> = {}) => {
-        console[level](JSON.stringify({ requestId, level, message, ...data }));
+        systemLog(level, message, { requestId, ...data });
     };
 
     const corsHeaders = {
