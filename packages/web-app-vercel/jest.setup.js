@@ -1,4 +1,6 @@
 import "@testing-library/jest-dom";
+import { MessagePort } from 'worker_threads';
+import { TextEncoder, TextDecoder } from "util";
 
 // React 18: act() を正しく扱うためのフラグ
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -119,7 +121,6 @@ global.Headers = class Headers {
   }
 };
 
-import { TextEncoder, TextDecoder } from "util";
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
@@ -174,5 +175,5 @@ global.URL.revokeObjectURL = jest.fn();
 
 // MessagePort をグローバルに定義 (undici 用)
 if (typeof global.MessagePort === 'undefined') {
-  global.MessagePort = require('worker_threads').MessagePort;
+  global.MessagePort = MessagePort;
 }

@@ -9,11 +9,12 @@ jest.mock('@/lib/auth', () => ({
 }));
 
 // Simplify supabase mock setup
+const mockSingle = jest.fn();
 jest.mock('@/lib/supabase', () => {
     const mockChain = {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
+        single: () => mockSingle(),
     };
     return {
         supabase: {
@@ -23,10 +24,13 @@ jest.mock('@/lib/supabase', () => {
 });
 
 describe('GET /api/settings/get', () => {
-    const mockSingle = (supabase.from('user_settings').select().eq() as any).single;
-
     beforeEach(() => {
         jest.clearAllMocks();
+        mockSingle.mockReset();
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
     });
 
     it('returns 401 when unauthenticated', async () => {
