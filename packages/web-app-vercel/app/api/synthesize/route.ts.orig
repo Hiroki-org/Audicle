@@ -115,6 +115,7 @@ function getTTSClient(): TextToSpeechClient | null {
     const googleKeyFileEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     if (googleKeyFileEnv && fs.existsSync(googleKeyFileEnv)) {
         ttsCLient = new TextToSpeechClient({ keyFilename: googleKeyFileEnv });
+    const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
     if (!credentialsJson) {
         // In test environments or CI, return null to allow fallback behavior
         // (the caller will synthesize a dummy buffer).
@@ -123,6 +124,7 @@ function getTTSClient(): TextToSpeechClient | null {
         throw new Error('GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set');
 
     // file-path variants. This helps when people paste multi-line JSON into
+    // env files; we prefer single-line JSON, but fall back to base64.
 
     const tryParseJson = (s: string): unknown | null => {
         try {
@@ -151,6 +153,7 @@ function getTTSClient(): TextToSpeechClient | null {
         } catch {
         }
     }
+
     // 3) If it's a path to a JSON file (e.g., set by developer), prefer keyFilename
         try {
             const trimmed = credentialsJson.trim();
@@ -161,6 +164,7 @@ function getTTSClient(): TextToSpeechClient | null {
             void _e;
             void _e;
         }
+    }
     if (!credentials) {
         throw new Error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON (expected JSON or base64-encoded JSON, or a path to a keyfile)');
     }
@@ -173,6 +177,7 @@ function getTTSClient(): TextToSpeechClient | null {
     return ttsCLient;
 }
 
+async function synthesizeToBuffer(text: string, voice: string, speakingRate: number = 2.0): Promise<Buffer> {
     const client = getTTSClient();
 
     // Fallback for test environments without credentials
@@ -201,6 +206,7 @@ function getTTSClient(): TextToSpeechClient | null {
     const textByteSize = Buffer.byteLength(text, 'utf-8');
     if (textByteSize > MAX_TTS_BYTES) {
         console.error(`[TTS Error] Text exceeds maximum byte size: ${textByteSize} bytes (max: ${MAX_TTS_BYTES})`);
+        throw new TTSError(
             `テキストが最大バイトサイズを超えています: ${textByteSize} bytes (最大: ${MAX_TTS_BYTES})`,
             'INVALID_ARGUMENT',
             400
