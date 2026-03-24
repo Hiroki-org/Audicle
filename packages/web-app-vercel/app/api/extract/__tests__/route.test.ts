@@ -1,3 +1,4 @@
+/** @jest-environment node */
 // 簡易版テスト（MSWなし）
 jest.mock('@/lib/api-auth', () => ({
     requireAuth: jest.fn(async (handler) => handler),
