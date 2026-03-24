@@ -115,14 +115,22 @@ function getTTSClient(): TextToSpeechClient | null {
     const googleKeyFileEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     if (googleKeyFileEnv && fs.existsSync(googleKeyFileEnv)) {
         ttsCLient = new TextToSpeechClient({ keyFilename: googleKeyFileEnv });
+        return ttsCLient;
+    }
+
+    const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
     if (!credentialsJson) {
         // In test environments or CI, return null to allow fallback behavior
         // (the caller will synthesize a dummy buffer).
         if (process.env.NODE_ENV !== 'production' || process.env.CI === 'true' || process.env.TEST_SESSION_TOKEN) {
             return null;
+        }
         throw new Error('GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set');
+    }
 
+    // Try parsing the env var as JSON, but be tolerant of base64-encoded or
     // file-path variants. This helps when people paste multi-line JSON into
+    // env files; we prefer single-line JSON, but fall back to base64.
 
     const tryParseJson = (s: string): unknown | null => {
         try {
@@ -145,34 +153,46 @@ function getTTSClient(): TextToSpeechClient | null {
         } catch (_) { void _; }
     }
 
+    // 2) If base64 encoded JSON
     if (!credentials) {
         try {
+            const decoded = Buffer.from(credentialsJson, 'base64').toString('utf8');
             credentials = tryParseJson(decoded);
         } catch {
+            // ignore decode errors
         }
     }
+
     // 3) If it's a path to a JSON file (e.g., set by developer), prefer keyFilename
+    if (!credentials) {
         try {
             const trimmed = credentialsJson.trim();
             if ((trimmed.startsWith('/') || trimmed.endsWith('.json') || trimmed.includes('.json')) && fs.existsSync(trimmed)) {
+                ttsCLient = new TextToSpeechClient({ keyFilename: trimmed });
                 return ttsCLient;
             }
         } catch (_e) {
+            // ignore
             void _e;
             void _e;
         }
+    }
+
     if (!credentials) {
         throw new Error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON (expected JSON or base64-encoded JSON, or a path to a keyfile)');
     }
 
+    // `credentials` is unknown type from tryParseJson; the TextToSpeechClient
     // expects a credential-like object. We'll pass it as `credentials` after a
     // best-effort cast.
     ttsCLient = new TextToSpeechClient({
 
+        credentials: credentials as any,
     });
     return ttsCLient;
 }
 
+async function synthesizeToBuffer(text: string, voice: string, speakingRate: number = 2.0): Promise<Buffer> {
     const client = getTTSClient();
 
     // Fallback for test environments without credentials
@@ -194,13 +214,17 @@ function getTTSClient(): TextToSpeechClient | null {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ]);
         return dummyMp3Buffer;
+    }
 
     // テキストのバイトサイズをチェック
     const textByteSize = Buffer.byteLength(text, 'utf-8');
     if (textByteSize > MAX_TTS_BYTES) {
         console.error(`[TTS Error] Text exceeds maximum byte size: ${textByteSize} bytes (max: ${MAX_TTS_BYTES})`);
+        throw new TTSError(
             `テキストが最大バイトサイズを超えています: ${textByteSize} bytes (最大: ${MAX_TTS_BYTES})`,
             'INVALID_ARGUMENT',
             400
