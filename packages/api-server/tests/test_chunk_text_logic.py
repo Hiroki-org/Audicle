@@ -2,11 +2,11 @@ import re
 import sys
 import unittest
 from unittest.mock import MagicMock
-import os
 
 # Mock external dependencies
 sys.modules["aiofiles"] = MagicMock()
 sys.modules["aiofiles.os"] = MagicMock()
+import os
 sys.modules["fastapi"] = MagicMock()
 sys.modules["fastapi.responses"] = MagicMock()
 sys.modules["fastapi.middleware.cors"] = MagicMock()
