@@ -33,9 +33,6 @@ describe('Home Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
-    // Suppress console.log/error if any
-    jest.spyOn(console, 'log').mockImplementation(() => {});
-    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
