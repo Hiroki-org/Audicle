@@ -345,7 +345,7 @@ async def synthesize_speech(request: SynthesizeRequest):
             logger.info("Attempting fallback: returning test audio file")
 
             fallback_path = "fallback.mp3"
-            if os.path.exists(fallback_path):
+            if await asyncio.to_thread(os.path.exists, fallback_path):
                 async with aiofiles.open(fallback_path, "rb") as fallback_file:
                     fallback_audio = await fallback_file.read()
 
