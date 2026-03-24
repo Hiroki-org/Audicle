@@ -11,6 +11,8 @@ let playbackQueue = [];
 let queueIndex = 0;
 // prefetch cache: queueIndex -> audioDataUrl
 let audioCache = new Map();
+// uncached indices for fast lookup
+let unCachedIndices = new Set();
 // 先読みするチャンク数
 let prefetchAhead = 2;
 
@@ -89,7 +91,7 @@ let isProcessingRequests = false; // リクエスト処理中フラグ
 function addToRequestQueue(requestData, callback) {
   requestQueue.push({ requestData, callback });
   debugLog(
-    `[Rate Limit] Added request to queue. Queue length: ${requestQueue.length}`
+    `[Rate Limit] Added request to queue. Queue length: ${requestQueue.length}`,
   );
   processRequestQueue();
 }
@@ -111,7 +113,7 @@ function processRequestQueue() {
       lastRequestTime = Date.now();
 
       debugLog(
-        `[Rate Limit] Processing request. Remaining in queue: ${requestQueue.length}`
+        `[Rate Limit] Processing request. Remaining in queue: ${requestQueue.length}`,
       );
 
       // 実際のリクエスト送信
@@ -132,7 +134,7 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
   debugLog(
     `[Sequential Request] Starting from index ${startIndex} to ${
       endIndex || playbackQueue.length - 1
-    }`
+    }`,
   );
 
   const actualEndIndex = endIndex || playbackQueue.length - 1;
@@ -140,7 +142,7 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
 
   // リクエストする項目を準備
   for (let i = startIndex; i <= actualEndIndex; i++) {
-    if (!audioCache.has(i)) {
+    if (unCachedIndices.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
         requests.push({ index: i, text: item.text });
@@ -150,7 +152,7 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
 
   if (requests.length === 0) {
     debugLog(
-      `[Sequential Request] All items ${startIndex}-${actualEndIndex} already cached`
+      `[Sequential Request] All items ${startIndex}-${actualEndIndex} already cached`,
     );
     callback();
     return;
@@ -169,15 +171,16 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
     addToRequestQueue(requestData, (response) => {
       if (response && response.audioDataUrl) {
         audioCache.set(request.index, response.audioDataUrl);
+        unCachedIndices.delete(request.index);
         debugLog(
-          `[Sequential Request] Cached audio for index: ${request.index}`
+          `[Sequential Request] Cached audio for index: ${request.index}`,
         );
       }
 
       completedRequests++;
       if (completedRequests === requests.length) {
         debugLog(
-          `[Sequential Request] Completed all ${requests.length} requests`
+          `[Sequential Request] Completed all ${requests.length} requests`,
         );
         callback();
       }
@@ -245,7 +248,7 @@ chrome.runtime.onMessage.addListener((message) => {
         audioPlayer.playbackRate = config.playbackRate || 1.0;
         audioPlayer.play();
       },
-      { once: true }
+      { once: true },
     ); // { once: true } でイベントが一度だけ実行されるようにする
 
     // リスナーを登録してから、音源ソースを設定する
@@ -293,7 +296,7 @@ audioPlayer.addEventListener("ended", () => {
     "Audio ended, current queueIndex:",
     queueIndex,
     "queue length:",
-    playbackQueue.length
+    playbackQueue.length,
   );
   retryCount = 0; // リトライカウンターをリセット
   queueIndex += 1;
@@ -307,6 +310,7 @@ audioPlayer.addEventListener("ended", () => {
     // キュー終了時にハイライト解除
     updateHighlight(null);
     playbackQueue = [];
+    unCachedIndices.clear();
     queueIndex = 0;
   }
 });
@@ -317,7 +321,7 @@ audioPlayer.addEventListener("error", (e) => {
   if (retryCount < maxRetries) {
     retryCount++;
     debugLog(
-      `Retrying playback for index ${queueIndex}, attempt ${retryCount}`
+      `Retrying playback for index ${queueIndex}, attempt ${retryCount}`,
     );
     setTimeout(() => playQueue(), 3000); // 3秒遅延してリトライ
   } else {
@@ -331,6 +335,7 @@ audioPlayer.addEventListener("error", (e) => {
     } else {
       updateHighlight(null);
       playbackQueue = [];
+      unCachedIndices.clear();
       queueIndex = 0;
     }
   }
@@ -359,7 +364,7 @@ function loadCurrentUrlState(callback) {
 
     // マイグレーション/クリーンアップ: 無効キーが残っている場合は削除
     const invalidKeys = Object.keys(urlStates).filter(
-      (k) => k === "" || k === "undefined" || k === null
+      (k) => k === "" || k === "undefined" || k === null,
     );
     if (invalidKeys.length > 0) {
       invalidKeys.forEach((k) => delete urlStates[k]);
@@ -414,7 +419,7 @@ function preparePage() {
   if (customRules[hostname]) {
     // 独自ルールで要素を準備
     const container = document.querySelector(
-      "#personal-public-article-body .mdContent-inner"
+      "#personal-public-article-body .mdContent-inner",
     );
     if (container) {
       const allElements = container.querySelectorAll("*");
@@ -547,6 +552,7 @@ function cleanupPage() {
   removeStyles();
   // 再生キューのリセット
   playbackQueue = [];
+  unCachedIndices.clear();
   queueIndex = 0;
   // audioCacheはクリアせず残す（一時停止用）
   retryCount = 0;
@@ -563,7 +569,7 @@ function updateHighlight(paragraphId) {
   // 新しいハイライトを設定
   if (paragraphId !== null) {
     const element = document.querySelector(
-      `[data-audicle-id="${paragraphId}"]`
+      `[data-audicle-id="${paragraphId}"]`,
     );
     if (element) {
       const palette = computeAdaptiveColors(element);
@@ -577,10 +583,7 @@ function updateHighlight(paragraphId) {
           block: "center", // 画面中央に配置
           inline: "nearest",
         });
-        debugLog(
-          "updateHighlight: Auto-scrolled to paragraphId:",
-          paragraphId
-        );
+        debugLog("updateHighlight: Auto-scrolled to paragraphId:", paragraphId);
       } catch (error) {
         console.warn("updateHighlight: ScrollIntoView failed:", error);
         // フォールバック: 古いブラウザ向け
@@ -589,7 +592,7 @@ function updateHighlight(paragraphId) {
     } else {
       console.warn(
         "updateHighlight: Element not found for paragraphId:",
-        paragraphId
+        paragraphId,
       );
     }
   }
@@ -601,11 +604,11 @@ function applyHighlightStyles(element, palette) {
   element.style.setProperty("--audicle-highlight-bg", palette.highlightBg);
   element.style.setProperty(
     "--audicle-highlight-color",
-    palette.highlightColor
+    palette.highlightColor,
   );
   element.style.setProperty(
     "--audicle-highlight-outline",
-    palette.highlightOutline
+    palette.highlightOutline,
   );
 }
 
@@ -631,7 +634,7 @@ function handleClick(event) {
     "ID:",
     target.dataset.audicleId,
     "isPlaying:",
-    isPlaying
+    isPlaying,
   );
 
   // 再生中の場合、位置変更のみ
@@ -643,7 +646,7 @@ function handleClick(event) {
         clickedId,
         "in queue of",
         playbackQueue.length,
-        "items"
+        "items",
       );
 
       // 同じparagraphIdを持つ複数のチャンクがある場合、現在位置から最も近いものを選択
@@ -669,7 +672,7 @@ function handleClick(event) {
           "current queueIndex:",
           queueIndex,
           "distance:",
-          bestDistance
+          bestDistance,
         );
         queueIndex = bestIndex;
         // 現在の再生を停止し、新しい位置から再生
@@ -686,7 +689,7 @@ function handleClick(event) {
           i < Math.min(bestIndex + JUMP_BATCH_SIZE, playbackQueue.length);
           i++
         ) {
-          if (!audioCache.has(i)) {
+          if (unCachedIndices.has(i)) {
             const item = playbackQueue[i];
             if (item && item.text) {
               jumpBatch.push({ index: i, text: item.text });
@@ -696,7 +699,7 @@ function handleClick(event) {
 
         if (jumpBatch.length > 0) {
           debugLog(
-            `handleClick: Requesting ${jumpBatch.length} items from jump position using sequential requests`
+            `handleClick: Requesting ${jumpBatch.length} items from jump position using sequential requests`,
           );
 
           // 新しいレート制限システムを使用してリクエスト
@@ -712,10 +715,10 @@ function handleClick(event) {
                   null,
                   () => {
                     debugLog("handleClick: Background loading completed");
-                  }
+                  },
                 );
               }
-            }
+            },
           );
         } else {
           playQueue();
@@ -730,7 +733,7 @@ function handleClick(event) {
         console.warn(
           "handleClick: ID",
           clickedId,
-          "not found in current queue"
+          "not found in current queue",
         );
         // デバッグ: キューの最初の5項目を表示
         debugLog(
@@ -738,13 +741,13 @@ function handleClick(event) {
           playbackQueue.slice(0, 5).map((item) => ({
             id: item.paragraphId,
             text: item.text.substring(0, 20),
-          }))
+          })),
         );
       }
     } else {
       console.warn(
         "handleClick: Invalid clicked ID:",
-        target.dataset.audicleId
+        target.dataset.audicleId,
       );
     }
     return;
@@ -789,11 +792,11 @@ function handleClick(event) {
     debugLog(
       `[🎯 Extraction Result] Rule: ${extractionInfo.rule}, Blocks: ${
         extractionInfo.queueLength || queue.length
-      }, Domain: ${extractionInfo.domain}`
+      }, Domain: ${extractionInfo.domain}`,
     );
     if (extractionInfo.priority) {
       debugLog(
-        `[📊 Rule Info] Priority: ${extractionInfo.priority}, Type: ${extractionInfo.type}`
+        `[📊 Rule Info] Priority: ${extractionInfo.priority}, Type: ${extractionInfo.type}`,
       );
     }
     if (extractionInfo.fallbackReason) {
@@ -806,6 +809,12 @@ function handleClick(event) {
   // キューが構築できた場合は再生開始
   if (queue.length > 0) {
     playbackQueue = queue;
+    unCachedIndices.clear();
+    for (let i = 0; i < queue.length; i++) {
+      if (!audioCache.has(i)) {
+        unCachedIndices.add(i);
+      }
+    }
     const clickedId = parseInt(target.dataset.audicleId);
     if (!isNaN(clickedId)) {
       // 同じparagraphIdを持つ複数のチャンクがある場合、最初のものを選択
@@ -824,7 +833,7 @@ function handleClick(event) {
           startIndex,
           "for ID:",
           clickedId,
-          "first chunk of this paragraph"
+          "first chunk of this paragraph",
         );
       } else {
         queueIndex = 0;
@@ -856,7 +865,7 @@ function buildQueueWithNewRulesManager() {
   }
 
   debugLog(
-    `[NewRulesManager] Using rule: ${rule.id} (${rule.type}, priority: ${rule.priority})`
+    `[NewRulesManager] Using rule: ${rule.id} (${rule.type}, priority: ${rule.priority})`,
   );
 
   // ルールを使って抽出実行
@@ -879,7 +888,7 @@ function buildQueueWithNewRulesManager() {
     const tagName = element ? element.tagName.toLowerCase() : "unknown";
     const textPreview = text ? text.substring(0, 30) + "..." : "no text";
     debugLog(
-      `[NewRulesManager] Processing block ${blockIndex}: ${tagName} (id: ${paragraphId}) - "${textPreview}"`
+      `[NewRulesManager] Processing block ${blockIndex}: ${tagName} (id: ${paragraphId}) - "${textPreview}"`,
     );
 
     // 要素にIDとクラスを設定（ハイライト用）
@@ -936,7 +945,7 @@ function buildQueueWithNewRulesManager() {
   };
 
   debugLog(
-    `[NewRulesManager] Successfully built queue: ${queue.length} chunks from ${extraction.length} blocks using rule '${rule.id}'`
+    `[NewRulesManager] Successfully built queue: ${queue.length} chunks from ${extraction.length} blocks using rule '${rule.id}'`,
   );
 
   return { queue, info };
@@ -977,7 +986,7 @@ function buildQueueWithLegacySystem() {
 
   info.queueLength = queue.length;
   debugLog(
-    `[LegacySystem] Built queue: ${queue.length} items using rule '${info.rule}'`
+    `[LegacySystem] Built queue: ${queue.length} items using rule '${info.rule}'`,
   );
 
   return { queue, info };
@@ -1042,16 +1051,16 @@ document.addEventListener("DOMContentLoaded", () => {
   debugLog("[🚀 Audicle Initialized]");
   debugLog(
     "- New Rules Manager:",
-    window.ExtractionRulesManager ? "✅ Available" : "❌ Not loaded"
+    window.ExtractionRulesManager ? "✅ Available" : "❌ Not loaded",
   );
   debugLog(
     "- Legacy Rules:",
     Object.keys(customRules).length,
-    "site-specific rules"
+    "site-specific rules",
   );
   debugLog(
     "- Readability.js:",
-    window.Readability ? "✅ Available" : "⏳ Will load dynamically"
+    window.Readability ? "✅ Available" : "⏳ Will load dynamically",
   );
 
   // 現在のページで採用されるルール情報を自動表示
@@ -1060,17 +1069,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (ruleInfo.activeRule) {
       debugLog(
-        `[📋 Current Page Rule] ${ruleInfo.activeRule.id} (${ruleInfo.activeRule.system} system, priority: ${ruleInfo.activeRule.priority})`
+        `[📋 Current Page Rule] ${ruleInfo.activeRule.id} (${ruleInfo.activeRule.system} system, priority: ${ruleInfo.activeRule.priority})`,
       );
     } else if (ruleInfo.legacyRule) {
       debugLog(
-        `[📋 Current Page Rule] ${ruleInfo.legacyRule.id} (legacy system)`
+        `[📋 Current Page Rule] ${ruleInfo.legacyRule.id} (legacy system)`,
       );
     } else if (ruleInfo.readabilityAvailable) {
       debugLog("[📋 Current Page Rule] Readability.js (fallback)");
     } else {
       debugLog(
-        "[📋 Current Page Rule] Emergency fallback (basic text extraction)"
+        "[📋 Current Page Rule] Emergency fallback (basic text extraction)",
       );
     }
 
@@ -1089,7 +1098,7 @@ function buildQueueWithRulesManager() {
   const applicableRules = rulesManager.getApplicableRules();
   debugLog(
     "[RulesManager] Found applicable rules:",
-    applicableRules.map((r) => `${r.name} (priority: ${r.priority})`)
+    applicableRules.map((r) => `${r.name} (priority: ${r.priority})`),
   );
 
   // 優先順位に従って順次試行
@@ -1103,7 +1112,7 @@ function buildQueueWithRulesManager() {
         // ライブラリの読み込み待ち（簡易チェック）
         if (typeof Readability === "undefined") {
           console.warn(
-            `[RulesManager] ${rule.name} requires Readability library but not available`
+            `[RulesManager] ${rule.name} requires Readability library but not available`,
           );
           continue;
         }
@@ -1113,7 +1122,7 @@ function buildQueueWithRulesManager() {
 
       if (blocks && blocks.length > 0) {
         debugLog(
-          `[RulesManager] ✅ Successfully extracted ${blocks.length} blocks with rule: ${rule.name}`
+          `[RulesManager] ✅ Successfully extracted ${blocks.length} blocks with rule: ${rule.name}`,
         );
 
         // 既存の形式に変換してキューを構築
@@ -1131,9 +1140,7 @@ function buildQueueWithRulesManager() {
 
 // 新しいブロック形式を既存のキュー形式に変換
 function convertBlocksToQueue(blocks) {
-  debugLog(
-    `[RulesManager] Converting ${blocks.length} blocks to queue format`
-  );
+  debugLog(`[RulesManager] Converting ${blocks.length} blocks to queue format`);
 
   const queue = [];
   const styleTasks = [];
@@ -1177,7 +1184,7 @@ function convertBlocksToQueue(blocks) {
 // 独自ルールでキューを構築
 function buildQueueWithCustomRule(rule) {
   const container = document.querySelector(
-    "#personal-public-article-body .mdContent-inner"
+    "#personal-public-article-body .mdContent-inner",
   );
   if (!container) {
     console.warn("buildQueueWithCustomRule: Container not found");
@@ -1191,7 +1198,7 @@ function buildQueueWithCustomRule(rule) {
   debugLog(
     "buildQueueWithCustomRule: Processing",
     allElements.length,
-    "elements"
+    "elements",
   );
 
   const styleTasks = [];
@@ -1207,7 +1214,7 @@ function buildQueueWithCustomRule(rule) {
         "ID:",
         paragraphId,
         "text length:",
-        text.length
+        text.length,
       );
       // chunkSize文字ごとに分割
       const chunkSize = config.chunkSize || 200;
@@ -1232,7 +1239,7 @@ function buildQueueWithCustomRule(rule) {
   debugLog(
     "buildQueueWithCustomRule: Built queue with",
     queue.length,
-    "chunks"
+    "chunks",
   );
   return queue;
 }
@@ -1302,7 +1309,7 @@ function playQueue() {
       "playQueue: Invalid queueIndex:",
       queueIndex,
       "queue length:",
-      playbackQueue.length
+      playbackQueue.length,
     );
     return;
   }
@@ -1320,7 +1327,7 @@ function playQueue() {
     "paragraphId:",
     item.paragraphId,
     "text:",
-    item.text
+    item.text,
   );
 
   // リトライカウンターはリセットしない（リトライ時は維持）
@@ -1341,7 +1348,7 @@ function playQueue() {
         audioPlayer.playbackRate = config.playbackRate || 1.0;
         audioPlayer.play();
       },
-      { once: true }
+      { once: true },
     );
     audioPlayer.src = cached;
   } else {
@@ -1349,7 +1356,7 @@ function playQueue() {
       "playQueue: No cached audio for index:",
       queueIndex,
       "Cache size:",
-      audioCache.size
+      audioCache.size,
     );
     // 全フェッチ済みのはずなので、エラー扱い
     retryCount++;
@@ -1358,7 +1365,7 @@ function playQueue() {
       setTimeout(() => playQueue(), 3000);
     } else {
       debugLog(
-        `playQueue: Max retries reached for index ${queueIndex}, skipping`
+        `playQueue: Max retries reached for index ${queueIndex}, skipping`,
       );
       retryCount = 0;
       isPlaying = false;
@@ -1369,6 +1376,7 @@ function playQueue() {
       } else {
         updateHighlight(null);
         playbackQueue = [];
+        unCachedIndices.clear();
         queueIndex = 0;
       }
     }
@@ -1385,20 +1393,24 @@ function prefetchNext(startIndex) {
     i < Math.min(playbackQueue.length, startIndex + prefetchAhead);
     i++
   ) {
-    if (audioCache.has(i)) continue;
+    if (!unCachedIndices.has(i)) continue;
     const item = playbackQueue[i];
     if (!item || !item.text) continue;
     // background に fetch 要求を送り、sendResponse で audioDataUrl を受け取る
-    setTimeout(() => {
-      chrome.runtime.sendMessage(
-        { command: "fetch", text: item.text },
-        (response) => {
-          if (response && response.audioDataUrl) {
-            audioCache.set(i, response.audioDataUrl);
-          }
-        }
-      );
-    }, (i - startIndex) * 1000); // 各リクエストに1秒間隔
+    setTimeout(
+      () => {
+        chrome.runtime.sendMessage(
+          { command: "fetch", text: item.text },
+          (response) => {
+            if (response && response.audioDataUrl) {
+              audioCache.set(i, response.audioDataUrl);
+              unCachedIndices.delete(i);
+            }
+          },
+        );
+      },
+      (i - startIndex) * 1000,
+    ); // 各リクエストに1秒間隔
   }
 }
 
@@ -1410,7 +1422,7 @@ function fetchBatch(startIndex) {
     i < Math.min(playbackQueue.length, startIndex + batchSize);
     i++
   ) {
-    if (!audioCache.has(i)) {
+    if (unCachedIndices.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
         batch.push({ index: i, text: item.text });
@@ -1426,6 +1438,7 @@ function fetchBatch(startIndex) {
     if (response && response.audioDataUrls) {
       response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
         audioCache.set(index, audioDataUrl);
+        unCachedIndices.delete(index);
       });
     }
     playFromCache(startIndex);
@@ -1435,17 +1448,15 @@ function fetchBatch(startIndex) {
 // バッチでプリフェッチ
 function prefetchBatch(startIndex) {
   const batch = [];
-  for (
-    let i = startIndex;
-    i < Math.min(playbackQueue.length, startIndex + prefetchAhead * batchSize);
-    i += batchSize
-  ) {
-    for (let j = i; j < Math.min(playbackQueue.length, i + batchSize); j++) {
-      if (!audioCache.has(j)) {
-        const item = playbackQueue[j];
-        if (item && item.text) {
-          batch.push({ index: j, text: item.text });
-        }
+  const limit = Math.min(
+    playbackQueue.length,
+    startIndex + prefetchAhead * batchSize,
+  );
+  for (let i = startIndex; i < limit; i++) {
+    if (unCachedIndices.has(i)) {
+      const item = playbackQueue[i];
+      if (item && item.text) {
+        batch.push({ index: i, text: item.text });
       }
     }
   }
@@ -1457,9 +1468,10 @@ function prefetchBatch(startIndex) {
           if (response && response.audioDataUrls) {
             response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
               audioCache.set(index, audioDataUrl);
+              unCachedIndices.delete(index);
             });
           }
-        }
+        },
       );
     }, 1000); // 1秒遅延
   }
@@ -1479,7 +1491,7 @@ function progressiveFetch(callback) {
     i < Math.min(startIndex + INITIAL_BATCH_SIZE, playbackQueue.length);
     i++
   ) {
-    if (!audioCache.has(i)) {
+    if (unCachedIndices.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
         initialBatch.push({ index: i, text: item.text });
@@ -1489,7 +1501,7 @@ function progressiveFetch(callback) {
 
   if (initialBatch.length === 0) {
     debugLog(
-      "progressiveFetch: Initial batch already cached, starting playback"
+      "progressiveFetch: Initial batch already cached, starting playback",
     );
     callback();
     // バックグラウンドで残りを読み込み
@@ -1498,7 +1510,7 @@ function progressiveFetch(callback) {
   }
 
   debugLog(
-    `progressiveFetch: Starting sequential fetch of initial batch (${initialBatch.length} items) for immediate playback`
+    `progressiveFetch: Starting sequential fetch of initial batch (${initialBatch.length} items) for immediate playback`,
   );
 
   // 最初のバッチを順次取得（レート制限対応）
@@ -1516,15 +1528,15 @@ function progressiveFetch(callback) {
           debugLog("progressiveFetch: All background loading completed");
         });
       }
-    }
+    },
   );
 }
 
 // バックグラウンドで残りの音声を読み込み（前後両方向、順次リクエスト）
 function fetchRemainingInBackground(priorityStartIndex) {
   // 前方向（priorityStartIndex以降）を優先で順次リクエストキューに追加
-  for (let i = priorityStartIndex; i < playbackQueue.length; i++) {
-    if (!audioCache.has(i)) {
+  for (const i of unCachedIndices) {
+    if (i >= priorityStartIndex) {
       const item = playbackQueue[i];
       if (item && item.text) {
         addToRequestQueue({ index: i, text: item.text });
@@ -1533,8 +1545,8 @@ function fetchRemainingInBackground(priorityStartIndex) {
   }
 
   // 後方向（queueIndexより前）を後回しでキューに追加
-  for (let i = 0; i < queueIndex; i++) {
-    if (!audioCache.has(i)) {
+  for (const i of unCachedIndices) {
+    if (i < queueIndex) {
       const item = playbackQueue[i];
       if (item && item.text) {
         addToRequestQueue({ index: i, text: item.text });
@@ -1543,7 +1555,7 @@ function fetchRemainingInBackground(priorityStartIndex) {
   }
 
   debugLog(
-    `fetchRemainingInBackground: Queued background loading from index ${priorityStartIndex}`
+    `fetchRemainingInBackground: Queued background loading from index ${priorityStartIndex}`,
   );
 }
 
@@ -1552,12 +1564,10 @@ function fullBatchFetch(callback) {
   debugLog("fullBatchFetch: Starting full sequential loading");
 
   // 全ての未キャッシュ項目を順次キューに追加
-  for (let i = 0; i < playbackQueue.length; i++) {
-    if (!audioCache.has(i)) {
-      const item = playbackQueue[i];
-      if (item && item.text) {
-        addToRequestQueue({ index: i, text: item.text });
-      }
+  for (const i of unCachedIndices) {
+    const item = playbackQueue[i];
+    if (item && item.text) {
+      addToRequestQueue({ index: i, text: item.text });
     }
   }
 
@@ -1619,7 +1629,7 @@ function getEffectiveBackgroundColor(element, cache = null) {
   if (!element || element === document.documentElement) {
     const body = document.body || document.documentElement;
     const bodyColor = parseColorString(
-      window.getComputedStyle(body).backgroundColor
+      window.getComputedStyle(body).backgroundColor,
     );
     const result = bodyColor
       ? { r: bodyColor.r, g: bodyColor.g, b: bodyColor.b, a: 1 }
@@ -1646,7 +1656,7 @@ function getEffectiveBackgroundColor(element, cache = null) {
 function ensureTextContrast(backgroundColor, preferredTextColor) {
   const preferredContrast = getContrastRatio(
     preferredTextColor,
-    backgroundColor
+    backgroundColor,
   );
   if (preferredContrast >= 4.5) {
     return preferredTextColor;
@@ -1738,7 +1748,7 @@ function parseColorString(color) {
   }
 
   const rgbMatch = trimmed.match(
-    /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(\d*\.?\d+))?\s*\)$/
+    /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(\d*\.?\d+))?\s*\)$/,
   );
   if (rgbMatch) {
     return {
@@ -1750,7 +1760,7 @@ function parseColorString(color) {
   }
 
   const hslMatch = trimmed.match(
-    /^hsla?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%(?:\s*,\s*(\d*\.?\d+))?\s*\)$/
+    /^hsla?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%(?:\s*,\s*(\d*\.?\d+))?\s*\)$/,
   );
   if (hslMatch) {
     const h = Number(hslMatch[1]);
