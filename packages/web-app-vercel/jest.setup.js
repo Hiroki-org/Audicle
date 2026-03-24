@@ -171,3 +171,8 @@ global.TransformStream = class TransformStream {
 // URL.createObjectURL のモック（ブラウザAPI）
 global.URL.createObjectURL = jest.fn(() => "blob:mock-url");
 global.URL.revokeObjectURL = jest.fn();
+
+// MessagePort をグローバルに定義 (undici 用)
+if (typeof global.MessagePort === 'undefined') {
+  global.MessagePort = require('worker_threads').MessagePort;
+}
