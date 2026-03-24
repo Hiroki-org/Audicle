@@ -9,7 +9,6 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-
     // 認証チェック
     const session = await auth();
 
