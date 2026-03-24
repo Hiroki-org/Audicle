@@ -76,7 +76,8 @@ MAX_TTS_BYTES = 5000
 
 # Maximum number of concurrent TTS API requests
 # This prevents hitting Google Cloud TTS API rate limits
-MAX_CONCURRENT_TTS_REQUESTS = int(os.getenv("MAX_CONCURRENT_TTS_REQUESTS", "10"))
+# Default to 5 concurrent requests
+TTS_MAX_CONCURRENCY = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
 
 # Semaphore for controlling TTS API concurrency
 _tts_semaphore = None
@@ -290,8 +291,7 @@ async def synthesize_speech(request: SynthesizeRequest):
         # Default to 5 concurrent requests
         global _tts_semaphore
         if _tts_semaphore is None:
-            max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
-            _tts_semaphore = asyncio.Semaphore(max_concurrency)
+            _tts_semaphore = asyncio.Semaphore(TTS_MAX_CONCURRENCY)
 
         async def _synthesize_chunk(chunk_text: str, voice_name: str, index: int, total: int) -> bytes:
             async with _tts_semaphore:
