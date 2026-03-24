@@ -10,7 +10,6 @@ import logging
 import re
 from typing import List, Pattern
 import aiofiles
-import aiofiles.os
 from google.api_core.exceptions import GoogleAPICallError, RetryError
 from google.cloud import texttospeech
 
@@ -348,7 +347,7 @@ async def synthesize_speech(request: SynthesizeRequest):
             fallback_path = "fallback.mp3"
 
 
-            if await aiofiles.os.path.exists(fallback_path):
+            try:
                 async with aiofiles.open(fallback_path, "rb") as fallback_file:
                     fallback_audio = await fallback_file.read()
 
@@ -362,7 +361,7 @@ async def synthesize_speech(request: SynthesizeRequest):
                         "X-Error": str(e)
                     }
                 )
-            else:
+            except FileNotFoundError:
                 logger.warning(
                     "Fallback audio file not found, returning empty response"
                 )
