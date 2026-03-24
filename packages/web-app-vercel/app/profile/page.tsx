@@ -3,19 +3,10 @@ import { redirect } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 
 export default async function ProfilePage() {
-  console.log("[PROFILE PAGE] Checking authentication...");
-
   const session = await auth();
-  console.log("[PROFILE PAGE] Session:", session ? "EXISTS" : "NULL");
-  console.log("[PROFILE PAGE] User ID:", session?.user?.id);
-  console.log("[PROFILE PAGE] User email:", session?.user?.email);
-
   if (!session) {
-    console.log("[PROFILE PAGE] No session - redirecting to signin");
     redirect("/auth/signin");
   }
-
-  console.log("[PROFILE PAGE] Session valid - rendering page");
 
   return (
     <div className="h-screen bg-black text-white flex flex-col lg:flex-row">
