@@ -21,15 +21,14 @@ app = FastAPI(title="Audicle API Server", version="1.0.0")
 
 # CORS設定
 cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS")
+allow_origins = []
 if cors_origins_env:
     allow_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
     if "*" in allow_origins:
         raise ValueError("CORS_ALLOWED_ORIGINS に '*' は使用できません。allow_credentials=True と組み合わせると起動に失敗します。")
-    if not allow_origins:
-        logger.warning("CORS_ALLOWED_ORIGINS が設定されましたが有効なオリジンがありません。デフォルト値を使用します。")
-        allow_origins = ["http://localhost:3000", "http://localhost:3001"]
-else:
-    allow_origins = ["http://localhost:3000", "http://localhost:3001"]
+
+if not allow_origins:
+    logger.warning("CORS_ALLOWED_ORIGINS が設定されていないか、有効なオリジンがありません。CORSは許可されません。")
 
 logger.info("CORS許可オリジン: %s", allow_origins)
 
