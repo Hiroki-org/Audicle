@@ -359,7 +359,7 @@ async def synthesize_speech(request: SynthesizeRequest):
                         "X-Error": str(e)
                     }
                 )
-            except FileNotFoundError:
+            except OSError:
                 logger.warning(
                     "Fallback audio file not found, returning empty response"
                 )
