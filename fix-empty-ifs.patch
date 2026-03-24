@@ -1,0 +1,20 @@
+--- a/packages/web-app-vercel/app/api/synthesize/route.ts
++++ b/packages/web-app-vercel/app/api/synthesize/route.ts
+@@ -150,8 +150,6 @@
+         try {
+             const unescaped = credentialsJson.replace(/\\n/g, '\n').replace(/^"|"$/g, '');
+             credentials = tryParseJson(unescaped);
+-            if (credentials) {
+-            }
+         } catch (_) { void _; }
+     }
+
+@@ -160,8 +158,6 @@
+         try {
+             const decoded = Buffer.from(credentialsJson, 'base64').toString('utf8');
+             credentials = tryParseJson(decoded);
+-            if (credentials) {
+-            }
+         } catch {
+             // ignore decode errors
+         }
