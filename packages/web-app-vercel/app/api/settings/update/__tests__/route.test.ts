@@ -29,6 +29,17 @@ import { auth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 describe('PUT /api/settings/update', () => {
+    let consoleErrorMock: jest.SpyInstance;
+
+    beforeAll(() => {
+        // Suppress expected console.error logs during error tests
+        consoleErrorMock = jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterAll(() => {
+        consoleErrorMock.mockRestore();
+    });
+
     beforeEach(() => {
         jest.clearAllMocks();
     });
@@ -139,6 +150,7 @@ describe('PUT /api/settings/update', () => {
         expect(response.status).toBe(500);
         const data = await response.json();
         expect(data).toEqual({ error: 'Failed to update settings', success: false });
+        expect(consoleErrorMock).toHaveBeenCalledWith('Supabase error:', expect.any(Error));
     });
 
     it('successfully updates settings and returns 200', async () => {
@@ -193,5 +205,6 @@ describe('PUT /api/settings/update', () => {
         expect(response.status).toBe(500);
         const data = await response.json();
         expect(data).toEqual({ error: 'Internal server error', success: false });
+        expect(consoleErrorMock).toHaveBeenCalledWith('Error in PUT /api/settings/update:', expect.any(Error));
     });
 });
