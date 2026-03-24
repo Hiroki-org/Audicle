@@ -349,3 +349,111 @@ describe('/api/playlists/[id]/items route', () => {
         })
     })
 })
+
+        it('adds a new playlist item with position 0 when playlist is empty', async () => {
+            ;(requireAuth as jest.Mock).mockResolvedValue({
+                userEmail: 'test@example.com',
+                response: null
+            })
+
+            const mockTables: Record<string, any> = {
+                playlists: {
+                    select: jest.fn().mockReturnThis(),
+                    eq: jest.fn().mockReturnThis(),
+                    single: jest.fn().mockResolvedValue({ data: { owner_email: 'test@example.com' }, error: null })
+                },
+                articles: {
+                    select: jest.fn().mockReturnThis(),
+                    eq: jest.fn().mockReturnThis(),
+                    update: jest.fn().mockReturnThis(),
+                    insert: jest.fn().mockReturnThis(),
+                    single: jest.fn().mockResolvedValue({ data: { id: 'article-1', title: 'Test' }, error: null }) // existingArticle
+                },
+                playlist_items: {
+                    select: jest.fn().mockReturnThis(),
+                    eq: jest.fn().mockReturnThis(),
+                    order: jest.fn().mockReturnThis(),
+                    limit: jest.fn().mockReturnThis(),
+                    insert: jest.fn().mockReturnThis(),
+                    single: jest.fn()
+                }
+            }
+            ;(supabase.from as jest.Mock).mockImplementation((table: string) => mockTables[table])
+
+            mockTables.playlist_items.single
+                .mockResolvedValueOnce({ data: null, error: null }) // existingItem
+                .mockResolvedValueOnce({ data: null, error: null }) // maxPos is null/empty
+                .mockResolvedValueOnce({ data: { id: 'item-1', position: 0 }, error: null }) // created
+
+            const request = new Request('http://localhost:3000/api/playlists/1/items', {
+                method: 'POST',
+                body: JSON.stringify({ article_url: 'http://test.com', article_title: 'Test' }),
+                headers: { 'Content-Type': 'application/json' }
+            })
+
+            process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
+            const res = await POST(request, { params: Promise.resolve({ id: 'playlist-123' }) }) as any
+
+            expect(res.status).toBe(200)
+            expect(mockTables.playlist_items.insert).toHaveBeenCalledWith({
+                playlist_id: 'playlist-123',
+                article_id: 'article-1',
+                position: 0
+            })
+        })
+
+        it('returns 403 if user is not the owner of the playlist on GET', async () => {
+            ;(supabase.from as jest.Mock).mockReturnValue({
+                select: jest.fn().mockReturnThis(),
+                eq: jest.fn().mockReturnThis(),
+                single: jest.fn().mockResolvedValue({
+                    data: { id: 'playlist-123', owner_email: 'other@example.com' },
+                    error: null
+                })
+            })
+
+            const request = new Request('http://localhost:3000/api/playlists/1/items', { method: 'GET' })
+            const res = await GET(request, { params: Promise.resolve({ id: 'playlist-123' }) }) as any
+
+            expect(res.status).toBe(403)
+            expect(await res.json()).toEqual({ error: 'Forbidden' })
+        })
+
+        it('handles internal server errors on GET', async () => {
+            ;(requireAuth as jest.Mock).mockRejectedValue(new Error('Auth service down'))
+
+            const request = new Request('http://localhost:3000/api/playlists/1/items', { method: 'GET' })
+            const res = await GET(request, { params: Promise.resolve({ id: 'playlist-123' }) }) as any
+
+            expect(res.status).toBe(500)
+            expect(await res.json()).toEqual({ error: 'Auth service down' })
+        })
+
+        it('handles database errors on playlist items GET', async () => {
+            ;(requireAuth as jest.Mock).mockResolvedValue({
+                userEmail: 'test@example.com',
+                response: null
+            })
+            const mockTables: Record<string, any> = {
+                playlists: {
+                    select: jest.fn().mockReturnThis(),
+                    eq: jest.fn().mockReturnThis(),
+                    single: jest.fn().mockResolvedValue({ data: { owner_email: 'test@example.com' }, error: null })
+                },
+                playlist_items: {
+                    select: jest.fn().mockReturnThis(),
+                    eq: jest.fn().mockReturnThis(),
+                    order: jest.fn().mockResolvedValue({
+                        data: null,
+                        error: { message: 'DB Error' }
+                    })
+                }
+            }
+            ;(supabase.from as jest.Mock).mockImplementation((table: string) => mockTables[table])
+
+            const request = new Request('http://localhost:3000/api/playlists/1/items', { method: 'GET' })
+            const res = await GET(request, { params: Promise.resolve({ id: 'playlist-123' }) }) as any
+
+            expect(res.status).toBe(500)
+            expect(await res.json()).toEqual({ error: 'Failed to fetch playlist items' })
+        })

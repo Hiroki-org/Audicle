@@ -1,0 +1,88 @@
+--- packages/web-app-vercel/app/api/playlists/[id]/items/__tests__/route.test.ts
++++ packages/web-app-vercel/app/api/playlists/[id]/items/__tests__/route.test.ts
+@@ -176,26 +176,46 @@
+                 position: 6
+             })
+         })
++
++        it('adds a new playlist item with position 0 when playlist is empty', async () => {
++            mockTables.articles.single
++                .mockResolvedValueOnce({ data: { id: 'article-1', title: 'Test' }, error: null })
++
++            mockTables.playlist_items.single
++                .mockResolvedValueOnce({ data: null, error: null }) // existingItem
++                .mockResolvedValueOnce({ data: null, error: null }) // maxPos is null/empty
++                .mockResolvedValueOnce({ data: { id: 'item-1', position: 0 }, error: null }) // created
++
++            const request = createRequest({ article_url: 'http://test.com', article_title: 'Test' })
++            const res = await POST(request, mockContext) as any
++            const data = await res.json()
++
++            expect(res.status).toBe(200)
++            expect(mockTables.playlist_items.insert).toHaveBeenCalledWith({
++                playlist_id: 'playlist-123',
++                article_id: 'article-1',
++                position: 0
++            })
++        })
+
+         it('updates an existing article and returns existing playlist item', async () => {
+@@ -348,6 +368,26 @@
+             const res = await GET(request, mockContext) as any
+             const data = await res.json()
+
+             expect(res.status).toBe(200)
+             expect(data).toEqual([{ id: 'item-1', position: 1 }])
+         })
++
++        it('returns 403 if user is not the owner of the playlist on GET', async () => {
++            ;(supabase.from as jest.Mock).mockReturnValue({
++                select: jest.fn().mockReturnThis(),
++                eq: jest.fn().mockReturnThis(),
++                single: jest.fn().mockResolvedValue({
++                    data: { id: 'playlist-123', owner_email: 'other@example.com' },
++                    error: null
++                })
++            })
++
++            const request = new Request('http://localhost:3000/api/playlists/1/items', { method: 'GET' })
++            const res = await GET(request, mockContext) as any
++
++            expect(res.status).toBe(403)
++            expect(await res.json()).toEqual({ error: 'Forbidden' })
++        })
++
++        it('handles internal server errors on GET', async () => {
++            ;(requireAuth as jest.Mock).mockRejectedValue(new Error('Auth service down'))
++
++            const request = new Request('http://localhost:3000/api/playlists/1/items', { method: 'GET' })
++            const res = await GET(request, mockContext) as any
++
++            expect(res.status).toBe(500)
++            expect(await res.json()).toEqual({ error: 'Auth service down' })
++        })
++
++        it('handles database errors on playlist items GET', async () => {
++            const mockTables: Record<string, any> = {
++                playlists: {
++                    select: jest.fn().mockReturnThis(),
++                    eq: jest.fn().mockReturnThis(),
++                    single: jest.fn().mockResolvedValue({ data: { owner_email: 'test@example.com' }, error: null })
++                },
++                playlist_items: {
++                    select: jest.fn().mockReturnThis(),
++                    eq: jest.fn().mockReturnThis(),
++                    order: jest.fn().mockResolvedValue({
++                        data: null,
++                        error: { message: 'DB Error' }
++                    })
++                }
++            }
++            ;(supabase.from as jest.Mock).mockImplementation((table: string) => mockTables[table])
++
++            const request = new Request('http://localhost:3000/api/playlists/1/items', { method: 'GET' })
++            const res = await GET(request, mockContext) as any
++
++            expect(res.status).toBe(500)
++            expect(await res.json()).toEqual({ error: 'Failed to fetch playlist items' })
++        })

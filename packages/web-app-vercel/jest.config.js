@@ -23,7 +23,7 @@ const customJestConfig = {
     "node_modules/(?!(msw|@mswjs|@bundled-es-modules|until-async|strict-event-emitter|@open-draft)/)",
   ],
   collectCoverageFrom: [
-    "lib/**/*.{js,jsx,ts,tsx}",
+    "lib/**/*.{js,jsx,ts,tsx}", "app/**/*.{js,jsx,ts,tsx}",
     "!lib/**/__tests__/**",
     "!**/*.d.ts",
     "!**/node_modules/**",
