@@ -341,25 +341,26 @@ async function seedTestData() {
     const popularArticles = createdArticles.slice(2);
     const fixedAccessCounts = [15, 20, 25];
 
-    for (let i = 0; i < popularArticles.length; i += 1) {
-        const article = popularArticles[i];
-        const articleHash = createHash("sha256").update(article.url).digest("hex");
+    if (popularArticles.length > 0) {
+        const now = new Date().toISOString();
+        const statsData = popularArticles.map((article, i) => {
+            const articleHash = createHash("sha256").update(article.url).digest("hex");
+            return {
+                article_hash: articleHash,
+                url: article.url,
+                title: article.title,
+                domain: "example.com",
+                access_count: fixedAccessCounts[i] ?? 10,
+                unique_users: 10,
+                cache_hit_rate: 0.85,
+                is_fully_cached: true,
+                last_accessed_at: now,
+            };
+        });
+
         const { error: statsError } = await supabase
             .from("article_stats")
-            .upsert(
-                {
-                    article_hash: articleHash,
-                    url: article.url,
-                    title: article.title,
-                    domain: "example.com",
-                    access_count: fixedAccessCounts[i] ?? 10,
-                    unique_users: 10,
-                    cache_hit_rate: 0.85,
-                    is_fully_cached: true,
-                    last_accessed_at: new Date().toISOString(),
-                },
-                { onConflict: "article_hash" }
-            );
+            .upsert(statsData, { onConflict: "article_hash" });
 
         if (statsError) {
             console.error("統計データの作成に失敗:", statsError);
@@ -372,21 +373,20 @@ async function seedTestData() {
 
     // 4. 音声キャッシュインデックス
     console.log("4. 音声キャッシュインデックスを作成中...");
-    for (let i = 0; i < popularArticles.length; i += 1) {
-        const article = popularArticles[i];
+    if (popularArticles.length > 0) {
+        const now = new Date().toISOString();
+        const cacheData = popularArticles.map((article, i) => ({
+            article_url: article.url,
+            voice: "ja-JP",
+            cached_chunks: ["chunk-1", "chunk-2"],
+            completed_playback: true,
+            read_count: 5 + i,
+            last_accessed: now,
+        }));
+
         const { error: cacheError } = await supabase
             .from("audio_cache_index")
-            .upsert(
-                {
-                    article_url: article.url,
-                    voice: "ja-JP",
-                    cached_chunks: ["chunk-1", "chunk-2"],
-                    completed_playback: true,
-                    read_count: 5 + i,
-                    last_accessed: new Date().toISOString(),
-                },
-                { onConflict: "article_url,voice" }
-            );
+            .upsert(cacheData, { onConflict: "article_url,voice" });
 
         if (cacheError) {
             console.error("キャッシュインデックスの作成に失敗:", cacheError);
@@ -424,13 +424,14 @@ async function seedTestData() {
 
     // 6. プレイリストアイテムの追加（3件）
     console.log("6. プレイリストアイテムを追加中...");
-    for (let i = 0; i < 3 && i < createdArticles.length; i += 1) {
-        const article = createdArticles[i];
-        const { error: itemError } = await supabase.from("playlist_items").insert({
-            playlist_id: defaultPlaylist.id,
-            article_id: article.id,
-            position: i,
-        });
+    const defaultPlaylistItems = createdArticles.slice(0, 3).map((article, i) => ({
+        playlist_id: defaultPlaylist.id,
+        article_id: article.id,
+        position: i,
+    }));
+
+    if (defaultPlaylistItems.length > 0) {
+        const { error: itemError } = await supabase.from("playlist_items").insert(defaultPlaylistItems);
 
         if (itemError) {
             console.error("プレイリストアイテムの追加に失敗:", itemError);
@@ -468,13 +469,14 @@ async function seedTestData() {
 
     // 8. ソートテスト用プレイリストにアイテムを追加
     console.log("8. ソートテスト用プレイリストにアイテムを追加中...");
-    for (let i = 0; i < 3 && i < createdArticles.length; i += 1) {
-        const article = createdArticles[i];
-        const { error: itemError } = await supabase.from("playlist_items").insert({
-            playlist_id: sortTestPlaylist.id,
-            article_id: article.id,
-            position: i,
-        });
+    const sortTestPlaylistItems = createdArticles.slice(0, 3).map((article, i) => ({
+        playlist_id: sortTestPlaylist.id,
+        article_id: article.id,
+        position: i,
+    }));
+
+    if (sortTestPlaylistItems.length > 0) {
+        const { error: itemError } = await supabase.from("playlist_items").insert(sortTestPlaylistItems);
 
         if (itemError) {
             console.error("ソートテスト用プレイリストアイテムの追加に失敗:", itemError);
