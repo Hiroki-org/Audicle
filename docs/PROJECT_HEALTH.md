@@ -1,6 +1,6 @@
 # 📊 Audicle - Project Health Report
 
-Last Updated: 2026-03-20 11:44:34 JST (Auto-generated)
+Last Updated: 2026-03-27 12:20:01 JST (Auto-generated)
 
 This report focuses on the web-app-vercel package only.
 
@@ -8,10 +8,10 @@ This report focuses on the web-app-vercel package only.
 
 | Category | Coverage |
 |----------|----------|
-| Statements | 36.64% |
-| Branches | 35.21% |
+| Statements | 36.71% |
+| Branches | 35.4% |
 | Functions | 30.08% |
-| Lines | 36.38% |
+| Lines | 36.47% |
 
 ## 📦 Technology Stack
 
@@ -24,9 +24,9 @@ This report focuses on the web-app-vercel package only.
 ## 📈 Repository Stats
 
 - ⭐ Stars: 1
-- 🐛 Open Issues: 11
-- 🔀 Open PRs: 4
-- 📝 Commits (30 days): 13
+- 🐛 Open Issues: 41
+- 🔀 Open PRs: 30
+- 📝 Commits (30 days): 27
 
 ## 🚀 Recent CI/CD Runs
 
