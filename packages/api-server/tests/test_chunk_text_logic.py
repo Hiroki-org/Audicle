@@ -3,13 +3,9 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 import os
+import re
 
 # Mock external dependencies
-sys.modules["aiofiles"] = MagicMock()
-sys.modules["fastapi"] = MagicMock()
-sys.modules["fastapi.responses"] = MagicMock()
-sys.modules["fastapi.middleware.cors"] = MagicMock()
-sys.modules["pydantic"] = MagicMock()
 sys.modules["google.api_core.exceptions"] = MagicMock()
 sys.modules["google.cloud"] = MagicMock()
 sys.modules["google.cloud.texttospeech"] = MagicMock()
