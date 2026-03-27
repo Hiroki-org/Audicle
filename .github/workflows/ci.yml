@@ -178,33 +178,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-      - name: Debug - Show directory structure
-        working-directory: packages/web-app-vercel
-        run: |
-          echo "=== Current working directory ==="
-          pwd
-          echo ""
-          echo "=== List current directory ==="
-          ls -la
-          echo ""
-          echo "=== List .next in current directory ==="
-          ls -la .next 2>/dev/null || echo ".next not found in current directory"
-          echo ""
-          echo "=== Go to repo root and list ==="
-          cd /home/runner/work/Audicle/Audicle
-          pwd
-          ls -la packages/web-app-vercel/ 2>/dev/null || echo "packages/web-app-vercel not found"
-          echo ""
-          echo "=== List packages/web-app-vercel/.next from root ==="
-          ls -la packages/web-app-vercel/.next 2>/dev/null || echo "packages/web-app-vercel/.next not found"
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: next-build
-          path: ${{ github.workspace }}/packages/web-app-vercel/.next
-          include-hidden-files: true
-          retention-days: 1
+      - name: Verify Next.js output exists
+        run: test -d packages/web-app-vercel/.next
+      - name: Verify Next.js output exists
+        run: test -d packages/web-app-vercel/.next
 
   e2e-auth:
     name: E2E Auth Setup
@@ -281,12 +258,6 @@ jobs:
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
-
-      - name: Download build
-        uses: actions/download-artifact@v8
-        with:
-          name: next-build
-          path: ./packages/web-app-vercel/.next
 
       - name: Run e2e shard
         run: npx playwright test --shard=${{ matrix.shard }}/3 --project=${{ matrix.browser }}
