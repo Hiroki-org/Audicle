@@ -230,18 +230,73 @@ async function seedTestData() {
         title: string;
         thumbnail_url: string;
     }
-    const createdArticles: Article[] = [];
-    for (const article of articles) {
-        // 既存の記事を検索
-        const { data: existing } = await supabase
-            .from("articles")
-            .select()
-            .eq("url", article.url)
-            .eq("owner_email", article.owner_email) // Add owner_email check
-            .single();
+    const urls = articles.map(a => a.url);
 
+    const emails = Array.from(new Set(articles.map(a => a.owner_email)));
+    // 既存の記事を一括検索 (urlとowner_emailでフィルタ)
+    const { data: existingData, error: selectError } = await supabase
+        .from("articles")
+        .select()
+        .in("url", urls)
+        .in("owner_email", emails);
+
+    if (selectError) {
+        console.error("記事の検索に失敗:", selectError);
+        process.exit(1);
+    }
+
+    const existingArticles = existingData || [];
+
+    // (owner_email, url)をキーにした既存記事のマップを作成
+    const existingMap = new Map();
+    for (const existing of existingArticles) {
+        existingMap.set(existing.owner_email + "||" + existing.url, existing);
+    }
+
+    const toInsert: typeof articles = [];
+    const toUpdate: typeof articles = [];
+
+    // 重複を避けるためのSet (owner_email + url)
+    const processedKeys = new Set();
+
+    for (const article of articles) {
+        const key = article.owner_email + "||" + article.url;
+        if (processedKeys.has(key)) continue;
+        processedKeys.add(key);
+
+        const existing = existingMap.get(key);
         if (existing) {
-            // 既存の記事を更新
+            toUpdate.push(article);
+        } else {
+            toInsert.push(article);
+        }
+    }
+
+    const createdArticlesMap = new Map<string, Article>();
+
+    // 新規記事を一括作成
+    if (toInsert.length > 0) {
+        const { data: created, error: createError } = await supabase
+            .from("articles")
+            .insert(toInsert)
+            .select();
+
+        if (createError) {
+            console.error("記事の一括作成に失敗:", createError);
+            process.exit(1);
+        }
+        if (created) {
+            for (const c of created) {
+                createdArticlesMap.set(c.owner_email + "||" + c.url, c as Article);
+            }
+        }
+    }
+
+    // 既存記事を更新
+    for (const article of toUpdate) {
+        const key = article.owner_email + "||" + article.url;
+        const existing = existingMap.get(key);
+        if (existing) {
             const { data: updated, error: updateError } = await supabase
                 .from("articles")
                 .update({
@@ -257,20 +312,21 @@ async function seedTestData() {
                 console.error("記事の更新に失敗:", updateError);
                 process.exit(1);
             }
-            if (updated) createdArticles.push(updated);
-        } else {
-            // 新規作成
-            const { data: created, error: createError } = await supabase
-                .from("articles")
-                .insert(article)
-                .select()
-                .single();
+            if (updated) createdArticlesMap.set(updated.owner_email + "||" + updated.url, updated as Article);
+        }
+    }
 
-            if (createError) {
-                console.error("記事の作成に失敗:", createError);
-                process.exit(1);
-            }
-            if (created) createdArticles.push(created);
+    // 元の配列の順序を維持して結果を構築
+    const createdArticles: Article[] = [];
+    const addedKeys = new Set<string>();
+
+    for (const article of articles) {
+        const key = article.owner_email + "||" + article.url;
+        const created = createdArticlesMap.get(key);
+        // 重複を防ぐ (O(1)のSetでチェック)
+        if (created && !addedKeys.has(key)) {
+            createdArticles.push(created);
+            addedKeys.add(key);
         }
     }
 
