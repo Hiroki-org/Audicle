@@ -54,15 +54,28 @@ async def setup_data(conn):
 
 async def worker(pool, playlist_id, bookmark_ids):
     async with pool.acquire() as conn:
-        for bm_id in bookmark_ids:
-            try:
-                # Insert into playlist_items. Position is handled by trigger.
-                await conn.execute("""
-                    INSERT INTO playlist_items (playlist_id, bookmark_id)
-                    VALUES ($1, $2)
-                """, playlist_id, bm_id)
-            except Exception as e:
-                print(f"Error inserting {bm_id}: {e}")
+        try:
+            # Insert into playlist_items. Position is handled by trigger.
+            # Use executemany for batched inserts instead of N+1 queries.
+            # Note: executemany wraps the batch in a single implicit transaction.
+            # This alters the lock contention profile compared to individual executes,
+            # but significantly improves throughput by eliminating N+1 queries.
+            values = [(playlist_id, bm_id) for bm_id in bookmark_ids]
+            await conn.executemany("""
+                INSERT INTO playlist_items (playlist_id, bookmark_id)
+                VALUES ($1, $2)
+            """, values)
+        except Exception as batch_err:
+            print(f"Error inserting batch, falling back to individual inserts: {batch_err}")
+            # Fallback to individual inserts to maintain error granularity
+            for bm_id in bookmark_ids:
+                try:
+                    await conn.execute("""
+                        INSERT INTO playlist_items (playlist_id, bookmark_id)
+                        VALUES ($1, $2)
+                    """, playlist_id, bm_id)
+                except Exception as e:
+                    print(f"Error inserting {bm_id}: {e}")
 
 async def run_benchmark():
     if not asyncpg:
