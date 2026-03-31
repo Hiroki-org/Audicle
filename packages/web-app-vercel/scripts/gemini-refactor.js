@@ -1,4 +1,4 @@
-const { execSync } = require("child_process");
+const { spawnSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const { Project } = require("ts-morph");
@@ -6,35 +6,41 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const ts = require("typescript");
 
 function getChangedFiles() {
-  const gitCommand = `
-    git log --since="1 week ago" --name-only --pretty=format: -- . |
-    grep -E '\\.tsx?$' |
-    grep -v -E '\\.(test|spec)\\.tsx?$' |
-    sort | uniq -c | sort -rn
-  `;
+  const gitArgs = ['log', '--since=1 week ago', '--name-only', '--pretty=format:', '--', '.'];
 
-  const output = execSync(gitCommand, { encoding: "utf-8" });
+  const result = spawnSync('git', gitArgs, { encoding: "utf-8" });
 
-  // 出力を解析: "  3 packages/web-app-vercel/src/app/page.tsx" の形式
-  const files = output
-    .split("\n")
-    .filter((line) => line.trim())
-    .map((line) => {
-      const match = line.trim().match(/^(\d+)\s+(.+)$/);
-      if (match) {
-        let filePath = match[2];
-        // working-directoryがpackages/web-app-vercelなので、プレフィックスを削除
-        if (filePath.startsWith("packages/web-app-vercel/")) {
-          filePath = filePath.replace("packages/web-app-vercel/", "");
-        }
-        return {
-          count: parseInt(match[1], 10),
-          path: filePath,
-        };
+  if (result.error) {
+    console.error("Failed to execute git command:", result.error);
+    return [];
+  }
+
+  const output = result.stdout;
+
+  // JSでシェルコマンド (grep, sort, uniq) をシミュレート
+  const allLines = output.split('\n').filter(line => line.trim());
+
+  // grep -E '\.tsx?$' | grep -v -E '\.(test|spec)\.tsx?$'
+  const fileOccurrences = {};
+
+  for (const line of allLines) {
+    const filePath = line.trim();
+    if (filePath.match(/\.tsx?$/) && !filePath.match(/\.(test|spec)\.tsx?$/)) {
+      fileOccurrences[filePath] = (fileOccurrences[filePath] || 0) + 1;
+    }
+  }
+
+  // sort | uniq -c | sort -rn に相当する処理
+  const files = Object.entries(fileOccurrences)
+    .map(([path, count]) => {
+      let filePath = path;
+      // working-directoryがpackages/web-app-vercelなので、プレフィックスを削除
+      if (filePath.startsWith("packages/web-app-vercel/")) {
+        filePath = filePath.replace("packages/web-app-vercel/", "");
       }
-      return null;
+      return { count, path: filePath };
     })
-    .filter((f) => f !== null);
+    .sort((a, b) => b.count - a.count);
 
   return files;
 }
