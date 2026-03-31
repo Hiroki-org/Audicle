@@ -177,3 +177,13 @@ global.URL.revokeObjectURL = jest.fn();
 if (typeof global.MessagePort === 'undefined') {
   global.MessagePort = MessagePort;
 }
+
+// Mock setPointerCapture and releasePointerCapture for JSDOM
+if (typeof window !== 'undefined' && typeof window.HTMLElement !== 'undefined') {
+  if (typeof window.HTMLElement.prototype.setPointerCapture === 'undefined') {
+    window.HTMLElement.prototype.setPointerCapture = jest.fn();
+  }
+  if (typeof window.HTMLElement.prototype.releasePointerCapture === 'undefined') {
+    window.HTMLElement.prototype.releasePointerCapture = jest.fn();
+  }
+}
