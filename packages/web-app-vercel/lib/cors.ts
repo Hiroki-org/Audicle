@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 
-export function getCorsHeaders(request: NextRequest) {
-    const origin = request.headers.get('origin');
+export function getCorsHeaders(request?: NextRequest) {
+    const origin = request?.headers?.get('origin');
     const allowedOriginsStr = process.env.ALLOWED_ORIGINS || '';
     const allowedOrigins = allowedOriginsStr.split(',').map(o => o.trim()).filter(Boolean);
 
