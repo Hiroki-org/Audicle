@@ -5,7 +5,7 @@ export function ArticleListSkeleton() {
     return (
         <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8">
             {[...Array(5)].map((_, i) => (
-                <Card key={i} className="relative group bg-zinc-900/50 border-zinc-800">
+                <Card key={i} data-testid="skeleton-card" className="relative group bg-zinc-900/50 border-zinc-800">
                     <CardContent className="p-4 sm:p-6">
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                             <div className="flex-1 min-w-0">
