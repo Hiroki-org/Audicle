@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-export function getCorsHeaders(request: NextRequest) {
+export function getCorsHeaders(request: NextRequest): Record<string, string> {
     let origin: string | null = null;
     if (request && request.headers && typeof request.headers.get === 'function') {
         origin = request.headers.get('origin');
@@ -13,18 +13,15 @@ export function getCorsHeaders(request: NextRequest) {
     // we don't need to return wildcard CORS headers. Return an empty object or restricted headers.
     // However, if we must return CORS headers, we should restrict them.
 
-    // If the origin is in the allowed list, we reflect it.
-    if (origin && allowedOrigins.includes(origin)) {
-        return {
-            'Access-Control-Allow-Origin': origin,
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        };
-    }
-
-    // Default restricted fallback
-    return {
+    const headers: Record<string, string> = {
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
     };
+
+    // If the origin is in the allowed list, we reflect it.
+    if (origin && allowedOrigins.includes(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin;
+    }
+
+    return headers;
 }
