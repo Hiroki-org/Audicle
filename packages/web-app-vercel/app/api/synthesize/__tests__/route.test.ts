@@ -1,5 +1,8 @@
 // next/server import not used in tests
 
+// Global mock reference
+let mockSynthesizeSpeech = jest.fn().mockResolvedValue([{ audioContent: Buffer.from('fake-audio') }]);
+
 // Mocks for auth, kv, storage, cacheIndex, and Google TTS
 jest.mock('@/lib/auth', () => ({
     auth: jest.fn()
@@ -23,7 +26,7 @@ jest.mock('@/lib/db/cacheIndex', () => ({
 jest.mock('@google-cloud/text-to-speech', () => {
     return {
         TextToSpeechClient: jest.fn().mockImplementation(() => ({
-            synthesizeSpeech: jest.fn().mockResolvedValue([{ audioContent: Buffer.from('fake-audio') }])
+            synthesizeSpeech: mockSynthesizeSpeech
         })),
         protos: {
             google: {
@@ -49,6 +52,8 @@ import * as routeModule from '../route';
 describe('/api/synthesize route', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockSynthesizeSpeech.mockReset();
+        mockSynthesizeSpeech.mockResolvedValue([{ audioContent: Buffer.from('fake-audio') }]);
         process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify({ project_id: 'test' });
     });
 
@@ -165,5 +170,68 @@ describe('/api/synthesize route', () => {
 
         const res = await routeModule.POST(req as any);
         expect(res.status).toBe(200);
+    });
+
+    describe('Error handling', () => {
+        it('returns 400 for SyntaxError', async () => {
+            (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+
+            // Mock JSON parsing to throw SyntaxError
+            const req: any = {
+                json: async () => {
+                    throw new SyntaxError('Unexpected token < in JSON at position 0');
+                }
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(400);
+            const body = await res.json();
+            expect(body).toHaveProperty('error', 'Invalid request body');
+        });
+
+        it('returns 500 for generic Error', async () => {
+            (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+
+            // Simulate unexpected error during request handling
+            const req: any = {
+                json: async () => {
+                    throw new Error('Unexpected generic error');
+                }
+            };
+
+            const originalEnv = process.env.NODE_ENV;
+            process.env.NODE_ENV = 'development';
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(500);
+            const body = await res.json();
+            expect(body).toHaveProperty('error', 'Failed to synthesize speech');
+            expect(body).toHaveProperty('errorType', 'UNKNOWN');
+            expect(body).toHaveProperty('detail', 'Unexpected generic error');
+
+            process.env.NODE_ENV = originalEnv;
+        });
+
+        it('returns appropriate status and message for TTSError via Google Cloud mock', async () => {
+            (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+
+            // Override the globally referenced mock function so the cached route client will use it
+            mockSynthesizeSpeech.mockRejectedValue(new Error('Operation timeout'));
+
+            (getStorageProvider as jest.Mock).mockReturnValue({
+                headObject: jest.fn().mockResolvedValue({ exists: false }),
+                uploadObject: jest.fn().mockRejectedValue(new Error('Storage error')),
+            });
+
+            const req: any = {
+                json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' })
+            };
+
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(503);
+            const body = await res.json();
+            expect(body).toHaveProperty('error', 'ネットワークエラーが発生しました。接続を確認してください。');
+            expect(body).toHaveProperty('errorType', 'NETWORK');
+        });
     });
 });
