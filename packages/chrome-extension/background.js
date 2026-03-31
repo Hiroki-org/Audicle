@@ -68,7 +68,7 @@ class GoogleTTSSynthesizer extends AudioSynthesizer {
   async synthesize(text) {
     const cleanedText = cleanText(text);
     const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
-      cleanedText
+      cleanedText,
     )}&tl=ja`;
 
     const response = await fetch(ttsUrl);
@@ -86,7 +86,7 @@ class TestSynthesizer extends AudioSynthesizer {
 
   async synthesize(text) {
     console.log(
-      `[TestSynthesizer] Request for text: "${text}" - returning sample.mp3`
+      `[TestSynthesizer] Request for text: "${text}" - returning sample.mp3`,
     );
 
     const sampleUrl = chrome.runtime.getURL("sample.mp3");
@@ -103,7 +103,7 @@ class EdgeTTSSynthesizer extends RemoteAudioSynthesizer {
     super(
       config.serverUrls?.edge_tts || "http://localhost:8001",
       "/synthesize/simple",
-      "EdgeTTSSynthesizer"
+      "EdgeTTSSynthesizer",
     );
   }
 }
@@ -114,7 +114,7 @@ class EdgeTTSDockerSynthesizer extends RemoteAudioSynthesizer {
     super(
       config.serverUrls?.edge_tts_docker || "http://localhost:8001",
       "/synthesize/simple",
-      "EdgeTTSDockerSynthesizer"
+      "EdgeTTSDockerSynthesizer",
     );
   }
 }
@@ -125,7 +125,7 @@ class GoogleCloudTTSDockerSynthesizer extends RemoteAudioSynthesizer {
     super(
       config.serverUrls?.google_cloud_tts_docker || "http://localhost:8002",
       "/synthesize/simple",
-      "GoogleCloudTTSDockerSynthesizer"
+      "GoogleCloudTTSDockerSynthesizer",
     );
   }
 }
@@ -136,7 +136,7 @@ class APIServerSynthesizer extends RemoteAudioSynthesizer {
     super(
       config.serverUrls?.api_server || "http://localhost:8000",
       "/synthesize",
-      "APIServerSynthesizer"
+      "APIServerSynthesizer",
     );
   }
 }
@@ -192,7 +192,7 @@ function cleanText(text) {
   // 特殊文字を除去（句読点以外）
   text = text.replace(
     /[^\w\s\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g,
-    ""
+    "",
   );
   // 連続する空白を1つに
   text = text.replace(/\s+/g, " ").trim();
@@ -236,7 +236,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const synthesizer = SynthesizerFactory.create(
           config.synthesizerType,
-          config
+          config,
         );
         const audioDataUrl = await synthesizer.synthesize(message.text);
 
@@ -266,7 +266,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const synthesizer = SynthesizerFactory.create(
           config.synthesizerType,
-          config
+          config,
         );
         const audioDataUrl = await synthesizer.synthesize(message.text);
         sendResponse({ audioDataUrl: audioDataUrl });
@@ -284,20 +284,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     loadConfig().then(async (config) => {
       const synthesizer = SynthesizerFactory.create(
         config.synthesizerType,
-        config
+        config,
       );
 
-      const promises = message.batch.map(async ({ index, text }) => {
-        try {
-          const audioDataUrl = await synthesizer.synthesize(text);
-          return { index, audioDataUrl };
-        } catch (error) {
-          console.error("Speech synthesis error for index", index, ":", error);
-          return { index, error: error.message };
-        }
-      });
-
-      const results = await Promise.all(promises);
+      const results = [];
+      const concurrency = 3;
+      for (let i = 0; i < message.batch.length; i += concurrency) {
+        const chunk = message.batch.slice(i, i + concurrency);
+        const promises = chunk.map(async ({ index, text }) => {
+          try {
+            const audioDataUrl = await synthesizer.synthesize(text);
+            return { index, audioDataUrl };
+          } catch (error) {
+            console.error(
+              "Speech synthesis error for index",
+              index,
+              ":",
+              error,
+            );
+            return { index, error: error.message };
+          }
+        });
+        const chunkResults = await Promise.all(promises);
+        results.push(...chunkResults);
+      }
       const audioDataUrls = results.filter((r) => r.audioDataUrl);
       sendResponse({ audioDataUrls });
     });
@@ -310,20 +320,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     loadConfig().then(async (config) => {
       const synthesizer = SynthesizerFactory.create(
         config.synthesizerType,
-        config
+        config,
       );
 
-      const promises = message.batch.map(async ({ index, text }) => {
-        try {
-          const audioDataUrl = await synthesizer.synthesize(text);
-          return { index, audioDataUrl };
-        } catch (error) {
-          console.error("Speech synthesis error for index", index, ":", error);
-          return { index, error: error.message };
-        }
-      });
-
-      const results = await Promise.all(promises);
+      const results = [];
+      const concurrency = 3;
+      for (let i = 0; i < message.batch.length; i += concurrency) {
+        const chunk = message.batch.slice(i, i + concurrency);
+        const promises = chunk.map(async ({ index, text }) => {
+          try {
+            const audioDataUrl = await synthesizer.synthesize(text);
+            return { index, audioDataUrl };
+          } catch (error) {
+            console.error(
+              "Speech synthesis error for index",
+              index,
+              ":",
+              error,
+            );
+            return { index, error: error.message };
+          }
+        });
+        const chunkResults = await Promise.all(promises);
+        results.push(...chunkResults);
+      }
       const audioDataUrls = results.filter((r) => r.audioDataUrl);
       sendResponse({ audioDataUrls });
     });
