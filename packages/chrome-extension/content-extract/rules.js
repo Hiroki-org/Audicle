@@ -281,7 +281,7 @@ class ExtractionRulesManager {
     const elements = Array.from(container.querySelectorAll(combinedSelector));
 
     console.log(
-      `[ExtractionRules] Found ${elements.length} elements with selector: ${combinedSelector}`
+      `[ExtractionRules] Found ${elements.length} elements with selector: ${combinedSelector}`,
     );
 
     // 結果を処理

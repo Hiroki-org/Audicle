@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ? "一時停止"
                 : "再開";
             }
-          }
+          },
         );
       }
     });
