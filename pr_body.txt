@@ -1,0 +1,3 @@
+🎯 **What:** The `useConfirmDialog` hook was lacking unit tests, meaning its internal state management and Promise-based resolution logic (confirming/canceling) were unchecked by automated tests.
+📊 **Coverage:** The hook's initial state (null dialog), rendering of the `ConfirmDialog` component via `confirmDialog`, and both positive (`onConfirm` resolving to true) and negative (`onCancel` resolving to false) resolution paths are now fully tested using `@testing-library/react`.
+✨ **Result:** Increased codebase reliability by ensuring the hook consistently returns correct Promise resolutions and properly cleans up its internal dialog state across interactions.
