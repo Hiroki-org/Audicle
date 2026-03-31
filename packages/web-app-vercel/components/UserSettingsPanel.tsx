@@ -68,23 +68,23 @@ export default function UserSettingsPanel() {
   }, [session]);
 
   const handlePlaybackSpeedChange = (value: number) => {
-    setSettings({ ...settings, playback_speed: value });
+    setSettings((prev) => ({ ...prev, playback_speed: value }));
     setHasChanged(true);
   };
 
   const handleVoiceModelChange = (value: string) => {
-    setSettings({
-      ...settings,
+    setSettings((prev) => ({
+      ...prev,
       voice_model: value as VoiceModel,
-    });
+    }));
     setHasChanged(true);
   };
 
   const handleLanguageChange = (value: string) => {
-    setSettings({
-      ...settings,
+    setSettings((prev) => ({
+      ...prev,
       language: value as Language,
-    });
+    }));
     setHasChanged(true);
   };
 
