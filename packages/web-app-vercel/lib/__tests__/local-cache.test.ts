@@ -21,7 +21,7 @@ describe("local-cache", () => {
         const localStorageMock = (function () {
             let store: { [key: string]: string } = {};
             return {
-                getItem: jest.fn((key: string) => store.hasOwnProperty(key) ? store[key] : null),
+                getItem: jest.fn((key: string) => Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null),
                 setItem: jest.fn((key: string, value: string) => {
                     store[key] = value.toString();
                 }),
@@ -32,7 +32,7 @@ describe("local-cache", () => {
                     store = {};
                 }),
                 length: 0,
-                key: jest.fn((index: number) => null),
+                key: jest.fn((_index: number) => null),
             };
         })();
 
