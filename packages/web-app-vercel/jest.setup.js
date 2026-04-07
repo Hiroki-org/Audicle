@@ -2,6 +2,13 @@ import "@testing-library/jest-dom";
 import { MessagePort } from 'worker_threads';
 import { TextEncoder, TextDecoder } from "util";
 
+// structuredClone polyfill for JSDOM
+if (typeof global.structuredClone === 'undefined') {
+  global.structuredClone = (val) => {
+    return JSON.parse(JSON.stringify(val));
+  };
+}
+
 // React 18: act() を正しく扱うためのフラグ
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 // eslint-disable-next-line no-undef
