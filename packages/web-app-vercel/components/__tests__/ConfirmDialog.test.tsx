@@ -1,5 +1,22 @@
-import { renderHook, act } from "@testing-library/react";
+import { useEffect } from "react";
+import { render, renderHook, fireEvent, screen, act } from "@testing-library/react";
 import { useConfirmDialog } from "../ConfirmDialog";
+
+type ConfirmDialogApi = ReturnType<typeof useConfirmDialog>;
+
+function ConfirmDialogHarness({
+  onReady,
+}: {
+  onReady: (api: ConfirmDialogApi) => void;
+}) {
+  const api = useConfirmDialog();
+
+  useEffect(() => {
+    onReady(api);
+  }, [api, onReady]);
+
+  return <>{api.confirmDialog}</>;
+}
 
 describe("useConfirmDialog", () => {
   it("should initialize with no dialog", () => {
@@ -8,69 +25,83 @@ describe("useConfirmDialog", () => {
     expect(result.current.confirmDialog).toBeNull();
   });
 
-  it("should return a Promise from showConfirm and display the dialog", () => {
-    const { result } = renderHook(() => useConfirmDialog());
+  it("should return a Promise from showConfirm and display the dialog", async () => {
+    let api: ConfirmDialogApi | null = null;
+    render(<ConfirmDialogHarness onReady={(value) => {
+      api = value;
+    }} />);
+    expect(api).not.toBeNull();
 
-    let promise: Promise<boolean>;
+    let promise!: Promise<boolean>;
+
     act(() => {
-      promise = result.current.showConfirm({
+      promise = api!.showConfirm({
         title: "Test Title",
-        message: "Test Message"
+        message: "Test Message",
       });
     });
 
-    expect(promise!).toBeInstanceOf(Promise);
-    expect(result.current.confirmDialog).not.toBeNull();
+    expect(promise).toBeInstanceOf(Promise);
+    expect(screen.getByText("Test Title")).toBeInTheDocument();
+    expect(screen.getByText("Test Message")).toBeInTheDocument();
 
-    // Check if ConfirmDialog component properties are rendered inside
-    const dialogElement = result.current.confirmDialog;
-    expect(dialogElement?.props.title).toBe("Test Title");
-    expect(dialogElement?.props.message).toBe("Test Message");
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+    });
+
+    await expect(promise).resolves.toBe(false);
+    expect(screen.queryByText("Test Title")).toBeNull();
   });
 
   it("should resolve the Promise to true when onConfirm is called", async () => {
-    const { result } = renderHook(() => useConfirmDialog());
+    let api: ConfirmDialogApi | null = null;
+    render(<ConfirmDialogHarness onReady={(value) => {
+      api = value;
+    }} />);
+    expect(api).not.toBeNull();
 
-    let promise: Promise<boolean>;
+    let promise!: Promise<boolean>;
+
     act(() => {
-      promise = result.current.showConfirm({
+      promise = api!.showConfirm({
         title: "Test Title",
-        message: "Test Message"
+        message: "Test Message",
       });
     });
 
-    const dialogProps = result.current.confirmDialog?.props;
+    expect(screen.getByText("Test Title")).toBeInTheDocument();
 
     act(() => {
-      dialogProps?.onConfirm();
+      fireEvent.click(screen.getByRole("button", { name: "確認" }));
     });
 
-    const isConfirmed = await promise!;
-
-    expect(isConfirmed).toBe(true);
-    expect(result.current.confirmDialog).toBeNull();
+    await expect(promise).resolves.toBe(true);
+    expect(screen.queryByText("Test Title")).toBeNull();
   });
 
   it("should resolve the Promise to false when onCancel is called", async () => {
-    const { result } = renderHook(() => useConfirmDialog());
+    let api: ConfirmDialogApi | null = null;
+    render(<ConfirmDialogHarness onReady={(value) => {
+      api = value;
+    }} />);
+    expect(api).not.toBeNull();
 
-    let promise: Promise<boolean>;
+    let promise!: Promise<boolean>;
+
     act(() => {
-      promise = result.current.showConfirm({
+      promise = api!.showConfirm({
         title: "Test Title",
-        message: "Test Message"
+        message: "Test Message",
       });
     });
 
-    const dialogProps = result.current.confirmDialog?.props;
+    expect(screen.getByText("Test Title")).toBeInTheDocument();
 
     act(() => {
-      dialogProps?.onCancel();
+      fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
     });
 
-    const isConfirmed = await promise!;
-
-    expect(isConfirmed).toBe(false);
-    expect(result.current.confirmDialog).toBeNull();
+    await expect(promise).resolves.toBe(false);
+    expect(screen.queryByText("Test Title")).toBeNull();
   });
 });
