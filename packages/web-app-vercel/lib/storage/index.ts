@@ -14,7 +14,6 @@ export function getStorageProvider(): StorageProvider {
     if (storageProvider) return storageProvider;
 
     const provider = process.env.STORAGE_PROVIDER || "vercel-blob";
-    console.log(`[Storage] Using provider: ${provider}`);
 
     if (provider === "r2") {
         storageProvider = new R2StorageProvider();
