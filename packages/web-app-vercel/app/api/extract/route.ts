@@ -210,9 +210,9 @@ async function fetchWithTimeout(
             } else {
               // Fallback for other domains (shouldn't be needed for the main request, but just in case)
               import("dns").then((dns) => {
-                dns.lookup(hostname, options, (err, address, family) => {
+                dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
                   if (err) return callback(err, []);
-                  callback(null, [{ address, family }]);
+                  callback(null, addresses.map(a => ({ address: a.address, family: a.family })));
                 });
               });
             }

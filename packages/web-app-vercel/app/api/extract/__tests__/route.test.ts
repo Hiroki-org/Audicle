@@ -7,7 +7,8 @@ jest.mock('@/lib/api-auth', () => ({
 
 // SSRFチェックをモック（常に許可）
 jest.mock('@/lib/ssrf', () => ({
-    isSafeUrl: jest.fn().mockResolvedValue(true)
+    isSafeUrl: jest.fn().mockResolvedValue(true),
+    validateAndResolveUrl: jest.fn().mockResolvedValue({ isSafe: true, ipAddress: '127.0.0.1', family: 4 })
 }))
 
 // fetchをモック
@@ -91,9 +92,9 @@ describe('/api/extract route', () => {
         expect(body.error).toBe('このURLは認証が必要なサイトです。ログインが必要なページは読み込めません。')
     })
 
-    it('returns 403 when SSRF check fails (isSafeUrl false)', async () => {
-        const { isSafeUrl } = require('@/lib/ssrf');
-        (isSafeUrl as jest.Mock).mockResolvedValueOnce(false);
+    it('returns 403 when SSRF check fails (validateAndResolveUrl false)', async () => {
+        const { validateAndResolveUrl } = require('@/lib/ssrf');
+        (validateAndResolveUrl as jest.Mock).mockResolvedValueOnce({ isSafe: false });
 
         const mockRequest = new Request('http://localhost:3000/api/extract', {
             method: 'POST',
