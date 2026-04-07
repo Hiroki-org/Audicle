@@ -97,6 +97,35 @@ class TestSynthesizer extends AudioSynthesizer {
   }
 }
 
+const CONCURRENCY_LIMIT = 5;
+
+async function synthesizeBatch(synthesizer, batch) {
+  const results = [];
+
+  for (let i = 0; i < batch.length; i += CONCURRENCY_LIMIT) {
+    const chunk = batch.slice(i, i + CONCURRENCY_LIMIT);
+    const chunkResults = await Promise.all(
+      chunk.map(async ({ index, text }) => {
+        try {
+          const audioDataUrl = await synthesizer.synthesize(text);
+          return { index, audioDataUrl };
+        } catch (error) {
+          console.error(
+            "Speech synthesis error for index",
+            index,
+            ":",
+            error,
+          );
+          return { index, error: error.message };
+        }
+      }),
+    );
+    results.push(...chunkResults);
+  }
+
+  return results;
+}
+
 // Edge TTS実装（Python TTS Serverを使用）
 class EdgeTTSSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
@@ -287,28 +316,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         config,
       );
 
-      const CONCURRENCY_LIMIT = 5;
-      const results = [];
-
-      for (let i = 0; i < message.batch.length; i += CONCURRENCY_LIMIT) {
-        const chunk = message.batch.slice(i, i + CONCURRENCY_LIMIT);
-        const promises = chunk.map(async ({ index, text }) => {
-          try {
-            const audioDataUrl = await synthesizer.synthesize(text);
-            return { index, audioDataUrl };
-          } catch (error) {
-            console.error(
-              "Speech synthesis error for index",
-              index,
-              ":",
-              error,
-            );
-            return { index, error: error.message };
-          }
-        });
-        const chunkResults = await Promise.all(promises);
-        results.push(...chunkResults);
-      }
+      const results = await synthesizeBatch(synthesizer, message.batch);
       const audioDataUrls = results.filter((r) => r.audioDataUrl);
       sendResponse({ audioDataUrls });
     });
@@ -324,28 +332,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         config,
       );
 
-      const CONCURRENCY_LIMIT = 5;
-      const results = [];
-
-      for (let i = 0; i < message.batch.length; i += CONCURRENCY_LIMIT) {
-        const chunk = message.batch.slice(i, i + CONCURRENCY_LIMIT);
-        const promises = chunk.map(async ({ index, text }) => {
-          try {
-            const audioDataUrl = await synthesizer.synthesize(text);
-            return { index, audioDataUrl };
-          } catch (error) {
-            console.error(
-              "Speech synthesis error for index",
-              index,
-              ":",
-              error,
-            );
-            return { index, error: error.message };
-          }
-        });
-        const chunkResults = await Promise.all(promises);
-        results.push(...chunkResults);
-      }
+      const results = await synthesizeBatch(synthesizer, message.batch);
       const audioDataUrls = results.filter((r) => r.audioDataUrl);
       sendResponse({ audioDataUrls });
     });
