@@ -162,27 +162,36 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     parts = merged_parts
 
     # Accumulate parts into chunks
-    chunks = []
+    final_chunks = []
     current_chunk = ""
+    current_size = 0
 
     for part in parts:
-        if len((current_chunk + part).encode('utf-8')) > limit:
-             if current_chunk:
-                 chunks.append(current_chunk)
-             current_chunk = part
+        part_size = len(part.encode('utf-8'))
+
+        # If a single part is larger than the limit, we need to split it further
+        if part_size > limit:
+            # First, flush the current_chunk if any
+            if current_chunk:
+                final_chunks.append(current_chunk)
+                current_chunk = ""
+                current_size = 0
+
+            # Then, recursively process this large part
+            final_chunks.extend(_chunk_text(part, limit, next_separators))
+        elif current_size + part_size > limit:
+            # Adding this part would exceed the limit, so flush current_chunk
+            if current_chunk:
+                final_chunks.append(current_chunk)
+            current_chunk = part
+            current_size = part_size
         else:
-             current_chunk += part
+            # Add part to current_chunk
+            current_chunk += part
+            current_size += part_size
 
     if current_chunk:
-        chunks.append(current_chunk)
-
-    # Recursively process any chunks that are still too big
-    final_chunks = []
-    for chunk in chunks:
-        if len(chunk.encode('utf-8')) > limit:
-            final_chunks.extend(_chunk_text(chunk, limit, next_separators))
-        else:
-            final_chunks.append(chunk)
+        final_chunks.append(current_chunk)
 
     return final_chunks
 
