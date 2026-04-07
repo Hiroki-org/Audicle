@@ -1532,71 +1532,99 @@ function progressiveFetch(callback) {
   );
 }
 
-// バックグラウンドで残りの音声を読み込み（前後両方向、順次リクエスト）
+// バックグラウンドで残りの音声を読み込み（前後両方向、バッチリクエスト）
 function fetchRemainingInBackground(priorityStartIndex) {
   const queuedIndices = new Set();
+  const batches = [];
+  let currentBatch = [];
 
-  const handleResponse = (index) => (response) => {
-    if (response && response.audioDataUrl) {
-      audioCache.set(index, response.audioDataUrl);
-      unCachedIndices.delete(index);
+  const addBatch = () => {
+    if (currentBatch.length > 0) {
+      batches.push([...currentBatch]);
+      currentBatch = [];
     }
   };
 
-  // 前方向（priorityStartIndex以降）を優先で順次リクエストキューに追加
+  // 前方向（priorityStartIndex以降）を優先でバッチに追加
   for (const i of unCachedIndices) {
     if (i >= priorityStartIndex && !queuedIndices.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
         queuedIndices.add(i);
-        addToRequestQueue(
-          { command: "fetch", text: item.text },
-          handleResponse(i),
-        );
+        currentBatch.push({ index: i, text: item.text });
+        if (currentBatch.length === batchSize) {
+          addBatch();
+        }
       }
     }
   }
+  addBatch();
 
-  // 後方向（queueIndexより前）を後回しでキューに追加
+  // 後方向（queueIndexより前）を後回しでバッチに追加
   for (const i of unCachedIndices) {
     if (i < queueIndex && !queuedIndices.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
         queuedIndices.add(i);
-        addToRequestQueue(
-          { command: "fetch", text: item.text },
-          handleResponse(i),
-        );
+        currentBatch.push({ index: i, text: item.text });
+        if (currentBatch.length === batchSize) {
+          addBatch();
+        }
       }
     }
   }
+  addBatch();
+
+  // バッチをリクエストキューに追加
+  batches.forEach((batch) => {
+    addToRequestQueue({ command: "batchFetch", batch }, (response) => {
+      if (response && response.audioDataUrls) {
+        response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
+          audioCache.set(index, audioDataUrl);
+          unCachedIndices.delete(index);
+        });
+      }
+    });
+  });
 
   debugLog(
-    `fetchRemainingInBackground: Queued background loading from index ${priorityStartIndex}`,
+    `fetchRemainingInBackground: Queued ${batches.length} background batches from index ${priorityStartIndex}`,
   );
 }
 
-// 全体的なバッチ取得（必要に応じて順次リクエストに変更）
+// 全体的なバッチ取得（バッチリクエストに変更）
 function fullBatchFetch(callback) {
-  debugLog("fullBatchFetch: Starting full sequential loading");
+  debugLog("fullBatchFetch: Starting full batch loading");
 
-  const handleResponse = (index) => (response) => {
-    if (response && response.audioDataUrl) {
-      audioCache.set(index, response.audioDataUrl);
-      unCachedIndices.delete(index);
-    }
-  };
+  const batches = [];
+  let currentBatch = [];
 
-  // 全ての未キャッシュ項目を順次キューに追加
+  // 全ての未キャッシュ項目をバッチにまとめる
   for (const i of unCachedIndices) {
     const item = playbackQueue[i];
     if (item && item.text) {
-      addToRequestQueue(
-        { command: "fetch", text: item.text },
-        handleResponse(i),
-      );
+      currentBatch.push({ index: i, text: item.text });
+      if (currentBatch.length === batchSize) {
+        batches.push([...currentBatch]);
+        currentBatch = [];
+      }
     }
   }
+  if (currentBatch.length > 0) {
+    batches.push([...currentBatch]);
+  }
+
+  // バッチをリクエストキューに追加
+  batches.forEach((batch) => {
+    addToRequestQueue({ command: "batchFetch", batch }, (response) => {
+      if (response && response.audioDataUrls) {
+        response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
+          audioCache.set(index, audioDataUrl);
+          unCachedIndices.delete(index);
+        });
+      }
+    });
+  });
 
   if (callback) callback();
 }
