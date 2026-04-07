@@ -18,7 +18,11 @@ export class AudioCache {
   private cache = new Map<string, CacheEntry>();
 
   // キャッシュキーを生成（音声モデルと再生速度を含む）
-  private getCacheKey(text: string, voiceModel: string = DEFAULT_VOICE, articleUrl?: string): string {
+  private getCacheKey(
+    text: string,
+    voiceModel: string = DEFAULT_VOICE,
+    articleUrl?: string,
+  ): string {
     const articleParam = articleUrl ? `_${articleUrl}` : "";
     return `${CACHE_PREFIX}${this.hashString(text)}_${voiceModel}${articleParam}`;
   }
@@ -39,7 +43,7 @@ export class AudioCache {
     text: string,
     voiceModel: string = DEFAULT_VOICE,
     articleUrl?: string,
-    forceRegenerate: boolean = false
+    forceRegenerate: boolean = false,
   ): Promise<string> {
     const key = this.getCacheKey(text, voiceModel, articleUrl);
 
@@ -77,7 +81,12 @@ export class AudioCache {
 
     // キャッシュミス - 新規合成
     logger.cache("MISS", `${text.substring(0, 30)}...`);
-    const blob = await synthesizeSpeech(text, undefined, voiceModel, articleUrl);
+    const blob = await synthesizeSpeech(
+      text,
+      undefined,
+      voiceModel,
+      articleUrl,
+    );
     const url = URL.createObjectURL(blob);
 
     // Evict the oldest item only if the cache is full and we are adding a new item.
@@ -107,23 +116,35 @@ export class AudioCache {
     return url;
   }
 
-  // 複数の音声を先読み
+  // 複数の音声を先読み（並行数を制限）
   async prefetch(
     texts: string[],
     voiceModel: string = DEFAULT_VOICE,
-    articleUrl?: string
+    articleUrl?: string,
   ): Promise<void> {
     logger.info(`🔄 先読み開始: ${texts.length}件`);
 
-    const promises = texts.map(async (text) => {
-      try {
-        await this.get(text, voiceModel, articleUrl);
-      } catch (error) {
-        logger.error(`先読みエラー: ${text.substring(0, 30)}...`, error);
-      }
-    });
+    const MAX_CONCURRENT_PREFETCH = 3;
+    const executing = new Set<Promise<void>>();
 
-    await Promise.all(promises);
+    for (const text of texts) {
+      const p = (async () => {
+        try {
+          await this.get(text, voiceModel, articleUrl);
+        } catch (error) {
+          logger.error(`先読みエラー: ${text.substring(0, 30)}...`, error);
+        }
+      })();
+
+      executing.add(p);
+      p.then(() => executing.delete(p));
+
+      if (executing.size >= MAX_CONCURRENT_PREFETCH) {
+        await Promise.race(executing);
+      }
+    }
+
+    await Promise.all(executing);
     logger.success(`✅ 先読み完了: ${texts.length}件`);
   }
 
