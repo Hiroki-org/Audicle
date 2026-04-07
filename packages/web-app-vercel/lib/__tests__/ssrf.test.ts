@@ -95,3 +95,48 @@ describe('isSafeUrl', () => {
         jest.resetModules();
     });
 });
+
+
+describe('validateAndResolveUrl', () => {
+    test('returns the resolved ip and family for safe URLs', async () => {
+        jest.resetModules();
+        jest.doMock('dns', () => ({
+            lookup: (_hostname: string, options: any, callback: any) => {
+                if (options && options.all) {
+                    callback(null, [
+                        { address: '93.184.216.34', family: 4 },
+                    ]);
+                } else {
+                    callback(null, '93.184.216.34', 4);
+                }
+            }
+        }));
+
+        const { validateAndResolveUrl } = require('../ssrf');
+        await expect(validateAndResolveUrl('https://example.com')).resolves.toEqual({
+            isSafe: true,
+            ipAddress: '93.184.216.34',
+            family: 4,
+        });
+
+        jest.dontMock('dns');
+        jest.resetModules();
+    });
+
+    test('returns unsafe when dns lookup fails', async () => {
+        jest.resetModules();
+        jest.doMock('dns', () => ({
+            lookup: (_hostname: string, _options: any, callback: any) => {
+                callback(new Error('lookup failed'));
+            }
+        }));
+
+        const { validateAndResolveUrl } = require('../ssrf');
+        await expect(validateAndResolveUrl('https://example.com')).resolves.toEqual({
+            isSafe: false,
+        });
+
+        jest.dontMock('dns');
+        jest.resetModules();
+    });
+});
