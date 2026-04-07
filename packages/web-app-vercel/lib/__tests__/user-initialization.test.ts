@@ -16,30 +16,21 @@ jest.mock('../playlist-utils', () => ({
   getOrCreateDefaultPlaylist: jest.fn(),
 }));
 
-const mockedSupabase = supabase as jest.Mocked<any>;
+const mockedSupabase = supabase as jest.Mocked<typeof supabase>;
 const mockedGetOrCreateDefaultPlaylist = getOrCreateDefaultPlaylist as jest.MockedFunction<typeof getOrCreateDefaultPlaylist>;
 
 describe('initializeNewUser', () => {
   const userId = 'user-123';
   const userEmail = 'test@example.com';
-  let originalConsoleLog: any;
-  let originalConsoleError: any;
-
-  beforeAll(() => {
-    // Hide console logs/errors to keep test output clean
-    originalConsoleLog = console.log;
-    originalConsoleError = console.error;
-    console.log = jest.fn();
-    console.error = jest.fn();
-  });
-
-  afterAll(() => {
-    console.log = originalConsoleLog;
-    console.error = originalConsoleError;
-  });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should return success if user settings already exist', async () => {
@@ -78,7 +69,7 @@ describe('initializeNewUser', () => {
       .mockReturnValueOnce(findMock as any)
       .mockReturnValueOnce(insertMock as any);
 
-    mockedGetOrCreateDefaultPlaylist.mockResolvedValue({ playlist: {} as any });
+    mockedGetOrCreateDefaultPlaylist.mockResolvedValue({ playlist: undefined });
 
     const result = await initializeNewUser(userId, userEmail);
 
