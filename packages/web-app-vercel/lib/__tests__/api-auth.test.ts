@@ -55,8 +55,11 @@ describe('requireAuth', () => {
         );
     });
 
-    it('returns 401 response if session has no user property', async () => {
-        (auth as jest.Mock).mockResolvedValueOnce({});
+    it('returns 401 response if user object is missing from session', async () => {
+        (auth as jest.Mock).mockResolvedValueOnce({
+            expires: '2025-01-01T00:00:00.000Z'
+            // no user object
+        });
 
         const result = await requireAuth();
 
@@ -71,9 +74,9 @@ describe('requireAuth', () => {
         );
     });
 
-    it('returns 401 response if user email is empty', async () => {
+    it('returns 401 response if user email is an empty string', async () => {
         (auth as jest.Mock).mockResolvedValueOnce({
-            user: { email: '' }
+            user: { email: '' } // empty email
         });
 
         const result = await requireAuth();
