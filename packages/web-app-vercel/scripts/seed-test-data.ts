@@ -189,7 +189,7 @@ async function seedTestData() {
             title: "Cherry",
             thumbnail_url: "https://via.placeholder.com/300",
         },
-        // その他の記事 (example.com/xxx returns 404, so use query params or root)
+        // その他の記事
         {
             owner_email: TEST_USER_EMAIL,
             url: "https://example.com/?id=article-1",
