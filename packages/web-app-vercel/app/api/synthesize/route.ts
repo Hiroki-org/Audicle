@@ -1,3 +1,4 @@
+import { getCorsHeaders } from '@/lib/cors';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { auth } from '@/lib/auth';
@@ -309,13 +310,9 @@ class TTSError extends Error {
     }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
     return NextResponse.json({}, {
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        },
+        headers: getCorsHeaders(request),
     });
 }
 
@@ -326,11 +323,7 @@ export async function POST(request: NextRequest) {
         console[level](JSON.stringify({ requestId, level, message, ...data }));
     };
 
-    const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    };
+    const corsHeaders = getCorsHeaders(request);
 
     try {
         log('info', 'リクエスト受信');
@@ -678,11 +671,7 @@ export async function POST(request: NextRequest) {
             }
         );
     } catch (error) {
-        const corsHeaders = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        };
+        const corsHeaders = getCorsHeaders(request);
 
         log('error', '音声合成エラー', {
             error,

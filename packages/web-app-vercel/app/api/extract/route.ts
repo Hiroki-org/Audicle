@@ -4,30 +4,23 @@ import { normalizeArticleText } from '@/lib/parseArticle';
 import { parseHTML } from 'linkedom';
 import { ExtractResponse } from '@/types/api';
 import { isSafeUrl } from '@/lib/ssrf';
+import { getCorsHeaders } from '@/lib/cors';
 
 // Node.js runtimeを明示的に指定（JSDOMはEdge Runtimeで動作しない）
 export const runtime = 'nodejs';
 // 動的レンダリングを強制（キャッシュを無効化）
 export const dynamic = 'force-dynamic';
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
     return NextResponse.json({}, {
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        },
+        headers: getCorsHeaders(request),
     });
 }
 
 export async function POST(request: NextRequest) {
     console.log('[Extract API] POST request received');
 
-    const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    };
+    const corsHeaders = getCorsHeaders(request);
 
     try {
         const { url } = await request.json();
@@ -95,11 +88,7 @@ export async function POST(request: NextRequest) {
             headers: corsHeaders,
         });
     } catch (error) {
-        const corsHeaders = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        };
+        const corsHeaders = getCorsHeaders(request);
 
         if (error instanceof SyntaxError) {
             return NextResponse.json(
