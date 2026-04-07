@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCorsHeaders } from '@/lib/cors';
 import { Readability } from '@mozilla/readability';
 import { normalizeArticleText } from '@/lib/parseArticle';
 import { parseHTML } from 'linkedom';
@@ -10,24 +11,16 @@ export const runtime = 'nodejs';
 // 動的レンダリングを強制（キャッシュを無効化）
 export const dynamic = 'force-dynamic';
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
     return NextResponse.json({}, {
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        },
+        headers: getCorsHeaders(request),
     });
 }
 
 export async function POST(request: NextRequest) {
     console.log('[Extract API] POST request received');
 
-    const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    };
+    const corsHeaders = getCorsHeaders(request);
 
     try {
         const { url } = await request.json();
@@ -95,11 +88,6 @@ export async function POST(request: NextRequest) {
             headers: corsHeaders,
         });
     } catch (error) {
-        const corsHeaders = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        };
 
         if (error instanceof SyntaxError) {
             return NextResponse.json(
