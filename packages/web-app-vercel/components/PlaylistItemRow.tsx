@@ -1,10 +1,12 @@
+"use client";
+
 import { PlaylistWithItems } from "@/types/playlist";
 
 interface PlaylistItemRowProps {
   playlist: PlaylistWithItems;
   isSelected: boolean;
   isSaving: boolean;
-  onToggle: (playlistId: string) => void;
+  onToggle: (_playlistId: string) => void;
 }
 
 export function PlaylistItemRow({
@@ -20,23 +22,23 @@ export function PlaylistItemRow({
         id={checkboxId}
         type="checkbox"
         checked={isSelected}
-        onChange={() => !isSaving && onToggle(playlist.id)}
+        onChange={() => onToggle(playlist.id)}
         className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 cursor-pointer"
         disabled={isSaving}
       />
       <label htmlFor={checkboxId} className="flex-1 min-w-0 cursor-pointer">
-        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
+        <span className="block font-medium text-gray-900 dark:text-gray-100 truncate">
           {playlist.name}
-        </p>
+        </span>
         {playlist.description && (
-          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+          <span className="block text-xs text-gray-600 dark:text-gray-400 truncate">
             {playlist.description}
-          </p>
+          </span>
         )}
         {playlist.is_default && (
-          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+          <span className="block text-xs text-blue-600 dark:text-blue-400 font-medium">
             デフォルト
-          </p>
+          </span>
         )}
       </label>
     </div>
