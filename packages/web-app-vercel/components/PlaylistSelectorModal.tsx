@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { logger } from "@/lib/logger";
+import { PlaylistItemRow } from "./PlaylistItemRow";
 import { usePlaylists } from "@/lib/hooks/usePlaylists";
 import {
   usePlaylistItemPlaylists,
@@ -45,7 +46,7 @@ export function PlaylistSelectorModal({
   // 結果を安全に選択（デフォルト値付き）
   const currentPlaylists = useMemo(
     () => (itemId ? playlistsByItemId || [] : playlistsByArticleId || []),
-    [itemId, playlistsByItemId, playlistsByArticleId]
+    [itemId, playlistsByItemId, playlistsByArticleId],
   );
 
   const isLoadingCurrent = itemId ? isLoadingItemId : isLoadingArticleId;
@@ -53,10 +54,10 @@ export function PlaylistSelectorModal({
   const updateMutation = useUpdateArticlePlaylistsMutation();
 
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [initialSelectedIds, setInitialSelectedIds] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [error, setError] = useState<string | null>(null);
   const [overlayClickable, setOverlayClickable] = useState(false);
@@ -137,10 +138,10 @@ export function PlaylistSelectorModal({
       setError(null);
 
       const addToPlaylistIds = Array.from(selectedPlaylistIds).filter(
-        (id) => !initialSelectedIds.has(id)
+        (id) => !initialSelectedIds.has(id),
       );
       const removeFromPlaylistIds = Array.from(initialSelectedIds).filter(
-        (id) => !selectedPlaylistIds.has(id)
+        (id) => !selectedPlaylistIds.has(id),
       );
 
       if (addToPlaylistIds.length > 0 || removeFromPlaylistIds.length > 0) {
@@ -229,44 +230,15 @@ export function PlaylistSelectorModal({
               </div>
             ) : (
               <div className="space-y-2">
-                {allPlaylists.map((playlist) => {
-                  const checkboxId = `playlist-checkbox-${playlist.id}`;
-                  return (
-                    <div
-                      key={playlist.id}
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      <input
-                        id={checkboxId}
-                        type="checkbox"
-                        checked={selectedPlaylistIds.has(playlist.id)}
-                        onChange={() =>
-                          !isSaving && handleTogglePlaylist(playlist.id)
-                        }
-                        className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 cursor-pointer"
-                        disabled={isSaving}
-                      />
-                      <label
-                        htmlFor={checkboxId}
-                        className="flex-1 min-w-0 cursor-pointer"
-                      >
-                        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {playlist.name}
-                        </p>
-                        {playlist.description && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                            {playlist.description}
-                          </p>
-                        )}
-                        {playlist.is_default && (
-                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                            デフォルト
-                          </p>
-                        )}
-                      </label>
-                    </div>
-                  );
-                })}
+                {allPlaylists.map((playlist) => (
+                  <PlaylistItemRow
+                    key={playlist.id}
+                    playlist={playlist}
+                    isSelected={selectedPlaylistIds.has(playlist.id)}
+                    isSaving={isSaving}
+                    onToggle={handleTogglePlaylist}
+                  />
+                ))}
               </div>
             )}
           </div>
