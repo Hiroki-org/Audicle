@@ -19,6 +19,20 @@ interface ReaderViewProps {
   onChunkClick?: (chunkId: string) => void;
 }
 
+
+function getDownloadButtonLabel(status: string): string {
+  switch (status) {
+    case "downloading":
+      return "音声を準備中...";
+    case "error":
+      return "再試行";
+    case "cancelled":
+      return "もう一度ダウンロード";
+    default:
+      return "全文をダウンロード";
+  }
+}
+
 export default function ReaderView({
   chunks = [],
   currentChunkId,
@@ -172,18 +186,7 @@ export default function ReaderView({
     };
   }, [chunkSignature]);
 
-  const downloadButtonLabel = useMemo(() => {
-    switch (downloadStatus) {
-      case "downloading":
-        return "音声を準備中...";
-      case "error":
-        return "再試行";
-      case "cancelled":
-        return "もう一度ダウンロード";
-      default:
-        return "全文をダウンロード";
-    }
-  }, [downloadStatus]);
+  const downloadButtonLabel = useMemo(() => getDownloadButtonLabel(downloadStatus), [downloadStatus]);
 
   return (
     <div
