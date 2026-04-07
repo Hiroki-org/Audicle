@@ -1,53 +1,44 @@
-import { checkStorageCapacity, getStorageUsage } from '../indexedDB';
+/** @jest-environment jsdom */
+import { checkStorageCapacity, getStorageUsage, clearAll } from '../indexedDB';
+
+// Setup fake-indexeddb
+import 'fake-indexeddb/auto';
+import { IDBKeyRange, IDBRequest } from 'fake-indexeddb';
+
+// polyfill IDBKeyRange in global if needed
+if (!global.IDBKeyRange) {
+    global.IDBKeyRange = IDBKeyRange as any;
+}
 
 describe('Storage Capacity Functions', () => {
-    let originalStorage: any;
-    let originalIndexedDB: any;
+    let originalNavigator: any;
 
-    beforeEach(() => {
-        jest.clearAllMocks();
-        originalStorage = global.navigator.storage;
-        originalIndexedDB = global.indexedDB;
-        Object.defineProperty(global.navigator, 'storage', {
+    beforeEach(async () => {
+        originalNavigator = global.navigator;
+        Object.defineProperty(global, 'navigator', {
             value: {
-                estimate: jest.fn()
+                storage: {
+                    estimate: jest.fn()
+                }
             },
             configurable: true
         });
+        jest.clearAllMocks();
+
+        // Clear DB state if it exists
+        try {
+            await clearAll();
+        } catch (e) {
+            // ignore if not created
+        }
     });
 
     afterEach(() => {
-        Object.defineProperty(global.navigator, 'storage', {
-            value: originalStorage,
-            configurable: true
-        });
-        Object.defineProperty(global, 'indexedDB', {
-            value: originalIndexedDB,
+        Object.defineProperty(global, 'navigator', {
+            value: originalNavigator,
             configurable: true
         });
     });
-
-    const createEmptyIndexedDBMock = () => {
-        const getAllRequest: any = { result: [] };
-        const store = {
-            getAll: jest.fn(() => {
-                queueMicrotask(() => getAllRequest.onsuccess?.({ target: getAllRequest } as any));
-                return getAllRequest;
-            })
-        };
-        const db = {
-            transaction: jest.fn(() => ({
-                objectStore: () => store
-            }))
-        };
-        return {
-            open: jest.fn(() => {
-                const request: any = { result: db };
-                queueMicrotask(() => request.onsuccess?.({ target: request } as any));
-                return request;
-            })
-        };
-    };
 
     describe('getStorageUsage', () => {
         it('returns used and available from navigator.storage.estimate if available', async () => {
@@ -61,13 +52,11 @@ describe('Storage Capacity Functions', () => {
             expect(global.navigator.storage.estimate).toHaveBeenCalledTimes(1);
         });
 
-        it('falls back to IndexedDB usage when navigator.storage is unavailable', async () => {
-            delete (global.navigator as any).storage;
-            Object.defineProperty(global, 'indexedDB', {
-                value: createEmptyIndexedDBMock(),
-                configurable: true
-            });
+        it('returns fallback from IndexedDB if navigator.storage is not available', async () => {
+            // Remove storage entirely
+            delete (global as any).navigator.storage;
 
+            // When no articles are downloaded, total size is 0
             const result = await getStorageUsage();
             expect(result).toEqual({ used: 0, available: Infinity });
         });
