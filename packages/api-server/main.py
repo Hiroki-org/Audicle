@@ -279,6 +279,8 @@ async def extract_content(request: ExtractRequest):
             status_code=500,
             detail="Failed to parse extraction result"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -349,6 +351,8 @@ async def synthesize_speech(request: SynthesizeRequest):
             headers={"Content-Disposition": "attachment; filename=speech.mp3"}
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Synthesis error: %s", str(e))
 
