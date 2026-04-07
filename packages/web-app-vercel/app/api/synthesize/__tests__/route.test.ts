@@ -55,7 +55,7 @@ describe('/api/synthesize route', () => {
     it('returns 400 if body missing text and chunks', async () => {
         (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
 
-        const req: any = { json: async () => ({}) };
+        const req: any = { json: async () => ({}), headers: { get: () => 'http://localhost' } };
         const res = await routeModule.POST(req as any);
         expect(res.status).toBe(400);
     });
@@ -63,7 +63,7 @@ describe('/api/synthesize route', () => {
     it('returns 401 when unauthenticated', async () => {
         (auth as jest.Mock).mockResolvedValue(null);
 
-        const req: any = { json: async () => ({ text: 'hello' }) };
+        const req: any = { json: async () => ({ text: 'hello' }), headers: { get: () => 'http://localhost' } };
         const res = await routeModule.POST(req as any);
         expect(res.status).toBe(401);
     });
@@ -81,7 +81,7 @@ describe('/api/synthesize route', () => {
         (getKv as jest.Mock).mockResolvedValue(null);
 
         const req: any = {
-            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' })
+            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' }), headers: { get: () => 'http://localhost' }
         };
 
         const res = await routeModule.POST(req as any);
@@ -109,7 +109,7 @@ describe('/api/synthesize route', () => {
         process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = Buffer.from(json).toString('base64');
 
         const req: any = {
-            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' })
+            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' }), headers: { get: () => 'http://localhost' }
         };
 
         const res = await routeModule.POST(req as any);
@@ -135,7 +135,7 @@ describe('/api/synthesize route', () => {
         process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = filepath;
 
         const req: any = {
-            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' })
+            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' }), headers: { get: () => 'http://localhost' }
         };
 
         const res = await routeModule.POST(req as any);
@@ -160,7 +160,7 @@ describe('/api/synthesize route', () => {
         process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = '"' + json.replace(/\n/g, '\\n') + '"';
 
         const req: any = {
-            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' })
+            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' }), headers: { get: () => 'http://localhost' }
         };
 
         const res = await routeModule.POST(req as any);
