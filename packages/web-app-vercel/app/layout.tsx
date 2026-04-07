@@ -33,7 +33,9 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  const theme = localStorage.getItem(document.currentScript.getAttribute('data-storage-key')) || document.currentScript.getAttribute('data-default-theme');
+                  const script = document.currentScript;
+                  if (!script) return;
+                  const theme = localStorage.getItem(script.getAttribute('data-storage-key')) || script.getAttribute('data-default-theme');
                   document.documentElement.setAttribute('data-theme', theme);
                   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     document.documentElement.classList.add('dark');
