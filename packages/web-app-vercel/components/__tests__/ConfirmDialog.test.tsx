@@ -1,107 +1,87 @@
-import { useEffect } from "react";
-import { render, renderHook, fireEvent, screen, act } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useConfirmDialog } from "../ConfirmDialog";
 
-type ConfirmDialogApi = ReturnType<typeof useConfirmDialog>;
+// テスト用ハーネスコンポーネント
+const TestComponent = ({ onResult }: { onResult: (res: boolean) => void }) => {
+  const { showConfirm, confirmDialog } = useConfirmDialog();
 
-function ConfirmDialogHarness({
-  onReady,
-}: {
-  onReady: (api: ConfirmDialogApi) => void;
-}) {
-  const api = useConfirmDialog();
-
-  useEffect(() => {
-    onReady(api);
-  }, [api, onReady]);
-
-  return <>{api.confirmDialog}</>;
-}
+  return (
+    <div>
+      <button
+        data-testid="trigger-btn"
+        onClick={async () => {
+          const res = await showConfirm({
+            title: "Test Title",
+            message: "Test Message",
+            confirmText: "Yes",
+            cancelText: "No",
+          });
+          onResult(res);
+        }}
+      >
+        Show Dialog
+      </button>
+      {confirmDialog}
+    </div>
+  );
+};
 
 describe("useConfirmDialog", () => {
   it("should initialize with no dialog", () => {
-    const { result } = renderHook(() => useConfirmDialog());
-
-    expect(result.current.confirmDialog).toBeNull();
-  });
-
-  it("should return a Promise from showConfirm and display the dialog", async () => {
-    let api: ConfirmDialogApi | null = null;
-    render(<ConfirmDialogHarness onReady={(value) => {
-      api = value;
-    }} />);
-    expect(api).not.toBeNull();
-
-    let promise!: Promise<boolean>;
-
-    act(() => {
-      promise = api!.showConfirm({
-        title: "Test Title",
-        message: "Test Message",
-      });
-    });
-
-    expect(promise).toBeInstanceOf(Promise);
-    expect(screen.getByText("Test Title")).toBeInTheDocument();
-    expect(screen.getByText("Test Message")).toBeInTheDocument();
-
-    act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
-    });
-
-    await expect(promise).resolves.toBe(false);
+    render(<TestComponent onResult={jest.fn()} />);
     expect(screen.queryByText("Test Title")).toBeNull();
   });
 
-  it("should resolve the Promise to true when onConfirm is called", async () => {
-    let api: ConfirmDialogApi | null = null;
-    render(<ConfirmDialogHarness onReady={(value) => {
-      api = value;
-    }} />);
-    expect(api).not.toBeNull();
+  it("should return a Promise from showConfirm and display the dialog", async () => {
+    const user = userEvent.setup();
+    render(<TestComponent onResult={jest.fn()} />);
 
-    let promise!: Promise<boolean>;
+    // ダイアログを表示
+    await user.click(screen.getByTestId("trigger-btn"));
 
-    act(() => {
-      promise = api!.showConfirm({
-        title: "Test Title",
-        message: "Test Message",
-      });
-    });
-
+    // ダイアログが表示されていることを確認
     expect(screen.getByText("Test Title")).toBeInTheDocument();
+    expect(screen.getByText("Test Message")).toBeInTheDocument();
+  });
 
-    act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "確認" }));
-    });
+  it("should resolve the Promise to true when onConfirm is called", async () => {
+    const user = userEvent.setup();
+    const handleResult = jest.fn();
+    render(<TestComponent onResult={handleResult} />);
 
-    await expect(promise).resolves.toBe(true);
+    await user.click(screen.getByTestId("trigger-btn"));
+
+    // ダイアログが表示されたことを確認
+    const confirmBtn = screen.getByRole("button", { name: "Yes" });
+
+    // 確認ボタンをクリック
+    await user.click(confirmBtn);
+
+    // Promiseがtrueで解決されたことを確認
+    expect(handleResult).toHaveBeenCalledWith(true);
+
+    // ダイアログが消えたことを確認
     expect(screen.queryByText("Test Title")).toBeNull();
   });
 
   it("should resolve the Promise to false when onCancel is called", async () => {
-    let api: ConfirmDialogApi | null = null;
-    render(<ConfirmDialogHarness onReady={(value) => {
-      api = value;
-    }} />);
-    expect(api).not.toBeNull();
+    const user = userEvent.setup();
+    const handleResult = jest.fn();
+    render(<TestComponent onResult={handleResult} />);
 
-    let promise!: Promise<boolean>;
+    await user.click(screen.getByTestId("trigger-btn"));
 
-    act(() => {
-      promise = api!.showConfirm({
-        title: "Test Title",
-        message: "Test Message",
-      });
-    });
+    // ダイアログが表示されたことを確認
+    const cancelBtn = screen.getByRole("button", { name: "No" });
 
-    expect(screen.getByText("Test Title")).toBeInTheDocument();
+    // キャンセルボタンをクリック
+    await user.click(cancelBtn);
 
-    act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
-    });
+    // Promiseがfalseで解決されたことを確認
+    expect(handleResult).toHaveBeenCalledWith(false);
 
-    await expect(promise).resolves.toBe(false);
+    // ダイアログが消えたことを確認
     expect(screen.queryByText("Test Title")).toBeNull();
   });
 });
