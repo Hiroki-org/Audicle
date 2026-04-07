@@ -16,7 +16,6 @@ const MAX_CACHE_SIZE = 50; // キャッシュする最大アイテム数
 
 export class AudioCache {
   private cache = new Map<string, CacheEntry>();
-  private static readonly MAX_CONCURRENT_PREFETCH = 3;
 
   // キャッシュキーを生成（音声モデルと再生速度を含む）
   private getCacheKey(
@@ -123,12 +122,12 @@ export class AudioCache {
     voiceModel: string = DEFAULT_VOICE,
     articleUrl?: string,
   ): Promise<void> {
-    const uniqueTexts = [...new Set(texts)];
-    logger.info(`🔄 先読み開始: ${uniqueTexts.length}件`);
+    logger.info(`🔄 先読み開始: ${texts.length}件`);
 
+    const MAX_CONCURRENT_PREFETCH = 3;
     const executing = new Set<Promise<void>>();
 
-    for (const text of uniqueTexts) {
+    for (const text of texts) {
       const p = (async () => {
         try {
           await this.get(text, voiceModel, articleUrl);
@@ -138,15 +137,15 @@ export class AudioCache {
       })();
 
       executing.add(p);
-      void p.finally(() => executing.delete(p));
+      p.then(() => executing.delete(p));
 
-      if (executing.size >= AudioCache.MAX_CONCURRENT_PREFETCH) {
+      if (executing.size >= MAX_CONCURRENT_PREFETCH) {
         await Promise.race(executing);
       }
     }
 
     await Promise.all(executing);
-    logger.success(`✅ 先読み完了: ${uniqueTexts.length}件`);
+    logger.success(`✅ 先読み完了: ${texts.length}件`);
   }
 
   // URL を解放
