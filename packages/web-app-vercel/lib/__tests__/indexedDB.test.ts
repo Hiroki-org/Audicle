@@ -2,26 +2,23 @@ import 'fake-indexeddb/auto';
 import { getAudioChunk, saveAudioChunk, clearAll, generateKey } from '../indexedDB';
 
 if (typeof global.structuredClone === 'undefined') {
-  global.structuredClone = function structuredClonePolyfill<T>(obj: T): T {
-    const cloneValue = (value: unknown): unknown => {
-      if (value instanceof Blob) {
-        return new Blob([value], { type: value.type });
+  global.structuredClone = function structuredClonePolyfill(obj: any): any {
+    if (obj instanceof Blob) {
+      return new Blob([obj], { type: obj.type });
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => structuredClonePolyfill(item));
+    }
+    if (obj !== null && typeof obj === 'object') {
+      const cloned: Record<string, any> = {};
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          cloned[key] = structuredClonePolyfill(obj[key]);
+        }
       }
-
-      if (Array.isArray(value)) {
-        return value.map((item) => cloneValue(item));
-      }
-
-      if (value && typeof value === 'object') {
-        return Object.fromEntries(
-          Object.entries(value).map(([key, nestedValue]) => [key, cloneValue(nestedValue)])
-        );
-      }
-
-      return value;
-    };
-
-    return cloneValue(obj) as T;
+      return cloned;
+    }
+    return obj;
   };
 }
 
@@ -62,6 +59,8 @@ describe('IndexedDB getAudioChunk', () => {
         expect(chunk?.voiceModel).toBe(voiceModel);
         expect(chunk?.size).toBe(testBlob.size);
         expect(chunk?.key).toBe(generateKey(articleUrl, chunkIndex, voiceModel));
+
+        // Assert audioData is still a Blob and preserves properties
         expect(chunk?.audioData).toBeInstanceOf(Blob);
         expect(chunk?.audioData.type).toBe('audio/mpeg');
         expect(chunk?.audioData.size).toBe(testBlob.size);
