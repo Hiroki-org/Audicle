@@ -11,12 +11,14 @@ function getChangedFiles() {
   const result = spawnSync('git', gitArgs, { encoding: "utf-8" });
 
   if (result.error) {
+    console.error("Failed to execute git command:", result.error);
     throw result.error;
   }
 
   if (result.status !== 0) {
-    const stderr = result.stderr?.trim() || result.stdout?.trim() || `git exited with code ${result.status}`;
-    throw new Error(`Failed to execute git command: ${stderr}`);
+    const errorMsg = `Git command exited with status ${result.status}: ${result.stderr || ''}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
 
   const output = result.stdout;
