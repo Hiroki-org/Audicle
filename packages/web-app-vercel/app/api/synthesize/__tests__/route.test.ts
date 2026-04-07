@@ -222,6 +222,7 @@ describe('/api/synthesize route', () => {
 
             (getStorageProvider as jest.Mock).mockReturnValue({
                 headObject: jest.fn().mockResolvedValue({ exists: false }),
+                uploadObject: jest.fn().mockRejectedValue(new Error('Storage error')),
             });
 
             const req: any = {
