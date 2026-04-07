@@ -230,44 +230,6 @@ function setDefaultIcon() {
   });
 }
 
-async function processBatchFetch(batch, sendResponse) {
-  try {
-    const config = await loadConfig();
-    const synthesizer = SynthesizerFactory.create(
-      config.synthesizerType,
-      config,
-    );
-
-    const results = [];
-    const concurrency = Math.max(1, config.batchSize || 3);
-    for (let i = 0; i < batch.length; i += concurrency) {
-      const chunk = batch.slice(i, i + concurrency);
-      const promises = chunk.map(async ({ index, text }) => {
-        try {
-          const audioDataUrl = await synthesizer.synthesize(text);
-          return { index, audioDataUrl };
-        } catch (error) {
-          console.error(
-            "Speech synthesis error for index",
-            index,
-            ":",
-            error,
-          );
-          return { index, error: error.message };
-        }
-      });
-      const chunkResults = await Promise.all(promises);
-      results.push(...chunkResults);
-    }
-
-    const audioDataUrls = results.filter((r) => r.audioDataUrl);
-    sendResponse({ audioDataUrls });
-  } catch (error) {
-    console.error("Speech synthesis error (batch):", error);
-    sendResponse({ error: error.message });
-  }
-}
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.command === "play") {
     loadConfig().then(async (config) => {
@@ -319,13 +281,73 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // バッチフェッチ
   if (message.command === "batchFetch") {
-    processBatchFetch(message.batch, sendResponse);
+    loadConfig().then(async (config) => {
+      const synthesizer = SynthesizerFactory.create(
+        config.synthesizerType,
+        config,
+      );
+
+      const results = [];
+      const concurrency = Math.max(1, config.batchSize || 3);
+      for (let i = 0; i < message.batch.length; i += concurrency) {
+        const chunk = message.batch.slice(i, i + concurrency);
+        const promises = chunk.map(async ({ index, text }) => {
+          try {
+            const audioDataUrl = await synthesizer.synthesize(text);
+            return { index, audioDataUrl };
+          } catch (error) {
+            console.error(
+              "Speech synthesis error for index",
+              index,
+              ":",
+              error,
+            );
+            return { index, error: error.message };
+          }
+        });
+        const chunkResults = await Promise.all(promises);
+        results.push(...chunkResults);
+      }
+      const audioDataUrls = results.filter((r) => r.audioDataUrl);
+      sendResponse({ audioDataUrls });
+    });
+
     return true;
   }
 
   // 全キュー一括フェッチ
   if (message.command === "fullBatchFetch") {
-    processBatchFetch(message.batch, sendResponse);
+    loadConfig().then(async (config) => {
+      const synthesizer = SynthesizerFactory.create(
+        config.synthesizerType,
+        config,
+      );
+
+      const results = [];
+      const concurrency = Math.max(1, config.batchSize || 3);
+      for (let i = 0; i < message.batch.length; i += concurrency) {
+        const chunk = message.batch.slice(i, i + concurrency);
+        const promises = chunk.map(async ({ index, text }) => {
+          try {
+            const audioDataUrl = await synthesizer.synthesize(text);
+            return { index, audioDataUrl };
+          } catch (error) {
+            console.error(
+              "Speech synthesis error for index",
+              index,
+              ":",
+              error,
+            );
+            return { index, error: error.message };
+          }
+        });
+        const chunkResults = await Promise.all(promises);
+        results.push(...chunkResults);
+      }
+      const audioDataUrls = results.filter((r) => r.audioDataUrl);
+      sendResponse({ audioDataUrls });
+    });
+
     return true;
   }
 
