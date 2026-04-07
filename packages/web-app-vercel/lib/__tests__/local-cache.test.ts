@@ -21,7 +21,9 @@ describe("local-cache", () => {
         const localStorageMock = (function () {
             let store: { [key: string]: string } = {};
             return {
-                getItem: jest.fn((key: string) => store[key] || null),
+                getItem: jest.fn((key: string) =>
+                    Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null
+                ),
                 setItem: jest.fn((key: string, value: string) => {
                     store[key] = value.toString();
                 }),
@@ -37,6 +39,7 @@ describe("local-cache", () => {
         })();
 
         Object.defineProperty(global, "localStorage", {
+            configurable: true,
             value: localStorageMock,
             writable: true,
         });
@@ -47,18 +50,24 @@ describe("local-cache", () => {
         jest.spyOn(console, "info").mockImplementation(() => {});
 
         originalWindow = global.window;
-        // make sure window is defined for most tests
-        // @ts-ignore
-        global.window = originalWindow || {};
+        Object.defineProperty(global, "window", {
+            configurable: true,
+            value: originalWindow || {},
+            writable: true,
+        });
     });
 
     afterEach(() => {
-        jest.clearAllMocks();
+        jest.restoreAllMocks();
         if (global.localStorage) {
              global.localStorage.clear();
         }
         if (originalWindow !== undefined) {
-             global.window = originalWindow;
+             Object.defineProperty(global, "window", {
+                 configurable: true,
+                 value: originalWindow,
+                 writable: true,
+             });
         } else {
              // @ts-ignore
              delete global.window;
@@ -84,9 +93,8 @@ describe("local-cache", () => {
         });
 
         it("should save payload to localStorage successfully", () => {
-            const originalDateNow = Date.now;
             const mockDateNow = 1234567890;
-            Date.now = jest.fn(() => mockDateNow);
+            const dateNowSpy = jest.spyOn(Date, "now").mockReturnValue(mockDateNow);
 
             setArticlesCache(mockUserId, mockData);
 
@@ -98,8 +106,7 @@ describe("local-cache", () => {
                     payload: mockData,
                 })
             );
-
-            Date.now = originalDateNow;
+            dateNowSpy.mockRestore();
         });
 
         it("should catch and warn QuotaExceededError", () => {
