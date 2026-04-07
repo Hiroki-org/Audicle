@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { checkStorageCapacity, getStorageUsage } from '../indexedDB';
 
 describe('Storage Capacity Functions', () => {
