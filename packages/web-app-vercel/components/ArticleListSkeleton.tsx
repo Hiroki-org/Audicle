@@ -3,7 +3,12 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export function ArticleListSkeleton() {
     return (
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8" data-testid="article-list-skeleton">
+        <div
+            className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8"
+            data-testid="article-list-skeleton"
+            role="status"
+            aria-label="Loading articles"
+        >
             {[...Array(5)].map((_, i) => (
                 <Card key={i} className="relative group bg-zinc-900/50 border-zinc-800" data-testid="article-skeleton-card">
                     <CardContent className="p-4 sm:p-6">
