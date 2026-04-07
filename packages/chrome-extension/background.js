@@ -239,7 +239,7 @@ async function processBatchFetch(batch, sendResponse) {
     );
 
     const results = [];
-    const concurrency = config.batchSize || 3;
+    const concurrency = Math.max(1, config.batchSize || 3);
     for (let i = 0; i < batch.length; i += concurrency) {
       const chunk = batch.slice(i, i + concurrency);
       const promises = chunk.map(async ({ index, text }) => {
