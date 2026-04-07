@@ -259,6 +259,23 @@ function setDefaultIcon() {
   });
 }
 
+async function processBatchFetch(batch, sendResponse) {
+  try {
+    const config = await loadConfig();
+    const synthesizer = SynthesizerFactory.create(
+      config.synthesizerType,
+      config,
+    );
+
+    const results = await synthesizeBatch(synthesizer, batch);
+    const audioDataUrls = results.filter((r) => r.audioDataUrl);
+    sendResponse({ audioDataUrls });
+  } catch (error) {
+    console.error("Speech synthesis error (batch):", error);
+    sendResponse({ error: error.message });
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.command === "play") {
     loadConfig().then(async (config) => {
@@ -310,33 +327,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // バッチフェッチ
   if (message.command === "batchFetch") {
-    loadConfig().then(async (config) => {
-      const synthesizer = SynthesizerFactory.create(
-        config.synthesizerType,
-        config,
-      );
-
-      const results = await synthesizeBatch(synthesizer, message.batch);
-      const audioDataUrls = results.filter((r) => r.audioDataUrl);
-      sendResponse({ audioDataUrls });
-    });
-
+    processBatchFetch(message.batch, sendResponse);
     return true;
   }
 
   // 全キュー一括フェッチ
   if (message.command === "fullBatchFetch") {
-    loadConfig().then(async (config) => {
-      const synthesizer = SynthesizerFactory.create(
-        config.synthesizerType,
-        config,
-      );
-
-      const results = await synthesizeBatch(synthesizer, message.batch);
-      const audioDataUrls = results.filter((r) => r.audioDataUrl);
-      sendResponse({ audioDataUrls });
-    });
-
+    processBatchFetch(message.batch, sendResponse);
     return true;
   }
 
