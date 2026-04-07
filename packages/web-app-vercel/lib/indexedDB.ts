@@ -6,7 +6,7 @@
  * データベース構造:
  * - DB名: audicle-cache
  * - Store名: audio-chunks
- * - キー: `${articleUrl}:${chunkIndex}:${voiceModel}`
+ * - キー: `${encodeURIComponent(articleUrl)}:${chunkIndex}:${encodeURIComponent(voiceModel)}`
  */
 
 import { logger } from './logger';
@@ -19,7 +19,7 @@ const DB_VERSION = 1;
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 export interface AudioCacheEntry {
-    key: string; // `${articleUrl}:${chunkIndex}:${voiceModel}`
+    key: string; // `${encodeURIComponent(articleUrl)}:${chunkIndex}:${encodeURIComponent(voiceModel)}`
     audioData: Blob; // 音声データ（Blob形式）
     timestamp: number; // 保存日時
     articleUrl: string;
@@ -46,7 +46,7 @@ export function generateKey(
     chunkIndex: number,
     voiceModel?: string
 ): string {
-    return `${articleUrl}:${chunkIndex}:${voiceModel || 'default'}`;
+    return `${encodeURIComponent(articleUrl)}:${chunkIndex}:${encodeURIComponent(voiceModel || 'default')}`;
 }
 
 /**
