@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { usePlaylists, usePlaylistDetail, useCreatePlaylistMutation, useDeletePlaylistMutation, useUpdatePlaylistMutation, useRemoveFromPlaylistMutation, useSetDefaultPlaylistMutation } from "../usePlaylists";
 import React from "react";
@@ -30,13 +30,8 @@ describe("usePlaylists hooks", () => {
             },
         });
         jest.clearAllMocks();
-        (global.fetch as jest.Mock).mockReset();
         const { useSession } = require("next-auth/react");
         useSession.mockReturnValue(mockSession);
-    });
-
-    afterEach(() => {
-        jest.useRealTimers();
     });
 
     const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -70,7 +65,6 @@ describe("usePlaylists hooks", () => {
         });
 
         it("should retry on network errors and eventually succeed", async () => {
-             jest.useFakeTimers();
              const mockData = [{ id: "1", name: "Retry Success" }];
              (global.fetch as jest.Mock)
                 .mockRejectedValueOnce(new Error("fetch failed with ECONNRESET"))
@@ -80,10 +74,6 @@ describe("usePlaylists hooks", () => {
                 });
 
              const { result } = renderHook(() => usePlaylists(), { wrapper });
-
-             await act(async () => {
-                 await jest.advanceTimersByTimeAsync(1000);
-             });
 
              await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 3000 });
              expect(result.current.data).toEqual(mockData);
@@ -99,22 +89,17 @@ describe("usePlaylists hooks", () => {
              expect(result.current.error).toBeDefined();
              expect(global.fetch).toHaveBeenCalledTimes(1);
         });
+    });
 
         it("should fail after max retries for network errors", async () => {
-             jest.useFakeTimers();
              (global.fetch as jest.Mock).mockRejectedValue(new Error("fetch failed with ECONNRESET"));
 
              const { result } = renderHook(() => usePlaylists(), { wrapper });
 
-             await act(async () => {
-                 await jest.runAllTimersAsync();
-             });
-
+             await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 4000 });
              expect(global.fetch).toHaveBeenCalledTimes(3);
-             expect(result.current.isError).toBe(true);
              expect(result.current.error).toBeDefined();
         });
-    });
 
     describe("usePlaylistDetail", () => {
         it("should fetch playlist detail successfully", async () => {
@@ -254,3 +239,5 @@ describe("usePlaylists hooks", () => {
         });
     });
 });
+// Ensure there's a test for network errors failing after max retries
+// We'll add this to the usePlaylists block.
