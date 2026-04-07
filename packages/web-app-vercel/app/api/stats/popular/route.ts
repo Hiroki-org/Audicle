@@ -115,7 +115,6 @@ export async function GET(request: NextRequest) {
 
         // レスポンスの整形
         const articles: PopularArticle[] = (data || []).map((row) => {
-
             return {
                 articleId: row.article_id || row.article_hash,
                 articleHash: row.article_hash,
