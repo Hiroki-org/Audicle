@@ -8,7 +8,7 @@ describe('generateKey', () => {
 
         const result = generateKey(articleUrl, chunkIndex, voiceModel);
 
-        expect(result).toBe('https://example.com/article:5:en-US-Neural2-F');
+        expect(result).toBe(`${encodeURIComponent(articleUrl)}:5:${encodeURIComponent(voiceModel)}`);
     });
 
     it('should generate a key with default voiceModel when not provided', () => {
@@ -17,7 +17,7 @@ describe('generateKey', () => {
 
         const result = generateKey(articleUrl, chunkIndex);
 
-        expect(result).toBe('https://example.com/article:2:default');
+        expect(result).toBe(`${encodeURIComponent(articleUrl)}:2:default`);
     });
 
     it('should generate a key with default voiceModel when provided as an empty string', () => {
@@ -27,7 +27,7 @@ describe('generateKey', () => {
 
         const result = generateKey(articleUrl, chunkIndex, voiceModel);
 
-        expect(result).toBe('https://example.com/article:0:default');
+        expect(result).toBe(`${encodeURIComponent(articleUrl)}:0:default`);
     });
 
     it('should handle complex URLs and different index values', () => {
@@ -37,6 +37,6 @@ describe('generateKey', () => {
 
         const result = generateKey(articleUrl, chunkIndex, voiceModel);
 
-        expect(result).toBe('https://example.com/path/to/article?param1=value1&param2=value2#hash:999:ja-JP-Standard-A');
+        expect(result).toBe(`${encodeURIComponent(articleUrl)}:999:${encodeURIComponent(voiceModel)}`);
     });
 });

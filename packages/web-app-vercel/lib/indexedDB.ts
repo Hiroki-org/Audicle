@@ -46,7 +46,8 @@ export function generateKey(
     chunkIndex: number,
     voiceModel?: string
 ): string {
-    return `${articleUrl}:${chunkIndex}:${voiceModel || 'default'}`;
+    const normalizedVoiceModel = voiceModel || 'default';
+    return `${encodeURIComponent(articleUrl)}:${chunkIndex}:${encodeURIComponent(normalizedVoiceModel)}`;
 }
 
 /**
