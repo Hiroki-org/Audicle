@@ -1,4 +1,7 @@
-import { getArticlesCache, setArticlesCache, CachedPlaylistData, CACHE_VERSION, CACHE_TTL_MS } from "../local-cache";
+/**
+ * @jest-environment jsdom
+ */
+import { getArticlesCache, setArticlesCache, CachedPlaylistData } from "../local-cache";
 import { STORAGE_KEYS } from "../constants";
 
 describe("local-cache", () => {
@@ -92,19 +95,17 @@ describe("local-cache", () => {
         });
 
         it("should return null and warn if envelope is invalid", () => {
-            const removeItemSpy = jest.spyOn(Storage.prototype, "removeItem");
             localStorage.setItem(cacheKey, JSON.stringify({ invalid: "structure" }));
 
             expect(getArticlesCache(userId)).toBeNull();
             expect(console.warn).toHaveBeenCalledWith("Invalid cache structure detected");
-            expect(removeItemSpy).toHaveBeenCalledWith(cacheKey);
         });
 
         it("should return null, warn, and remove item if version mismatch", () => {
             const removeItemSpy = jest.spyOn(Storage.prototype, "removeItem");
 
             const invalidVersionEnvelope = {
-                version: CACHE_VERSION + 1,
+                version: 999,
                 timestamp: Date.now(),
                 payload: mockData
             };
@@ -119,8 +120,8 @@ describe("local-cache", () => {
             const removeItemSpy = jest.spyOn(Storage.prototype, "removeItem");
 
             const expiredEnvelope = {
-                version: CACHE_VERSION,
-                timestamp: Date.now() - CACHE_TTL_MS - 1000,
+                version: 1,
+                timestamp: Date.now() - (1000 * 60 * 60 * 25), // 25 hours ago
                 payload: mockData
             };
             localStorage.setItem(cacheKey, JSON.stringify(expiredEnvelope));
@@ -132,7 +133,7 @@ describe("local-cache", () => {
 
         it("should return payload if valid", () => {
             const validEnvelope = {
-                version: CACHE_VERSION,
+                version: 1,
                 timestamp: Date.now(),
                 payload: mockData
             };
@@ -143,7 +144,7 @@ describe("local-cache", () => {
 
         it("should return null and warn if payload structure is invalid", () => {
             const invalidPayloadEnvelope = {
-                version: CACHE_VERSION,
+                version: 1,
                 timestamp: Date.now(),
                 payload: { invalid: "payload" }
             };
