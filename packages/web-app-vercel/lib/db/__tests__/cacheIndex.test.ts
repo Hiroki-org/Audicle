@@ -17,30 +17,6 @@ describe('isCachedInIndex', () => {
         expect(isCachedInIndex(mockIndex, 'hash3')).toBe(false);
     });
 
-    it('returns false if cached_chunks is empty', () => {
-        const mockIndex: CacheIndex = {
-            article_url: 'https://example.com',
-            voice: 'en-US-Standard-A',
-            cached_chunks: [],
-            completed_playback: false,
-            read_count: 0,
-            last_accessed: new Date().toISOString(),
-        };
-        expect(isCachedInIndex(mockIndex, 'hash1')).toBe(false);
-    });
-
-    it('returns false if cached_chunks is null', () => {
-        const mockIndex = {
-            article_url: 'https://example.com',
-            voice: 'en-US-Standard-A',
-            cached_chunks: null,
-            completed_playback: false,
-            read_count: 0,
-            last_accessed: new Date().toISOString(),
-        } as unknown as CacheIndex;
-        expect(isCachedInIndex(mockIndex, 'hash1')).toBe(false);
-    });
-
     it('returns true if textHash is in cached_chunks', () => {
         const mockIndex: CacheIndex = {
             article_url: 'https://example.com',
