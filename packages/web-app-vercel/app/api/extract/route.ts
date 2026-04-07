@@ -219,17 +219,19 @@ async function fetchWithTimeout(
           },
         },
       });
-      const requestInit: RequestInit & { dispatcher: Agent; duplex: "half" } = {
+      // Use standard fetch (which now respects global dispatcher in Node 18+)
+      const response = await fetch(currentUrl, {
         signal: controller.signal,
-        redirect: "manual",
+        redirect: "manual", // 自動リダイレクトを無効化
+        // @ts-ignore - undici agent dispatcher
         dispatcher: agent,
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         },
+        // @ts-ignore - duplex is needed for some fetch implementations but not in standard type
         duplex: "half",
-      };
-      const response = await fetch(currentUrl, requestInit);
+      });
 
       // 認証が必要なサイトの場合は専用エラーをスロー
       if (response.status === 401 || response.status === 403) {

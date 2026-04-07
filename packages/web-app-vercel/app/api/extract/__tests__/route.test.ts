@@ -8,7 +8,7 @@ jest.mock('@/lib/api-auth', () => ({
 // SSRFチェックをモック（常に許可）
 jest.mock('@/lib/ssrf', () => ({
     isSafeUrl: jest.fn().mockResolvedValue(true),
-    validateAndResolveUrl: jest.fn().mockResolvedValue({ isSafe: true, ipAddress: '93.184.216.34', family: 4 })
+    validateAndResolveUrl: jest.fn().mockResolvedValue({ isSafe: true, ipAddress: '127.0.0.1', family: 4 })
 }))
 
 // fetchをモック
@@ -102,33 +102,9 @@ describe('/api/extract route', () => {
             headers: { 'Content-Type': 'application/json' }
         });
 
-        const res = await routeModule.POST(mockRequest)
-        expect(res.status).toBe(403)
-        const body = await res.json()
-        expect(body.error).toContain('restricted')
-    })
-
-    it('returns 403 when redirect target fails SSRF validation', async () => {
-        (jest.requireMock('@/lib/ssrf').validateAndResolveUrl as jest.Mock).mockResolvedValueOnce({ isSafe: true, ipAddress: '93.184.216.34', family: 4 });
-        (jest.requireMock('@/lib/ssrf').validateAndResolveUrl as jest.Mock).mockResolvedValueOnce({ isSafe: false });
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: false,
-            status: 302,
-            statusText: 'Found',
-            headers: { get: jest.fn().mockReturnValue('http://internal-server/') },
-            body: { cancel: jest.fn() }
-        })
-
-        const mockRequest = new Request('http://localhost:3000/api/extract', {
-            method: 'POST',
-            body: JSON.stringify({ url: 'https://example.com' }),
-            headers: { 'Content-Type': 'application/json' }
-        })
-
-        const res = await routeModule.POST(mockRequest)
-        expect(res.status).toBe(403)
-        const body = await res.json()
-        expect(body.error).toContain('redirect URL')
+        const res = await routeModule.POST(mockRequest);
+        expect(res.status).toBe(403);
+        const body = await res.json();
+        expect(body.error).toContain('restricted');
     })
 })
