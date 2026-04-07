@@ -103,5 +103,5 @@ export function isCachedInIndex(
     index: CacheIndex | null,
     textHash: string
 ): boolean {
-    return index?.cached_chunks.includes(textHash) ?? false;
+    return index?.cached_chunks?.includes(textHash) ?? false;
 }
