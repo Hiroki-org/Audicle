@@ -1,162 +1,178 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Readability } from '@mozilla/readability';
-import { normalizeArticleText } from '@/lib/parseArticle';
-import { parseHTML } from 'linkedom';
-import { ExtractResponse } from '@/types/api';
-import { isSafeUrl } from '@/lib/ssrf';
+import { NextRequest, NextResponse } from "next/server";
+import { Readability } from "@mozilla/readability";
+import { normalizeArticleText } from "@/lib/parseArticle";
+import { parseHTML } from "linkedom";
+import { ExtractResponse } from "@/types/api";
+import { validateAndResolveUrl } from "@/lib/ssrf";
+import { Agent } from "undici";
 
 // Node.js runtimeを明示的に指定（JSDOMはEdge Runtimeで動作しない）
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 // 動的レンダリングを強制（キャッシュを無効化）
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function OPTIONS() {
-    return NextResponse.json({}, {
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        },
-    });
+  return NextResponse.json(
+    {},
+    {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    },
+  );
 }
 
 export async function POST(request: NextRequest) {
-    console.log('[Extract API] POST request received');
+  console.log("[Extract API] POST request received");
 
-    const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  try {
+    const { url } = await request.json();
+    console.log("[Extract API] Extracting content from:", url);
+
+    if (!url || typeof url !== "string") {
+      return NextResponse.json(
+        { error: "URL is required" },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    // URLのバリデーション
+    try {
+      new URL(url);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid URL format" },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    // SSRFチェック (initial check)
+    const validatedUrl = await validateAndResolveUrl(url);
+    if (!validatedUrl.isSafe || !validatedUrl.ipAddress) {
+      console.warn("[Extract API] SSRF attempt blocked:", url);
+      return NextResponse.json(
+        { error: "Access to this URL is restricted for security reasons" },
+        { status: 403, headers: corsHeaders },
+      );
+    }
+
+    // HTMLを取得 (with secure redirect handling)
+    const html = await fetchWithTimeout(
+      url,
+      validatedUrl.ipAddress,
+      validatedUrl.family,
+    );
+
+    // linkedomでパース
+    const { document } = parseHTML(html);
+
+    // Readabilityで本文抽出
+    const article = new Readability(document).parse();
+
+    if (!article) {
+      return NextResponse.json(
+        { error: "Failed to extract content from URL" },
+        { status: 422, headers: corsHeaders },
+      );
+    }
+
+    // テキストコンテンツの取得（重複やUIテキスト混入を防ぐため normalizeArticleText を利用）
+    const textContent =
+      normalizeArticleText(article.content || "") || article.textContent || "";
+
+    const response: ExtractResponse = {
+      title: article.title || "",
+      content: article.content || textContent,
+      textLength: textContent.length,
+      author: article.byline || undefined,
+      siteName: article.siteName || undefined,
     };
 
-    try {
-        const { url } = await request.json();
-        console.log('[Extract API] Extracting content from:', url);
+    console.log("[Extract API] Successfully extracted:", {
+      title: response.title,
+      textLength: response.textLength,
+    });
 
-        if (!url || typeof url !== 'string') {
-            return NextResponse.json(
-                { error: 'URL is required' },
-                { status: 400, headers: corsHeaders }
-            );
-        }
+    return NextResponse.json(response, {
+      headers: corsHeaders,
+    });
+  } catch (error) {
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
 
-        // URLのバリデーション
-        try {
-            new URL(url);
-        } catch {
-            return NextResponse.json(
-                { error: 'Invalid URL format' },
-                { status: 400, headers: corsHeaders }
-            );
-        }
-
-        // SSRFチェック (initial check)
-        if (!(await isSafeUrl(url))) {
-            console.warn('[Extract API] SSRF attempt blocked:', url);
-            return NextResponse.json(
-                { error: 'Access to this URL is restricted for security reasons' },
-                { status: 403, headers: corsHeaders }
-            );
-        }
-
-        // HTMLを取得 (with secure redirect handling)
-        const html = await fetchWithTimeout(url);
-
-        // linkedomでパース
-        const { document } = parseHTML(html);
-
-        // Readabilityで本文抽出
-        const article = new Readability(document).parse();
-
-        if (!article) {
-            return NextResponse.json(
-                { error: 'Failed to extract content from URL' },
-                { status: 422, headers: corsHeaders }
-            );
-        }
-
-        // テキストコンテンツの取得（重複やUIテキスト混入を防ぐため normalizeArticleText を利用）
-        const textContent = normalizeArticleText(article.content || '') || (article.textContent || '');
-
-        const response: ExtractResponse = {
-            title: article.title || '',
-            content: article.content || textContent,
-            textLength: textContent.length,
-            author: article.byline || undefined,
-            siteName: article.siteName || undefined,
-        };
-
-        console.log('[Extract API] Successfully extracted:', {
-            title: response.title,
-            textLength: response.textLength,
-        });
-
-        return NextResponse.json(response, {
-            headers: corsHeaders,
-        });
-    } catch (error) {
-        const corsHeaders = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        };
-
-        if (error instanceof SyntaxError) {
-            return NextResponse.json(
-                { error: 'Invalid request body' },
-                { status: 400, headers: corsHeaders }
-            );
-        }
-
-        if (error instanceof TimeoutError) {
-            return NextResponse.json(
-                { error: 'Request timeout - URL took too long to fetch' },
-                { status: 408, headers: corsHeaders }
-            );
-        }
-
-        if (error instanceof AuthenticationRequiredError) {
-            return NextResponse.json(
-                { error: 'このURLは認証が必要なサイトです。ログインが必要なページは読み込めません。' },
-                { status: error.statusCode, headers: corsHeaders }
-            );
-        }
-
-        if (error instanceof SSRFBlockedError) {
-            return NextResponse.json(
-                { error: 'Access to the redirect URL is restricted for security reasons' },
-                { status: 403, headers: corsHeaders }
-            );
-        }
-
-        if (error instanceof TooManyRedirectsError) {
-            return NextResponse.json(
-                { error: 'Too many redirects' },
-                { status: 400, headers: corsHeaders }
-            );
-        }
-
-        console.error('Extract error:', error);
-        return NextResponse.json(
-            { error: 'Failed to extract content' },
-            { status: 500, headers: corsHeaders }
-        );
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400, headers: corsHeaders },
+      );
     }
+
+    if (error instanceof TimeoutError) {
+      return NextResponse.json(
+        { error: "Request timeout - URL took too long to fetch" },
+        { status: 408, headers: corsHeaders },
+      );
+    }
+
+    if (error instanceof AuthenticationRequiredError) {
+      return NextResponse.json(
+        {
+          error:
+            "このURLは認証が必要なサイトです。ログインが必要なページは読み込めません。",
+        },
+        { status: error.statusCode, headers: corsHeaders },
+      );
+    }
+
+    if (error instanceof SSRFBlockedError) {
+      return NextResponse.json(
+        {
+          error:
+            "Access to the redirect URL is restricted for security reasons",
+        },
+        { status: 403, headers: corsHeaders },
+      );
+    }
+
+    if (error instanceof TooManyRedirectsError) {
+      return NextResponse.json(
+        { error: "Too many redirects" },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    console.error("Extract error:", error);
+    return NextResponse.json(
+      { error: "Failed to extract content" },
+      { status: 500, headers: corsHeaders },
+    );
+  }
 }
 
 // Configure undici agent for custom fetch behavior
 // In test/CI environments, we might need to ignore SSL errors for internal services or proxies
-import { Agent, setGlobalDispatcher, getGlobalDispatcher } from 'undici';
+import { setGlobalDispatcher } from "undici";
 
 // Initialize global dispatcher if needed (safe to call multiple times)
 // This ensures fetch uses our custom agent settings
-if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
-    const agent = new Agent({
-        connect: {
-            rejectUnauthorized: false
-        }
-    });
-    setGlobalDispatcher(agent);
+if (process.env.NODE_ENV === "test" || process.env.CI === "true") {
+  const agent = new Agent({
+    connect: {
+      rejectUnauthorized: false,
+    },
+  });
+  setGlobalDispatcher(agent);
 }
 
 /**
@@ -165,106 +181,143 @@ if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
  *
  * NOTE: SSRF保護のため、リダイレクトは手動で処理し、ホップごとに `isSafeUrl` をチェックします。
  */
-async function fetchWithTimeout(url: string, timeout: number = 8000): Promise<string> {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    const maxRedirects = 5;
-    let currentUrl = url;
-    let redirectCount = 0;
+async function fetchWithTimeout(
+  url: string,
+  validatedIp: string,
+  validatedFamily?: number,
+  timeout: number = 8000,
+): Promise<string> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  const maxRedirects = 5;
+  let currentUrl = url;
+  let redirectCount = 0;
 
-    try {
-        while (redirectCount < maxRedirects) {
-            // Use standard fetch (which now respects global dispatcher in Node 18+)
-            const response = await fetch(currentUrl, {
-                signal: controller.signal,
-                redirect: 'manual', // 自動リダイレクトを無効化
-                headers: {
-                    'User-Agent':
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                },
-                // @ts-ignore - duplex is needed for some fetch implementations but not in standard type
-                duplex: 'half', 
-            });
+  try {
+    let currentIp = validatedIp;
+    let currentFamily = validatedFamily;
+    while (redirectCount < maxRedirects) {
+      const currentHostname = new URL(currentUrl).hostname;
 
-            // 認証が必要なサイトの場合は専用エラーをスロー
-            if (response.status === 401 || response.status === 403) {
-                throw new AuthenticationRequiredError(
-                    `このURLには認証が必要です（HTTP ${response.status}）`,
-                    response.status
-                );
+      // Create a custom agent for this request to use the validated IP
+      const agent = new Agent({
+        connect: {
+          lookup: (hostname, options, callback) => {
+            if (hostname === currentHostname) {
+              callback(null, [
+                { address: currentIp, family: currentFamily || 4 },
+              ]);
+            } else {
+              // Fallback for other domains (shouldn't be needed for the main request, but just in case)
+              import("dns").then((dns) => {
+                dns.lookup(hostname, options, (err, address, family) => {
+                  if (err) return callback(err, []);
+                  callback(null, [{ address, family }]);
+                });
+              });
             }
+          },
+        },
+      });
+      // Use standard fetch (which now respects global dispatcher in Node 18+)
+      const response = await fetch(currentUrl, {
+        signal: controller.signal,
+        redirect: "manual", // 自動リダイレクトを無効化
+        // @ts-ignore - undici agent dispatcher
+        dispatcher: agent,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        },
+        // @ts-ignore - duplex is needed for some fetch implementations but not in standard type
+        duplex: "half",
+      });
 
-            // リダイレクト処理
-            if (response.status >= 300 && response.status < 400) {
-                // レスポンスボディを破棄してリソースを解放
-                // biome-ignore lint/suspicious/noExplicitAny: response.body might be missing in some environments
-                await response.body?.cancel();
+      // 認証が必要なサイトの場合は専用エラーをスロー
+      if (response.status === 401 || response.status === 403) {
+        throw new AuthenticationRequiredError(
+          `このURLには認証が必要です（HTTP ${response.status}）`,
+          response.status,
+        );
+      }
 
-                const location = response.headers.get('Location');
-                if (!location) {
-                    throw new Error(`HTTP ${response.status} Redirect without Location header`);
-                }
+      // リダイレクト処理
+      if (response.status >= 300 && response.status < 400) {
+        // レスポンスボディを破棄してリソースを解放
+        // biome-ignore lint/suspicious/noExplicitAny: response.body might be missing in some environments
+        await response.body?.cancel();
 
-                // 相対パスの場合は絶対パスに変換
-                const nextUrlObj = new URL(location, currentUrl);
-                const nextUrl = nextUrlObj.toString();
-
-                // SSRFチェック（リダイレクト先もチェック）
-                if (!(await isSafeUrl(nextUrl))) {
-                    console.warn('[Extract API] Blocked unsafe redirect to:', nextUrl);
-                    throw new SSRFBlockedError('Access to the redirect URL is restricted for security reasons');
-                }
-
-                currentUrl = nextUrl;
-                redirectCount++;
-                continue;
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            return await response.text();
+        const location = response.headers.get("Location");
+        if (!location) {
+          throw new Error(
+            `HTTP ${response.status} Redirect without Location header`,
+          );
         }
 
-        throw new TooManyRedirectsError('Too many redirects');
+        // 相対パスの場合は絶対パスに変換
+        const nextUrlObj = new URL(location, currentUrl);
+        const nextUrl = nextUrlObj.toString();
 
-    } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-            throw new TimeoutError('Fetch timeout');
+        // SSRFチェック（リダイレクト先もチェック）
+        const validatedRedirectUrl = await validateAndResolveUrl(nextUrl);
+        if (!validatedRedirectUrl.isSafe || !validatedRedirectUrl.ipAddress) {
+          console.warn("[Extract API] Blocked unsafe redirect to:", nextUrl);
+          throw new SSRFBlockedError(
+            "Access to the redirect URL is restricted for security reasons",
+          );
         }
-        throw error;
-    } finally {
-        clearTimeout(id);
+        currentIp = validatedRedirectUrl.ipAddress;
+        currentFamily = validatedRedirectUrl.family;
+
+        currentUrl = nextUrl;
+        redirectCount++;
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.text();
     }
+
+    throw new TooManyRedirectsError("Too many redirects");
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new TimeoutError("Fetch timeout");
+    }
+    throw error;
+  } finally {
+    clearTimeout(id);
+  }
 }
 
 class TimeoutError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'TimeoutError';
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = "TimeoutError";
+  }
 }
 
 class AuthenticationRequiredError extends Error {
-    statusCode: number;
-    constructor(message: string, statusCode: number = 403) {
-        super(message);
-        this.name = 'AuthenticationRequiredError';
-        this.statusCode = statusCode;
-    }
+  statusCode: number;
+  constructor(message: string, statusCode: number = 403) {
+    super(message);
+    this.name = "AuthenticationRequiredError";
+    this.statusCode = statusCode;
+  }
 }
 
 class SSRFBlockedError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'SSRFBlockedError';
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = "SSRFBlockedError";
+  }
 }
 
 class TooManyRedirectsError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'TooManyRedirectsError';
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = "TooManyRedirectsError";
+  }
 }
