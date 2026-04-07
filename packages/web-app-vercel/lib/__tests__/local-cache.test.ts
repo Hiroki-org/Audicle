@@ -1,45 +1,21 @@
 /** @jest-environment node */
-import { getArticlesCache, setArticlesCache, CachedPlaylistData, CACHE_VERSION, CACHE_TTL_MS } from '../local-cache';
+import { getArticlesCache, setArticlesCache, CachedPlaylistData } from '../local-cache';
 import { STORAGE_KEYS } from '../constants';
 
 // Mock localStorage
 const localStorageMock = (() => {
     let store: Record<string, string> = {};
-    const getItem = jest.fn((key: string) => store[key] ?? null);
-    const setItem = jest.fn((key: string, value: string) => {
-        store[key] = value;
-    });
-    const removeItem = jest.fn((key: string) => {
-        delete store[key];
-    });
-    const clear = jest.fn(() => {
-        store = {};
-    });
-    const reset = () => {
-        getItem.mockReset();
-        setItem.mockReset();
-        removeItem.mockReset();
-        clear.mockReset();
-
-        getItem.mockImplementation((key: string) => store[key] ?? null);
-        setItem.mockImplementation((key: string, value: string) => {
-            store[key] = value;
-        });
-        removeItem.mockImplementation((key: string) => {
-            delete store[key];
-        });
-        clear.mockImplementation(() => {
-            store = {};
-        });
-    };
-
-    reset();
     return {
-        getItem,
-        setItem,
-        removeItem,
-        clear,
-        reset,
+        getItem: jest.fn((key: string) => store[key] || null),
+        setItem: jest.fn((key: string, value: string) => {
+            store[key] = value;
+        }),
+        removeItem: jest.fn((key: string) => {
+            delete store[key];
+        }),
+        clear: jest.fn(() => {
+            store = {};
+        }),
     };
 })();
 
@@ -58,6 +34,8 @@ Object.defineProperty(global, 'localStorage', {
 describe('local-cache', () => {
     const mockUserId = 'user123';
     const cacheKey = `${STORAGE_KEYS.ARTICLES_CACHE}-${mockUserId}`;
+    const CACHE_VERSION = 1;
+    const CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 
     const validPayload: CachedPlaylistData = {
         playlistId: 'playlist1',
@@ -67,7 +45,6 @@ describe('local-cache', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        localStorageMock.reset();
         localStorageMock.clear();
         jest.spyOn(console, 'warn').mockImplementation(() => {});
         jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -94,19 +71,6 @@ describe('local-cache', () => {
             localStorageMock.setItem(cacheKey, JSON.stringify({ invalid: 'data' }));
             expect(getArticlesCache(mockUserId)).toBeNull();
             expect(console.warn).toHaveBeenCalledWith('Invalid cache structure detected');
-            expect(localStorageMock.removeItem).toHaveBeenCalledWith(cacheKey);
-        });
-
-        it('should return null without touching localStorage when window is undefined', () => {
-            const originalWindow = global.window;
-            (global as any).window = undefined;
-
-            try {
-                expect(getArticlesCache(mockUserId)).toBeNull();
-                expect(localStorageMock.getItem).not.toHaveBeenCalled();
-            } finally {
-                (global as any).window = originalWindow;
-            }
         });
 
         it('should return null, warn, and clear cache when version mismatches', () => {

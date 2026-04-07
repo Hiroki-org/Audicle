@@ -293,39 +293,26 @@ async function seedTestData() {
     }
 
     // 既存記事を更新
-    if (toUpdate.length > 0) {
-        const batchUpdateData = toUpdate.map((article) => {
-            const key = article.owner_email + "||" + article.url;
-            const existing = existingMap.get(key);
+    for (const article of toUpdate) {
+        const key = article.owner_email + "||" + article.url;
+        const existing = existingMap.get(key);
+        if (existing) {
+            const { data: updated, error: updateError } = await supabase
+                .from("articles")
+                .update({
+                    owner_email: article.owner_email,
+                    title: article.title,
+                    thumbnail_url: article.thumbnail_url,
+                })
+                .eq("id", existing.id)
+                .select()
+                .single();
 
-            if (!existing) {
-                // This shouldn't happen due to the logic above, but added for safety and TS
-                return null;
+            if (updateError) {
+                console.error("記事の更新に失敗:", updateError);
+                process.exit(1);
             }
-
-            return {
-                id: existing.id,
-                owner_email: article.owner_email,
-                title: article.title,
-                thumbnail_url: article.thumbnail_url,
-                url: article.url, // required if we are mapping createdArticlesMap with url below
-            };
-        }).filter((item) => item !== null) as { id: string; owner_email: string; title: string; thumbnail_url: string; url: string }[];
-
-        const { data: updatedItems, error: updateError } = await supabase
-            .from("articles")
-            .upsert(batchUpdateData, { onConflict: "id" })
-            .select();
-
-        if (updateError) {
-            console.error("記事の更新に失敗:", updateError);
-            process.exit(1);
-        }
-
-        if (updatedItems) {
-            for (const updated of updatedItems) {
-                createdArticlesMap.set(updated.owner_email + "||" + updated.url, updated as Article);
-            }
+            if (updated) createdArticlesMap.set(updated.owner_email + "||" + updated.url, updated as Article);
         }
     }
 

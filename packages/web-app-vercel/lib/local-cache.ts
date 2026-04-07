@@ -13,9 +13,9 @@ interface CacheEnvelope {
     payload: CachedPlaylistData;
 }
 
-export const CACHE_VERSION = 1;
+const CACHE_VERSION = 1;
 // Default TTL: 24 hours
-export const CACHE_TTL_MS = 1000 * 60 * 60 * 24;
+const CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 
 export function getArticlesCache(userId: string): CachedPlaylistData | null {
     if (typeof window === "undefined" || !userId) return null;
@@ -28,7 +28,6 @@ export function getArticlesCache(userId: string): CachedPlaylistData | null {
 
         if (!isValidEnvelope(parsed)) {
             console.warn("Invalid cache structure detected");
-            try { localStorage.removeItem(key); } catch { }
             return null;
         }
 

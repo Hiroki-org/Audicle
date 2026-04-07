@@ -87,6 +87,32 @@ export function useDownload({ articleUrl, chunks, voiceModel, speed, onSlowConne
     }, [articleUrl, voiceModel, chunks]);
 
     /**
+     * バッチでチャンクをダウンロード
+     */
+    const downloadBatch = useCallback(async (
+        chunksToDownload: Chunk[],
+        startIndex: number
+    ): Promise<void> => {
+        const promises: Promise<void>[] = [];
+
+        for (let i = 0; i < Math.min(MAX_CONCURRENT, chunksToDownload.length); i++) {
+            const chunk = chunksToDownload[i];
+            const index = startIndex + i;
+            promises.push(downloadChunk(chunk, index));
+        }
+
+        await Promise.all(promises);
+
+        // 次のバッチを処理
+        if (chunksToDownload.length > MAX_CONCURRENT) {
+            await downloadBatch(
+                chunksToDownload.slice(MAX_CONCURRENT),
+                startIndex + MAX_CONCURRENT
+            );
+        }
+    }, [downloadChunk]);
+
+    /**
      * 推定残り時間を更新
      */
     const updateEstimatedTime = useCallback((current: number, total: number) => {
@@ -146,40 +172,31 @@ export function useDownload({ articleUrl, chunks, voiceModel, speed, onSlowConne
         try {
             logger.info(`ダウンロード開始: ${chunks.length}チャンク`);
 
-            let currentIndex = 0;
-            let completedCount = 0;
-            let hasError = false;
-
-            // ワーカープールパターンの実装
-            const workers = Array.from({ length: Math.min(MAX_CONCURRENT, chunks.length) }, async () => {
-                while (currentIndex < chunks.length && !cancelledRef.current && !hasError) {
-                    const chunkIndex = currentIndex++;
-                    const chunk = chunks[chunkIndex];
-
-                    try {
-                        await downloadChunk(chunk, chunkIndex);
-
-                        if (cancelledRef.current) break;
-
-                        completedCount++;
-                        setProgress({ current: completedCount, total: chunks.length });
-                        updateEstimatedTime(completedCount, chunks.length);
-                    } catch (err) {
-                        hasError = true;
-                        throw err; // Promise.allでキャッチされるようにする
-                    }
+            // チャンクを順次ダウンロード（バッチ処理）
+            for (let i = 0; i < chunks.length; i += MAX_CONCURRENT) {
+                if (cancelledRef.current) {
+                    setStatus('cancelled');
+                    logger.info('ダウンロードがキャンセルされました');
+                    return;
                 }
-            });
 
-            await Promise.all(workers);
+                const batch = chunks.slice(i, i + MAX_CONCURRENT);
+                await downloadBatch(batch, i);
 
-            if (cancelledRef.current) {
-                setStatus('cancelled');
-                logger.info('ダウンロードがキャンセルされました');
-            } else {
-                setStatus('completed');
-                logger.success(`全${chunks.length}チャンクのダウンロードが完了しました`);
+                // バッチ完了後にもキャンセルチェック
+                 if (cancelledRef.current) {
+                    setStatus('cancelled');
+                    logger.info('ダウンロードがキャンセルされました');
+                    return;
+                }
+
+                const current = Math.min(i + MAX_CONCURRENT, chunks.length);
+                setProgress({ current, total: chunks.length });
+                updateEstimatedTime(current, chunks.length);
             }
+
+            setStatus('completed');
+            logger.success(`全${chunks.length}チャンクのダウンロードが完了しました`);
         } catch (err) {
             if (cancelledRef.current || (err instanceof Error && err.message === 'Cancelled')) {
                 setStatus('cancelled');
@@ -189,7 +206,7 @@ export function useDownload({ articleUrl, chunks, voiceModel, speed, onSlowConne
                 logger.error('ダウンロードエラー', err);
             }
         }
-    }, [chunks, updateEstimatedTime, onSlowConnection, downloadChunk]);
+    }, [chunks, updateEstimatedTime, onSlowConnection, downloadBatch]);
 
     /**
      * ダウンロードキャンセル

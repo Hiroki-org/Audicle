@@ -115,6 +115,12 @@ export async function GET(request: NextRequest) {
 
         // レスポンスの整形
         const articles: PopularArticle[] = (data || []).map((row) => {
+            // デバッグログ追加
+            console.log('[DEBUG] row:', JSON.stringify(row));
+            console.log('[DEBUG] row.article_hash:', row.article_hash);
+            console.log('[DEBUG] row.article_id:', row.article_id);
+            console.log('[DEBUG] articleId will be:', row.article_id || row.article_hash);
+
             return {
                 articleId: row.article_id || row.article_hash,
                 articleHash: row.article_hash,

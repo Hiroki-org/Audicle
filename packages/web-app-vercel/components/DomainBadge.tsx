@@ -12,8 +12,7 @@ const DOMAIN_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export function DomainBadge({ domain }: DomainBadgeProps) {
-  const normalizedDomain = domain.toLowerCase();
-  const config = DOMAIN_CONFIG[normalizedDomain];
+  const config = DOMAIN_CONFIG[domain];
   const label = config?.label || domain;
   const colorClass = config?.color || "bg-zinc-800 text-zinc-300";
 
