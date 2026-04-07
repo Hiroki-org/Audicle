@@ -85,12 +85,14 @@ function splitTextByByteSize(text: string, maxBytes: number = SAFE_MAX_TTS_BYTES
     if (parts.length > 1) {
       const result: string[] = [];
       let currentChunk = '';
+      let currentChunkBytes = 0;
 
       for (const part of parts) {
-        const potentialChunk = currentChunk + part;
+        const partBytes = getByteSize(part);
 
-        if (getByteSize(potentialChunk) <= maxBytes) {
-          currentChunk = potentialChunk;
+        if (currentChunkBytes + partBytes <= maxBytes) {
+          currentChunk += part;
+          currentChunkBytes += partBytes;
         } else {
           // 現在のチャンクを保存
           if (currentChunk) {
@@ -98,12 +100,14 @@ function splitTextByByteSize(text: string, maxBytes: number = SAFE_MAX_TTS_BYTES
           }
 
           // partが単体でも大きすぎる場合は再帰的に分割
-          if (getByteSize(part) > maxBytes) {
+          if (partBytes > maxBytes) {
             const subParts = splitTextByByteSize(part, maxBytes);
             result.push(...subParts);
             currentChunk = '';
+            currentChunkBytes = 0;
           } else {
             currentChunk = part;
+            currentChunkBytes = partBytes;
           }
         }
       }
