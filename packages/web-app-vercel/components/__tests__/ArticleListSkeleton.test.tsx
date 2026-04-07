@@ -5,6 +5,7 @@ import { ArticleListSkeleton } from "../ArticleListSkeleton";
 describe("ArticleListSkeleton", () => {
     it("renders exactly 5 skeleton items", () => {
         render(<ArticleListSkeleton />);
+
         const skeletonItems = screen.getAllByTestId("article-list-skeleton-item");
         expect(skeletonItems).toHaveLength(5);
     });
@@ -13,11 +14,20 @@ describe("ArticleListSkeleton", () => {
         render(<ArticleListSkeleton />);
 
         const skeletonItems = screen.getAllByTestId("article-list-skeleton-item");
+
+        // Assert count before iterating
         expect(skeletonItems).toHaveLength(5);
 
         skeletonItems.forEach((item) => {
-            expect(within(item).getAllByTestId("article-list-skeleton-line")).toHaveLength(3);
-            expect(within(item).getAllByTestId("article-list-skeleton-action")).toHaveLength(2);
+            const titleContainer = within(item).getByTestId("skeleton-title-placeholders");
+            // It should have 3 title/domain placeholder lines
+            const titleDomainPlaceholders = titleContainer.querySelectorAll("div.animate-pulse");
+            expect(titleDomainPlaceholders).toHaveLength(3);
+
+            const actionContainer = within(item).getByTestId("skeleton-action-placeholders");
+            // It should have 2 action button placeholders
+            const actionButtonPlaceholders = actionContainer.querySelectorAll("div.animate-pulse");
+            expect(actionButtonPlaceholders).toHaveLength(2);
         });
     });
 });
