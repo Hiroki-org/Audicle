@@ -24,38 +24,13 @@ describe('requireAuth', () => {
         jest.clearAllMocks();
     });
 
-    it('returns 401 Unauthorized when session is null', async () => {
-        (auth as jest.Mock).mockResolvedValue(null);
-
-        const result = await requireAuth();
-
-        expect(auth).toHaveBeenCalledTimes(1);
-        expect(result.userEmail).toBeNull();
-        expect(NextResponse.json).toHaveBeenCalledWith(
-            { error: 'Unauthorized' },
-            { status: 401 }
-        );
-        expect(result.response?.status).toBe(401);
-    });
-
-    it('returns 401 Unauthorized when session exists but user email is missing', async () => {
-        (auth as jest.Mock).mockResolvedValue({
-            user: { name: 'Test User' }, // email is missing
-        });
-
-        const result = await requireAuth();
-
-        expect(auth).toHaveBeenCalledTimes(1);
-        expect(result.userEmail).toBeNull();
-        expect(NextResponse.json).toHaveBeenCalledWith(
-            { error: 'Unauthorized' },
-            { status: 401 }
-        );
-        expect(result.response?.status).toBe(401);
-    });
-
-    it('returns 401 Unauthorized when session exists but user is missing', async () => {
-        (auth as jest.Mock).mockResolvedValue({}); // user is missing
+    it.each([
+        ['session is null', null],
+        ['session exists but user is missing', {}],
+        ['session exists but user email is missing', { user: { name: 'Test User' } }],
+        ['session exists but user email is an empty string', { user: { email: '' } }],
+    ])('returns 401 Unauthorized when %s', async (_scenario, mockSession) => {
+        (auth as jest.Mock).mockResolvedValue(mockSession);
 
         const result = await requireAuth();
 
