@@ -671,7 +671,6 @@ export async function POST(request: NextRequest) {
             }
         );
     } catch (error) {
-        const corsHeaders = getCorsHeaders(request);
 
         log('error', '音声合成エラー', {
             error,

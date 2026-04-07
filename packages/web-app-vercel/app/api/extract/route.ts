@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
             headers: corsHeaders,
         });
     } catch (error) {
-        const corsHeaders = getCorsHeaders(request);
 
         if (error instanceof SyntaxError) {
             return NextResponse.json(
