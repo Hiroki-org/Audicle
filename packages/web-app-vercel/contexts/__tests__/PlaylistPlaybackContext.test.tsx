@@ -51,17 +51,12 @@ describe("PlaylistPlaybackContext circular behavior", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     // initialize
     await act(async () => {
-      getCtx().startPlaylistPlayback(
-        "pl-1",
-        "My Playlist",
-        sampleItems,
-        0
-      );
+      getCtx().startPlaylistPlayback("pl-1", "My Playlist", sampleItems, 0);
     });
 
     const { canMovePrevious, canMoveNext, state } = getCtx();
@@ -75,17 +70,12 @@ describe("PlaylistPlaybackContext circular behavior", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
       // start at last index
-      getCtx().startPlaylistPlayback(
-        "pl-1",
-        "My Playlist",
-        sampleItems,
-        2
-      );
+      getCtx().startPlaylistPlayback("pl-1", "My Playlist", sampleItems, 2);
       getCtx().playNext();
     });
 
@@ -99,17 +89,12 @@ describe("PlaylistPlaybackContext circular behavior", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
       // start at first index
-      getCtx().startPlaylistPlayback(
-        "pl-1",
-        "My Playlist",
-        sampleItems,
-        0
-      );
+      getCtx().startPlaylistPlayback("pl-1", "My Playlist", sampleItems, 0);
       getCtx().playPrevious();
     });
 
@@ -130,7 +115,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
@@ -146,7 +131,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
@@ -175,7 +160,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
@@ -200,7 +185,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
@@ -222,7 +207,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
@@ -255,7 +240,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     // Start at last index with repeatMode off
@@ -281,7 +266,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     // Start at last index
@@ -311,7 +296,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     // Start at middle index (not last)
@@ -337,7 +322,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     const { unmount } = render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
@@ -352,7 +337,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     expect(getCtx().state.repeatMode).toBe("all");
@@ -362,17 +347,21 @@ describe("PlaylistPlaybackContext repeat modes", () => {
 });
 
 describe("generateShuffledIndices", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test("generates array with all indices", () => {
     const result = generateShuffledIndices(5);
     expect(result).toHaveLength(5);
-    expect(result.sort()).toEqual([0, 1, 2, 3, 4]);
+    expect([...result].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
   });
 
   test("places currentIndex at position 0", () => {
     const result = generateShuffledIndices(5, 3);
     expect(result[0]).toBe(3);
     expect(result).toHaveLength(5);
-    expect(result.sort()).toEqual([0, 1, 2, 3, 4]);
+    expect([...result].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
   });
 
   test("handles empty array", () => {
@@ -388,7 +377,55 @@ describe("generateShuffledIndices", () => {
   test("currentIndex out of range is ignored", () => {
     const result = generateShuffledIndices(3, 10);
     expect(result).toHaveLength(3);
-    expect(result.sort()).toEqual([0, 1, 2]);
+    expect([...result].sort((a, b) => a - b)).toEqual([0, 1, 2]);
+  });
+
+  test("currentIndex out of range (negative) is ignored", () => {
+    const result = generateShuffledIndices(3, -1);
+    expect(result).toHaveLength(3);
+    expect([...result].sort((a, b) => a - b)).toEqual([0, 1, 2]);
+  });
+
+  test("shuffles correctly using Math.random", () => {
+    // Mock Math.random to always return 0.5
+    // i=4 (len=5): j = Math.floor(0.5 * 5) = 2. Swaps index 4 and 2. Array: [0, 1, 4, 3, 2]
+    // i=3: j = Math.floor(0.5 * 4) = 2. Swaps index 3 and 2. Array: [0, 1, 3, 4, 2]
+    // i=2: j = Math.floor(0.5 * 3) = 1. Swaps index 2 and 1. Array: [0, 3, 1, 4, 2]
+    // i=1: j = Math.floor(0.5 * 2) = 1. Swaps index 1 and 1. Array: [0, 3, 1, 4, 2]
+    jest.spyOn(Math, "random").mockReturnValue(0.5);
+
+    const result = generateShuffledIndices(5);
+    expect(Math.random).toHaveBeenCalledTimes(4);
+    expect(result).toEqual([0, 3, 1, 4, 2]);
+  });
+
+  test("swaps currentIndex to position 0 if it is not already there", () => {
+    // Mock Math.random to return 0.99 (always picks the last possible index, so it doesn't shuffle much)
+    // Actually, j = Math.floor(0.99 * (i+1)) = i. It swaps an element with itself.
+    // So the array remains [0, 1, 2, 3, 4] after shuffle loop.
+    jest.spyOn(Math, "random").mockReturnValue(0.99);
+
+    const result = generateShuffledIndices(5, 3);
+    // After shuffle loop: [0, 1, 2, 3, 4]
+    // Since currentIndex=3 is at pos=3, it swaps pos=0 and pos=3.
+    // Final result should be [3, 1, 2, 0, 4]
+    expect(result).toEqual([3, 1, 2, 0, 4]);
+  });
+
+  test("does not swap if currentIndex is already at position 0", () => {
+    // Mock Math.random to return 0
+    // i=4: j = 0. Swaps index 4 and 0. Array: [4, 1, 2, 3, 0]
+    // i=3: j = 0. Swaps index 3 and 0. Array: [3, 1, 2, 4, 0]
+    // i=2: j = 0. Swaps index 2 and 0. Array: [2, 1, 3, 4, 0]
+    // i=1: j = 0. Swaps index 1 and 0. Array: [1, 2, 3, 4, 0]
+    jest.spyOn(Math, "random").mockReturnValue(0);
+
+    // We want currentIndex to be 1, because 1 ends up at pos 0 in the above logic
+    const result = generateShuffledIndices(5, 1);
+
+    // pos of 1 is 0. So no swap occurs at the end.
+    // Result remains [1, 2, 3, 4, 0]
+    expect(result).toEqual([1, 2, 3, 4, 0]);
   });
 });
 
@@ -402,7 +439,7 @@ describe("PlaylistPlaybackContext shuffle playback", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
@@ -429,7 +466,7 @@ describe("PlaylistPlaybackContext shuffle playback", () => {
     render(
       <PlaylistPlaybackProvider>
         <TestComponent />
-      </PlaylistPlaybackProvider>
+      </PlaylistPlaybackProvider>,
     );
 
     await act(async () => {
