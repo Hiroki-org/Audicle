@@ -27,11 +27,16 @@ export default function RootLayout({
     <html lang="ja" suppressHydrationWarning>
       <head>
         <script
+          data-theme-key={STORAGE_KEYS.COLOR_THEME}
+          data-default-theme={DEFAULT_SETTINGS.color_theme}
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  const theme = localStorage.getItem('${STORAGE_KEYS.COLOR_THEME}') || '${DEFAULT_SETTINGS.color_theme}';
+                  const script = document.currentScript;
+                  const themeKey = script.getAttribute('data-theme-key');
+                  const defaultTheme = script.getAttribute('data-default-theme');
+                  const theme = localStorage.getItem(themeKey) || defaultTheme;
                   document.documentElement.setAttribute('data-theme', theme);
                   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     document.documentElement.classList.add('dark');
