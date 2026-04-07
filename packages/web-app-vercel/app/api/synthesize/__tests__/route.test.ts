@@ -202,14 +202,16 @@ describe('/api/synthesize route', () => {
             const originalEnv = process.env.NODE_ENV;
             process.env.NODE_ENV = 'development';
 
-            const res = await routeModule.POST(req as any);
-            expect(res.status).toBe(500);
-            const body = await res.json();
-            expect(body).toHaveProperty('error', 'Failed to synthesize speech');
-            expect(body).toHaveProperty('errorType', 'UNKNOWN');
-            expect(body).toHaveProperty('detail', 'Unexpected generic error');
-
-            process.env.NODE_ENV = originalEnv;
+            try {
+                const res = await routeModule.POST(req as any);
+                expect(res.status).toBe(500);
+                const body = await res.json();
+                expect(body).toHaveProperty('error', 'Failed to synthesize speech');
+                expect(body).toHaveProperty('errorType', 'UNKNOWN');
+                expect(body).toHaveProperty('detail', 'Unexpected generic error');
+            } finally {
+                process.env.NODE_ENV = originalEnv;
+            }
         });
 
         it('returns appropriate status and message for TTSError via Google Cloud mock', async () => {
@@ -220,7 +222,6 @@ describe('/api/synthesize route', () => {
 
             (getStorageProvider as jest.Mock).mockReturnValue({
                 headObject: jest.fn().mockResolvedValue({ exists: false }),
-                uploadObject: jest.fn().mockRejectedValue(new Error('Storage error')),
             });
 
             const req: any = {
