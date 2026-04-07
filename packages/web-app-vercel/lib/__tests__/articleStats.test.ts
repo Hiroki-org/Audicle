@@ -311,6 +311,7 @@ describe("recordArticleStats", () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    jest.useRealTimers();
   });
 
   const mockParams = {
@@ -347,17 +348,18 @@ describe("recordArticleStats", () => {
       expect.objectContaining({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: expect.stringContaining(
-          '"cacheHits":1,"cacheMisses":0,"isFullyCached":true',
-        ),
       }),
     );
-    expect(global.fetch).toHaveBeenCalledWith(
-      "/api/stats/article",
-      expect.objectContaining({
-        body: expect.stringContaining('"domain":"example.com"'),
-      }),
+
+    const requestBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0][1].body as string,
     );
+    expect(requestBody).toMatchObject({
+      cacheHits: 1,
+      cacheMisses: 0,
+      isFullyCached: true,
+      domain: "example.com",
+    });
 
     expect(logger.info).toHaveBeenCalledWith(
       "記事統計を記録",
@@ -392,7 +394,7 @@ describe("recordArticleStats", () => {
     );
   });
 
-  it("should retry on network errors (ECONNRESET/aborted) and throw after max retries", async () => {
+  it("should retry on network errors until max retries are exhausted", async () => {
     jest.useFakeTimers();
     const mockedGetArticleChunks = getArticleChunks as jest.MockedFunction<
       typeof getArticleChunks
@@ -425,11 +427,9 @@ describe("recordArticleStats", () => {
       "記事統計記録エラー",
       expect.any(Error),
     );
-
-    jest.useRealTimers();
   });
 
-  it("should throw error immediately for non-network errors", async () => {
+  it("should stop retrying immediately for non-network errors", async () => {
     const mockedGetArticleChunks = getArticleChunks as jest.MockedFunction<
       typeof getArticleChunks
     >;
