@@ -149,7 +149,6 @@ export function useDownload({ articleUrl, chunks, voiceModel, speed, onSlowConne
             let currentIndex = 0;
             let completedCount = 0;
             let hasError = false;
-            let firstError: unknown = null;
 
             // ワーカープールパターンの実装
             const workers = Array.from({ length: Math.min(MAX_CONCURRENT, chunks.length) }, async () => {
@@ -160,36 +159,21 @@ export function useDownload({ articleUrl, chunks, voiceModel, speed, onSlowConne
                     try {
                         await downloadChunk(chunk, chunkIndex);
 
-                        if (cancelledRef.current || hasError) {
-                            return;
-                        }
+                        if (cancelledRef.current) break;
 
                         completedCount++;
                         setProgress({ current: completedCount, total: chunks.length });
                         updateEstimatedTime(completedCount, chunks.length);
                     } catch (err) {
-                        if (
-                            cancelledRef.current ||
-                            (err instanceof Error && err.message === 'Cancelled')
-                        ) {
-                            return;
-                        }
-
                         hasError = true;
-                        firstError = err;
-                        cancelledRef.current = true;
-                        return;
+                        throw err; // Promise.allでキャッチされるようにする
                     }
                 }
             });
 
-            await Promise.allSettled(workers);
+            await Promise.all(workers);
 
-            if (hasError) {
-                setStatus('error');
-                setError(firstError instanceof Error ? firstError.message : 'ダウンロードエラー');
-                logger.error('ダウンロードエラー', firstError);
-            } else if (cancelledRef.current) {
+            if (cancelledRef.current) {
                 setStatus('cancelled');
                 logger.info('ダウンロードがキャンセルされました');
             } else {
