@@ -1,7 +1,57 @@
-
+import dns from 'dns';
 import { isSafeUrl } from '../ssrf';
 
+jest.mock('dns', () => ({
+    lookup: jest.fn(),
+}));
+
+const mockedLookup = dns.lookup as jest.Mock;
+
+const defaultLookupResponses: Record<string, Array<{ address: string; family: number }>> = {
+    'example.com': [{ address: '93.184.216.34', family: 4 }],
+    'google.com': [{ address: '142.250.190.14', family: 4 }],
+    'github.com': [{ address: '140.82.112.4', family: 4 }],
+    '127.0.0.1': [{ address: '127.0.0.1', family: 4 }],
+    '[::1]': [{ address: '::1', family: 6 }],
+    '::1': [{ address: '::1', family: 6 }],
+    '10.0.0.1': [{ address: '10.0.0.1', family: 4 }],
+    '192.168.1.1': [{ address: '192.168.1.1', family: 4 }],
+    '172.16.0.1': [{ address: '172.16.0.1', family: 4 }],
+    '172.31.255.255': [{ address: '172.31.255.255', family: 4 }],
+    '169.254.169.254': [{ address: '169.254.169.254', family: 4 }],
+    '0.0.0.0': [{ address: '0.0.0.0', family: 4 }],
+    '255.255.255.255': [{ address: '255.255.255.255', family: 4 }],
+    '224.0.0.1': [{ address: '224.0.0.1', family: 4 }],
+    '192.0.2.1': [{ address: '192.0.2.1', family: 4 }],
+    '198.51.100.1': [{ address: '198.51.100.1', family: 4 }],
+    '203.0.113.1': [{ address: '203.0.113.1', family: 4 }],
+};
+
 describe('isSafeUrl', () => {
+    beforeEach(() => {
+        mockedLookup.mockImplementation((hostname: string, options: { all?: boolean }, callback: (...args: unknown[]) => void) => {
+            const addresses = defaultLookupResponses[hostname];
+
+            if (!addresses) {
+                callback(new Error(`getaddrinfo ENOTFOUND ${hostname}`));
+                return;
+            }
+
+            if (options?.all) {
+                callback(null, addresses);
+                return;
+            }
+
+            callback(null, addresses[0].address, addresses[0].family);
+        });
+
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
     // Public/Safe URLs
     test('should allow public https URLs', async () => {
         expect(await isSafeUrl('https://example.com')).toBe(true);
@@ -73,14 +123,35 @@ describe('isSafeUrl', () => {
     });
 
     test('should reject when DNS resolves to both public and internal IPs', async () => {
-        // Isolate modules and mock dns.lookup to return multiple addresses
+        mockedLookup.mockImplementation((hostname: string, options: { all?: boolean }, callback: (...args: unknown[]) => void) => {
+            if (hostname !== 'example.com') {
+                callback(new Error(`getaddrinfo ENOTFOUND ${hostname}`));
+                return;
+            }
+
+            if (options?.all) {
+                callback(null, [
+                    { address: '93.184.216.34', family: 4 },
+                    { address: '127.0.0.1', family: 4 },
+                ]);
+                return;
+            }
+
+            callback(null, '93.184.216.34', 4);
+        });
+
+        await expect(isSafeUrl('http://example.com')).resolves.toBe(false);
+    });
+});
+
+describe('validateAndResolveUrl', () => {
+    test('returns the resolved ip and family for safe URLs', async () => {
         jest.resetModules();
         jest.doMock('dns', () => ({
-            lookup: (hostname: string, options: any, callback: any) => {
+            lookup: (_hostname: string, options: any, callback: any) => {
                 if (options && options.all) {
                     callback(null, [
                         { address: '93.184.216.34', family: 4 },
-                        { address: '127.0.0.1', family: 4 },
                     ]);
                 } else {
                     callback(null, '93.184.216.34', 4);
@@ -88,8 +159,54 @@ describe('isSafeUrl', () => {
             }
         }));
 
-        const { isSafeUrl: mockedIsSafeUrl } = require('../ssrf');
-        await expect(mockedIsSafeUrl('http://example.com')).resolves.toBe(false);
+        const { validateAndResolveUrl } = require('../ssrf');
+        await expect(validateAndResolveUrl('https://example.com')).resolves.toEqual({
+            isSafe: true,
+            ipAddress: '93.184.216.34',
+            family: 4,
+        });
+
+        jest.dontMock('dns');
+        jest.resetModules();
+    });
+
+    test('returns unsafe when dns lookup fails', async () => {
+        jest.resetModules();
+        jest.doMock('dns', () => ({
+            lookup: (_hostname: string, _options: any, callback: any) => {
+                callback(new Error('lookup failed'));
+            }
+        }));
+
+        const { validateAndResolveUrl } = require('../ssrf');
+        await expect(validateAndResolveUrl('https://example.com')).resolves.toEqual({
+            isSafe: false,
+        });
+
+        jest.dontMock('dns');
+        jest.resetModules();
+    });
+
+    test('returns unsafe when dns resolves to both public and internal IPs', async () => {
+        jest.resetModules();
+        jest.doMock('dns', () => ({
+            lookup: (_hostname: string, options: any, callback: any) => {
+                if (options && options.all) {
+                    callback(null, [
+                        { address: '93.184.216.34', family: 4 },
+                        { address: '127.0.0.1', family: 4 },
+                    ]);
+                    return;
+                }
+
+                callback(null, '93.184.216.34', 4);
+            }
+        }));
+
+        const { validateAndResolveUrl } = require('../ssrf');
+        await expect(validateAndResolveUrl('https://example.com')).resolves.toEqual({
+            isSafe: false,
+        });
 
         jest.dontMock('dns');
         jest.resetModules();
