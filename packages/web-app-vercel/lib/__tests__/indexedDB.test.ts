@@ -2,12 +2,26 @@ import 'fake-indexeddb/auto';
 import { getAudioChunk, saveAudioChunk, clearAll, generateKey } from '../indexedDB';
 
 if (typeof global.structuredClone === 'undefined') {
-  global.structuredClone = function (obj) {
-    if (obj instanceof Blob) {
-      return new Blob([obj], { type: obj.type });
-    }
-    // simple deep copy for other objects
-    return JSON.parse(JSON.stringify(obj));
+  global.structuredClone = function structuredClonePolyfill<T>(obj: T): T {
+    const cloneValue = (value: unknown): unknown => {
+      if (value instanceof Blob) {
+        return new Blob([value], { type: value.type });
+      }
+
+      if (Array.isArray(value)) {
+        return value.map((item) => cloneValue(item));
+      }
+
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(
+          Object.entries(value).map(([key, nestedValue]) => [key, cloneValue(nestedValue)])
+        );
+      }
+
+      return value;
+    };
+
+    return cloneValue(obj) as T;
   };
 }
 
@@ -48,6 +62,9 @@ describe('IndexedDB getAudioChunk', () => {
         expect(chunk?.voiceModel).toBe(voiceModel);
         expect(chunk?.size).toBe(testBlob.size);
         expect(chunk?.key).toBe(generateKey(articleUrl, chunkIndex, voiceModel));
+        expect(chunk?.audioData).toBeInstanceOf(Blob);
+        expect(chunk?.audioData.type).toBe('audio/mpeg');
+        expect(chunk?.audioData.size).toBe(testBlob.size);
     });
 
     it('should handle missing voiceModel by using "default"', async () => {
@@ -71,7 +88,7 @@ describe('IndexedDB getAudioChunk', () => {
         expect(chunk).not.toBeNull();
         expect(chunk?.articleUrl).toBe(articleUrl);
         expect(chunk?.chunkIndex).toBe(chunkIndex);
-        expect(chunk?.voiceModel).toBeUndefined(); // Assuming saveAudioChunk doesn't mutate voiceModel to 'default' in the object itself
-        expect(chunk?.key).toBe(generateKey(articleUrl, chunkIndex)); // It should generate 'articleUrl:chunkIndex:default'
+        expect(chunk?.voiceModel).toBeUndefined();
+        expect(chunk?.key).toBe(generateKey(articleUrl, chunkIndex));
     });
 });
