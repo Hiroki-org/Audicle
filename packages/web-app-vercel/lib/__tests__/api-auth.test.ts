@@ -49,6 +49,44 @@ describe('requireAuth', () => {
         expect(result.response?.status).toBe(401);
         const body = await result.response?.json();
         expect(body).toEqual({ error: 'Unauthorized' });
+        expect(NextResponse.json).toHaveBeenCalledWith(
+            { error: 'Unauthorized' },
+            { status: 401 }
+        );
+    });
+
+    it('returns 401 response if session has no user property', async () => {
+        (auth as jest.Mock).mockResolvedValueOnce({});
+
+        const result = await requireAuth();
+
+        expect(result.userEmail).toBeNull();
+        expect(result.response).not.toBeNull();
+        expect(result.response?.status).toBe(401);
+        const body = await result.response?.json();
+        expect(body).toEqual({ error: 'Unauthorized' });
+        expect(NextResponse.json).toHaveBeenCalledWith(
+            { error: 'Unauthorized' },
+            { status: 401 }
+        );
+    });
+
+    it('returns 401 response if user email is empty', async () => {
+        (auth as jest.Mock).mockResolvedValueOnce({
+            user: { email: '' }
+        });
+
+        const result = await requireAuth();
+
+        expect(result.userEmail).toBeNull();
+        expect(result.response).not.toBeNull();
+        expect(result.response?.status).toBe(401);
+        const body = await result.response?.json();
+        expect(body).toEqual({ error: 'Unauthorized' });
+        expect(NextResponse.json).toHaveBeenCalledWith(
+            { error: 'Unauthorized' },
+            { status: 401 }
+        );
     });
 
     it('returns userEmail if session is valid', async () => {
