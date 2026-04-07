@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { PlaylistSelectorModal } from "../PlaylistSelectorModal";
 import { usePlaylists } from "@/lib/hooks/usePlaylists";
 import {
@@ -39,7 +39,7 @@ const mockCurrentPlaylists = [
 
 describe("PlaylistSelectorModal", () => {
   const mockOnClose = jest.fn();
-  const mockOnPlaylistsUpdated = jest.fn();
+  const mockOnPlaylistsUpdated = jest.fn().mockResolvedValue(undefined);
   const mockMutateAsync = jest.fn();
 
   beforeEach(() => {
@@ -68,6 +68,10 @@ describe("PlaylistSelectorModal", () => {
     });
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   const defaultProps = {
     isOpen: true,
     onClose: mockOnClose,
@@ -88,10 +92,7 @@ describe("PlaylistSelectorModal", () => {
       isLoading: true,
     });
     render(<PlaylistSelectorModal {...defaultProps} />);
-    // Testing library's getByRole shouldn't find an obvious string, but we can check if there's a status or spin indicator
-    // Looking at the implementation, it uses a div with className="animate-spin"
-    // So let's check for the spin indicator or lack of lists.
-    // Instead of querying by class, we verify the empty message isn't there and the title is there.
+    expect(screen.getByRole("status", { name: "読み込み中" })).toBeInTheDocument();
     expect(screen.getByText("Test Article Title")).toBeInTheDocument();
     expect(screen.queryByText("プレイリストがありません")).not.toBeInTheDocument();
 
@@ -165,13 +166,38 @@ describe("PlaylistSelectorModal", () => {
         addToPlaylistIds: ["playlist-2"],
         removeFromPlaylistIds: ["playlist-1"],
       });
+      expect(mockOnPlaylistsUpdated).toHaveBeenCalled();
+      expect(mockOnClose).toHaveBeenCalled();
     });
+  });
+
+  it("calls onPlaylistsUpdated and onClose without saving when there are no changes", async () => {
+    render(<PlaylistSelectorModal {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
+      expect(mockMutateAsync).not.toHaveBeenCalled();
       expect(mockOnPlaylistsUpdated).toHaveBeenCalled();
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+  });
+
+  it("prevents overlay clicks immediately after opening but allows them later", () => {
+    jest.useFakeTimers();
+    render(<PlaylistSelectorModal {...defaultProps} />);
+
+    const overlay = screen.getByRole("presentation");
+
+    fireEvent.click(overlay);
+    expect(mockOnClose).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(100);
     });
 
-    expect(mockOnClose).toHaveBeenCalled();
+    fireEvent.click(overlay);
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   it("handles mutation error on save", async () => {

@@ -221,7 +221,11 @@ export function PlaylistSelectorModal({
 
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border border-blue-300 border-t-blue-600" />
+                <div
+                  className="animate-spin rounded-full h-8 w-8 border border-blue-300 border-t-blue-600"
+                  role="status"
+                  aria-label="読み込み中"
+                />
               </div>
             ) : allPlaylists.length === 0 ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -286,7 +290,11 @@ export function PlaylistSelectorModal({
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             >
               {isSaving && (
-                <div className="animate-spin rounded-full h-4 w-4 border border-white border-t-transparent" />
+                <div
+                  className="animate-spin rounded-full h-4 w-4 border border-white border-t-transparent"
+                  role="status"
+                  aria-label="保存中"
+                />
               )}
               {isSaving ? "保存中..." : "保存"}
             </button>
