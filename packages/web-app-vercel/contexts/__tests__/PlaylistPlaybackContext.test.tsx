@@ -193,7 +193,7 @@ describe("PlaylistPlaybackContext repeat modes", () => {
     // Current index (0) should be at position 0
     expect(getCtx().state.shuffledIndices[0]).toBe(0);
     // All indices should be present
-    expect(getCtx().state.shuffledIndices.sort()).toEqual([0, 1, 2]);
+    expect([...getCtx().state.shuffledIndices].sort((a, b) => a - b)).toEqual([0, 1, 2]);
   });
 
   test("toggleShuffle off clears shuffledIndices", async () => {
@@ -362,27 +362,23 @@ describe("PlaylistPlaybackContext repeat modes", () => {
 });
 
 describe("generateShuffledIndices", () => {
-  let originalMathRandom: typeof Math.random;
-
-  beforeAll(() => {
-    originalMathRandom = Math.random;
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
-  afterAll(() => {
-    Math.random = originalMathRandom;
-  });
+  const sortIndices = (indices: number[]) => [...indices].sort((a, b) => a - b);
 
   test("generates array with all indices", () => {
     const result = generateShuffledIndices(5);
     expect(result).toHaveLength(5);
-    expect([...result].sort()).toEqual([0, 1, 2, 3, 4]);
+    expect(sortIndices(result)).toEqual([0, 1, 2, 3, 4]);
   });
 
   test("places currentIndex at position 0", () => {
     const result = generateShuffledIndices(5, 3);
     expect(result[0]).toBe(3);
     expect(result).toHaveLength(5);
-    expect([...result].sort()).toEqual([0, 1, 2, 3, 4]);
+    expect(sortIndices(result)).toEqual([0, 1, 2, 3, 4]);
   });
 
   test("handles empty array", () => {
@@ -398,13 +394,13 @@ describe("generateShuffledIndices", () => {
   test("currentIndex out of range is ignored", () => {
     const result = generateShuffledIndices(3, 10);
     expect(result).toHaveLength(3);
-    expect([...result].sort()).toEqual([0, 1, 2]);
+    expect(sortIndices(result)).toEqual([0, 1, 2]);
   });
 
   test("currentIndex out of range (negative) is ignored", () => {
     const result = generateShuffledIndices(3, -1);
     expect(result).toHaveLength(3);
-    expect([...result].sort()).toEqual([0, 1, 2]);
+    expect(sortIndices(result)).toEqual([0, 1, 2]);
   });
 
   test("shuffles correctly using Math.random", () => {
@@ -413,10 +409,10 @@ describe("generateShuffledIndices", () => {
     // i=3: j = Math.floor(0.5 * 4) = 2. Swaps index 3 and 2. Array: [0, 1, 3, 4, 2]
     // i=2: j = Math.floor(0.5 * 3) = 1. Swaps index 2 and 1. Array: [0, 3, 1, 4, 2]
     // i=1: j = Math.floor(0.5 * 2) = 1. Swaps index 1 and 1. Array: [0, 3, 1, 4, 2]
-    Math.random = jest.fn().mockReturnValue(0.5);
+    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.5);
 
     const result = generateShuffledIndices(5);
-    expect(Math.random).toHaveBeenCalledTimes(4);
+    expect(randomSpy).toHaveBeenCalledTimes(4);
     expect(result).toEqual([0, 3, 1, 4, 2]);
   });
 
@@ -424,7 +420,7 @@ describe("generateShuffledIndices", () => {
     // Mock Math.random to return 0.99 (always picks the last possible index, so it doesn't shuffle much)
     // Actually, j = Math.floor(0.99 * (i+1)) = i. It swaps an element with itself.
     // So the array remains [0, 1, 2, 3, 4] after shuffle loop.
-    Math.random = jest.fn().mockReturnValue(0.99);
+    jest.spyOn(Math, "random").mockReturnValue(0.99);
 
     const result = generateShuffledIndices(5, 3);
     // After shuffle loop: [0, 1, 2, 3, 4]
@@ -439,7 +435,7 @@ describe("generateShuffledIndices", () => {
     // i=3: j = 0. Swaps index 3 and 0. Array: [3, 1, 2, 4, 0]
     // i=2: j = 0. Swaps index 2 and 0. Array: [2, 1, 3, 4, 0]
     // i=1: j = 0. Swaps index 1 and 0. Array: [1, 2, 3, 4, 0]
-    Math.random = jest.fn().mockReturnValue(0);
+    jest.spyOn(Math, "random").mockReturnValue(0);
 
     // We want currentIndex to be 1, because 1 ends up at pos 0 in the above logic
     const result = generateShuffledIndices(5, 1);
