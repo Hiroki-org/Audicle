@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GET, POST } from '../route'
+import { validateUrl } from '../../../lib/validation'
 
 // モックを定義
 jest.mock('@/lib/auth', () => ({
@@ -270,7 +271,7 @@ describe('Share Target Route Handlers', () => {
         })
     })
 
-    describe('URL validation', () => {
+    describe('URL validation during GET request', () => {
         it('http:// スキームは許可される', async () => {
             mockAuth.mockResolvedValue({
                 user: { id: 'test-user', email: 'test@example.com' },
@@ -333,6 +334,45 @@ describe('Share Target Route Handlers', () => {
 
             expect(response.status).toBe(307)
             expect(response.headers.get('Location')).toContain('/share-target/error')
+        })
+    })
+
+    describe('validateUrl function', () => {
+        it('valid http URL returns true', () => {
+            expect(validateUrl('http://example.com')).toBe(true)
+        })
+
+        it('valid https URL returns true', () => {
+            expect(validateUrl('https://example.com/path?query=1#hash')).toBe(true)
+        })
+
+        it('invalid url format returns false', () => {
+            expect(validateUrl('not-a-url')).toBe(false)
+        })
+
+        it('javascript scheme returns false', () => {
+            expect(validateUrl('javascript:alert(1)')).toBe(false)
+        })
+
+        it('data scheme returns false', () => {
+            expect(validateUrl('data:text/html,<h1>test</h1>')).toBe(false)
+        })
+
+        it('ftp scheme returns false', () => {
+            expect(validateUrl('ftp://example.com')).toBe(false)
+        })
+
+        it('file scheme returns false', () => {
+            expect(validateUrl('file:///etc/passwd')).toBe(false)
+        })
+
+        it('empty string returns false', () => {
+            expect(validateUrl('')).toBe(false)
+        })
+
+        // new URL() automatically trims spaces, so this returns true, which is acceptable
+        it('URL with leading/trailing spaces returns true because new URL trims it', () => {
+            expect(validateUrl(' https://example.com ')).toBe(true)
         })
     })
 })
