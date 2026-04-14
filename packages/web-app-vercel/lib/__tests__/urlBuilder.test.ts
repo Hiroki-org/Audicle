@@ -36,10 +36,6 @@ describe('createReaderUrl', () => {
   });
 
   it('should not include index if playlistId is missing', () => {
-    // Note: The current implementation doesn't explicitly prevent index without playlist,
-    // but the logic shows nested if:
-    // if (params.playlistId) { ... if (params.playlistIndex !== undefined) ... }
-    // So if playlistId is missing, index should be ignored even if provided.
     const params: ReaderUrlParams = {
       playlistIndex: 5,
     };
