@@ -52,37 +52,6 @@ async def setup_data(conn):
 
     return playlist_id, bookmark_ids, user_email
 
-
-async def insert_batch_recursive(conn, playlist_id, bookmark_ids):
-    if not bookmark_ids:
-        return
-
-    if len(bookmark_ids) == 1:
-        bm_id = bookmark_ids[0]
-        try:
-            await conn.execute("""
-                INSERT INTO playlist_items (playlist_id, bookmark_id)
-                VALUES ($1, $2)
-            """, playlist_id, bm_id)
-        except Exception as single_err:
-            print(f"Error inserting {bm_id}: {single_err}")
-        return
-
-    try:
-        values = [(playlist_id, bm_id) for bm_id in bookmark_ids]
-        await conn.executemany("""
-            INSERT INTO playlist_items (playlist_id, bookmark_id)
-            VALUES ($1, $2)
-        """, values)
-    except Exception as batch_err:
-        print(
-            f"Batch insert failed for {len(bookmark_ids)} items; splitting recursively: {batch_err}"
-        )
-        mid = len(bookmark_ids) // 2
-        await insert_batch_recursive(conn, playlist_id, bookmark_ids[:mid])
-        await insert_batch_recursive(conn, playlist_id, bookmark_ids[mid:])
-
-
 async def worker(pool, playlist_id, bookmark_ids):
     async with pool.acquire() as conn:
         try:
@@ -97,8 +66,23 @@ async def worker(pool, playlist_id, bookmark_ids):
                 VALUES ($1, $2)
             """, values)
         except Exception as batch_err:
-            print(f"Error inserting batch, falling back to divide-and-conquer: {batch_err}")
-            await insert_batch_recursive(conn, playlist_id, bookmark_ids)
+            print(f"Error inserting batch, falling back to unnest batch insert: {batch_err}")
+            # Fallback to a single query using unnest to maintain performance while avoiding N+1
+            try:
+                # ON CONFLICT DO NOTHING handles duplicates, RETURNING lets us find what failed
+                inserted = await conn.fetch("""
+                    INSERT INTO playlist_items (playlist_id, bookmark_id)
+                    SELECT $1, unnest($2::uuid[])
+                    ON CONFLICT (playlist_id, bookmark_id) DO NOTHING
+                    RETURNING bookmark_id
+                """, playlist_id, bookmark_ids)
+
+                inserted_ids = {str(r['bookmark_id']) for r in inserted}
+                for bm_id in bookmark_ids:
+                    if bm_id not in inserted_ids:
+                        print(f"Error inserting {bm_id}: duplicate key value violates unique constraint")
+            except Exception as e:
+                print(f"Fallback batch insert failed entirely: {e}")
 
 async def run_benchmark():
     if not asyncpg:
