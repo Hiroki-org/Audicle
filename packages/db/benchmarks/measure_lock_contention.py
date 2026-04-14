@@ -53,7 +53,8 @@ async def setup_data(conn):
     return playlist_id, bookmark_ids, user_email
 
 
-async def insert_batch_recursive(conn, playlist_id, bookmark_ids):
+
+async def insert_batch(conn, playlist_id, bookmark_ids):
     if not bookmark_ids:
         return
 
@@ -74,22 +75,10 @@ async def insert_batch_recursive(conn, playlist_id, bookmark_ids):
             INSERT INTO playlist_items (playlist_id, bookmark_id)
             VALUES ($1, $2)
         """, values)
-    except Exception as batch_err:
-        print(
-            f"Batch insert failed for {len(bookmark_ids)} items; splitting recursively: {batch_err}"
-        )
+    except Exception as e:
         mid = len(bookmark_ids) // 2
-        await insert_batch_recursive(conn, playlist_id, bookmark_ids[:mid])
-        await insert_batch_recursive(conn, playlist_id, bookmark_ids[mid:])
-
-
-async def insert_batch(conn, playlist_id, bookmark_ids):
-    values = [(playlist_id, bm_id) for bm_id in bookmark_ids]
-    await conn.executemany("""
-        INSERT INTO playlist_items (playlist_id, bookmark_id)
-        VALUES ($1, $2)
-    """, values)
-
+        await insert_batch(conn, playlist_id, bookmark_ids[:mid])
+        await insert_batch(conn, playlist_id, bookmark_ids[mid:])
 
 async def worker(pool, playlist_id, bookmark_ids):
     async with pool.acquire() as conn:
@@ -99,17 +88,16 @@ async def worker(pool, playlist_id, bookmark_ids):
             # Note: executemany wraps the batch in a single implicit transaction.
             # This alters the lock contention profile compared to individual executes,
             # but significantly improves throughput by eliminating N+1 queries.
-            await insert_batch(conn, playlist_id, bookmark_ids)
+            values = [(playlist_id, bm_id) for bm_id in bookmark_ids]
+            await conn.executemany("""
+                INSERT INTO playlist_items (playlist_id, bookmark_id)
+                VALUES ($1, $2)
+            """, values)
         except Exception as batch_err:
             print(f"Error inserting batch, falling back to divide-and-conquer: {batch_err}")
-            if not bookmark_ids:
-                return
-            if len(bookmark_ids) == 1:
-                await insert_batch_recursive(conn, playlist_id, bookmark_ids)
-                return
             mid = len(bookmark_ids) // 2
-            await insert_batch_recursive(conn, playlist_id, bookmark_ids[:mid])
-            await insert_batch_recursive(conn, playlist_id, bookmark_ids[mid:])
+            await insert_batch(conn, playlist_id, bookmark_ids[:mid])
+            await insert_batch(conn, playlist_id, bookmark_ids[mid:])
 
 async def run_benchmark():
     if not asyncpg:
@@ -180,9 +168,9 @@ async def run_benchmark():
 
                 # Check for gaps
                 if max_pos - min_pos + 1 == count:
-                    print("✅ Positions are contiguous.")
+                     print("✅ Positions are contiguous.")
                 else:
-                    print("⚠️ Positions have gaps.")
+                     print("⚠️ Positions have gaps.")
 
     except Exception as e:
         print(f"An error occurred during the benchmark: {e}")
