@@ -4,25 +4,9 @@ import { TextEncoder, TextDecoder } from "util";
 
 // structuredClone polyfill for JSDOM
 if (typeof global.structuredClone === 'undefined') {
-  const cloneValue = (val) => {
-    if (val instanceof Blob) {
-      return val.slice(0, val.size, val.type);
-    }
-
-    if (Array.isArray(val)) {
-      return val.map(cloneValue);
-    }
-
-    if (val && typeof val === 'object') {
-      return Object.fromEntries(
-        Object.entries(val).map(([key, value]) => [key, cloneValue(value)])
-      );
-    }
-
-    return val;
+  global.structuredClone = (val) => {
+    return JSON.parse(JSON.stringify(val));
   };
-
-  global.structuredClone = cloneValue;
 }
 
 // React 18: act() を正しく扱うためのフラグ

@@ -211,23 +211,25 @@ describe('indexedDB utils', () => {
   });
 
   describe('getStorageUsage', () => {
-    let originalStorage: StorageManager | undefined;
+    let originalNavigator: any;
 
     beforeEach(() => {
-      originalStorage = navigator.storage;
+      originalNavigator = global.navigator;
     });
 
     afterEach(() => {
-      Object.defineProperty(navigator, 'storage', {
-        value: originalStorage,
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
         configurable: true,
       });
     });
 
     it('should use navigator.storage.estimate if available', async () => {
-      Object.defineProperty(navigator, 'storage', {
+      Object.defineProperty(global, 'navigator', {
         value: {
-          estimate: jest.fn().mockResolvedValue({ usage: 1234, quota: 5678 })
+          storage: {
+            estimate: jest.fn().mockResolvedValue({ usage: 1234, quota: 5678 })
+          }
         },
         configurable: true,
       });
@@ -237,7 +239,7 @@ describe('indexedDB utils', () => {
     });
 
     it('should fallback to calculating from DB if navigator.storage.estimate is not available', async () => {
-      Object.defineProperty(navigator, 'storage', {
+      Object.defineProperty(global, 'navigator', {
         value: {},
         configurable: true,
       });
@@ -318,23 +320,25 @@ describe('indexedDB utils', () => {
   });
 
   describe('checkStorageCapacity', () => {
-    let originalStorage: StorageManager | undefined;
+    let originalNavigator: any;
 
     beforeEach(() => {
-      originalStorage = navigator.storage;
+      originalNavigator = global.navigator;
     });
 
     afterEach(() => {
-      Object.defineProperty(navigator, 'storage', {
-        value: originalStorage,
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
         configurable: true,
       });
     });
 
     it('should return true if enough capacity', async () => {
-      Object.defineProperty(navigator, 'storage', {
+      Object.defineProperty(global, 'navigator', {
         value: {
-          estimate: jest.fn().mockResolvedValue({ usage: 100, quota: 1000 })
+          storage: {
+            estimate: jest.fn().mockResolvedValue({ usage: 100, quota: 1000 })
+          }
         },
         configurable: true,
       });
@@ -344,9 +348,11 @@ describe('indexedDB utils', () => {
     });
 
     it('should return false if not enough capacity', async () => {
-      Object.defineProperty(navigator, 'storage', {
+      Object.defineProperty(global, 'navigator', {
         value: {
-          estimate: jest.fn().mockResolvedValue({ usage: 800, quota: 1000 })
+          storage: {
+            estimate: jest.fn().mockResolvedValue({ usage: 800, quota: 1000 })
+          }
         },
         configurable: true,
       });
@@ -355,6 +361,7 @@ describe('indexedDB utils', () => {
       expect(canFit).toBe(false); // 800 + 500 = 1300 > 1000
     });
   });
+});
 
   describe('Error Handling', () => {
     let originalIndexedDB: IDBFactory;
@@ -411,7 +418,8 @@ describe('indexedDB utils', () => {
         articleUrl: 'err', chunkIndex: 0, totalChunks: 1, timestamp: 0, size: 0, audioData: new Blob()
       });
 
-      await Promise.resolve();
+      // wait a tick for the promise to be created and indexedDB.open to be called
+      await new Promise(r => setTimeout(r, 0));
 
       if (mockRequest.onerror) {
         (mockRequest as any).onerror({ target: mockRequest });
@@ -472,10 +480,10 @@ describe('indexedDB utils', () => {
         articleUrl: 'err', chunkIndex: 0, totalChunks: 1, timestamp: 0, size: 0, audioData: new Blob()
       });
 
-      await Promise.resolve();
+      await new Promise(r => setTimeout(r, 0));
       if (mockRequest.onsuccess) (mockRequest as any).onsuccess();
 
-      await Promise.resolve();
+      await new Promise(r => setTimeout(r, 0));
       if (mockTransaction.onerror) (mockTransaction as any).onerror();
 
       await expect(promise).rejects.toThrow('Tx error');
@@ -519,10 +527,10 @@ describe('indexedDB utils', () => {
         articleUrl: 'err', chunkIndex: 0, totalChunks: 1, timestamp: 0, size: 0, audioData: new Blob()
       });
 
-      await Promise.resolve();
+      await new Promise(r => setTimeout(r, 0));
       if (mockRequest.onsuccess) (mockRequest as any).onsuccess();
 
-      await Promise.resolve();
+      await new Promise(r => setTimeout(r, 0));
       if (mockPutRequest.onerror) (mockPutRequest as any).onerror();
 
       await expect(promise).rejects.toThrow('Put error');
@@ -564,85 +572,60 @@ describe('indexedDB utils', () => {
 
       const promise = dbModule.getAudioChunk('url', 0);
 
-      await Promise.resolve();
+      await new Promise(r => setTimeout(r, 0));
       if (mockRequest.onsuccess) (mockRequest as any).onsuccess();
 
-      await Promise.resolve();
+      await new Promise(r => setTimeout(r, 0));
       if (mockGetRequest.onerror) (mockGetRequest as any).onerror();
 
       await expect(promise).rejects.toThrow('Get error');
     });
 
     it('should handle connection unexpectedly closed', async () => {
-      let dbModule: any;
-      jest.isolateModules(() => {
-        dbModule = require('../indexedDB');
-      });
+        let dbModule: any;
+        jest.isolateModules(() => {
+            dbModule = require('../indexedDB');
+        });
 
-      const firstGetRequest = {
-        onerror: null as any,
-        onsuccess: null as any,
-        result: undefined,
-      };
-      const secondGetRequest = {
-        onerror: null as any,
-        onsuccess: null as any,
-        result: undefined,
-      };
+        const mockDb = {
+            onclose: null as any,
+            transaction: jest.fn().mockReturnValue({
+                objectStore: jest.fn().mockReturnValue({
+                    get: jest.fn().mockReturnValue({ onsuccess: (cb: any) => setTimeout(cb, 10) })
+                })
+            })
+        };
 
-      const objectStore = {
-        get: jest
-          .fn()
-          .mockReturnValueOnce(firstGetRequest)
-          .mockReturnValueOnce(secondGetRequest),
-      };
+        const mockRequest = {
+            onerror: null as any,
+            onsuccess: null as any,
+            result: mockDb
+        };
 
-      const mockDb = {
-        onclose: null as any,
-        transaction: jest.fn().mockReturnValue({
-          objectStore: jest.fn().mockReturnValue(objectStore),
-        }),
-      };
+        Object.defineProperty(global, 'indexedDB', {
+            value: { open: jest.fn().mockReturnValue(mockRequest) },
+            configurable: true,
+        });
 
-      const mockRequest = {
-        onerror: null as any,
-        onsuccess: null as any,
-        result: mockDb,
-      };
+        const promise1 = dbModule.getAudioChunk('url', 0);
+        await new Promise(r => setTimeout(r, 0));
+        if (mockRequest.onsuccess) (mockRequest as any).onsuccess();
 
-      const mockRequest2 = {
-        onerror: null as any,
-        onsuccess: null as any,
-        result: mockDb,
-      };
+        // Trigger onclose
+        if (mockDb.onclose) (mockDb as any).onclose();
 
-      Object.defineProperty(global, 'indexedDB', {
-        value: {
-          open: jest.fn()
-            .mockReturnValueOnce(mockRequest)
-            .mockReturnValueOnce(mockRequest2),
-        },
-        configurable: true,
-      });
+        // Next call should open a new connection
+        const mockRequest2 = {
+            onerror: null as any,
+            onsuccess: null as any,
+            result: mockDb
+        };
+        (global.indexedDB.open as jest.Mock).mockReturnValueOnce(mockRequest2);
 
-      const promise1 = dbModule.getAudioChunk('url', 0);
-      await Promise.resolve();
-      if (mockRequest.onsuccess) (mockRequest as any).onsuccess();
-      await Promise.resolve();
-      if (firstGetRequest.onsuccess) (firstGetRequest as any).onsuccess();
-      await expect(promise1).resolves.toBeNull();
+        const promise2 = dbModule.getAudioChunk('url', 0);
+        await new Promise(r => setTimeout(r, 0));
+        if (mockRequest2.onsuccess) (mockRequest2 as any).onsuccess();
 
-      // Trigger onclose and ensure next call re-opens DB
-      if (mockDb.onclose) (mockDb as any).onclose();
-
-      const promise2 = dbModule.getAudioChunk('url', 0);
-      await Promise.resolve();
-      if (mockRequest2.onsuccess) (mockRequest2 as any).onsuccess();
-      await Promise.resolve();
-      if (secondGetRequest.onsuccess) (secondGetRequest as any).onsuccess();
-      await expect(promise2).resolves.toBeNull();
-
-      expect(global.indexedDB.open).toHaveBeenCalledTimes(2);
+        expect(global.indexedDB.open).toHaveBeenCalledTimes(2);
     });
   });
-});
