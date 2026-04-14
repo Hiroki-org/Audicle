@@ -1,4 +1,4 @@
-import { render, screen, act } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PlaybackSpeedDial } from "../PlaybackSpeedDial";
 
@@ -10,29 +10,39 @@ describe("PlaybackSpeedDial", () => {
     onOpenChange: jest.fn(),
   };
 
+  let originalSetPointerCapture: typeof HTMLElement.prototype.setPointerCapture;
+  let originalReleasePointerCapture: typeof HTMLElement.prototype.releasePointerCapture;
+
   beforeAll(() => {
+    originalSetPointerCapture = window.HTMLElement.prototype.setPointerCapture;
+    originalReleasePointerCapture = window.HTMLElement.prototype.releasePointerCapture;
+
     // Mock setPointerCapture as it is not implemented in JSDOM
     window.HTMLElement.prototype.setPointerCapture = jest.fn();
     window.HTMLElement.prototype.releasePointerCapture = jest.fn();
   });
 
+  afterAll(() => {
+    window.HTMLElement.prototype.setPointerCapture = originalSetPointerCapture;
+    window.HTMLElement.prototype.releasePointerCapture = originalReleasePointerCapture;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // reset scroll / bounding mocks
-    Element.prototype.getBoundingClientRect = jest.fn(() => {
+    jest.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(() => {
       return {
-          width: 640,
-          height: 100,
-          top: 0,
-          left: 0,
-          bottom: 0,
-          right: 0,
-          x: 0,
-          y: 0,
-          toJSON: () => {}
-      }
-    })
+        width: 640,
+        height: 100,
+        top: 0,
+        left: 0,
+        bottom: 0,
+        right: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      };
+    });
   });
 
   it("should not render when open is false", () => {
@@ -46,8 +56,8 @@ describe("PlaybackSpeedDial", () => {
 
     // Get all elements containing "1.0x" and find the one that is the actual current speed display
     const elements = screen.getAllByText("1.0x");
-    // Since there are multiple, verify at least one is rendered
-    expect(elements.length).toBeGreaterThan(0);
+    // current speed label と speed option の少なくとも2箇所に 1.0x が表示される
+    expect(elements.length).toBeGreaterThanOrEqual(2);
 
     expect(screen.getByTestId("speed-option-1.0")).toBeInTheDocument(); // Speed option
   });
