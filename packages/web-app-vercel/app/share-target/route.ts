@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import * as supabaseLocal from '@/lib/supabaseLocal'
 import { getOrCreateDefaultPlaylist } from '@/lib/playlist-utils'
 import type { Article } from '@/types/playlist'
-import { validateUrl } from "@/lib/validation"
+import { validateUrl } from '@/lib/validation'
 
 /**
  * GET リクエスト: 後方互換性のため（既存のブックマークなど）

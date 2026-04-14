@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GET, POST } from '../route'
-import { validateUrl } from '../../../lib/validation'
+import { validateUrl } from '@/lib/validation'
 
 // モックを定義
 jest.mock('@/lib/auth', () => ({
@@ -338,40 +338,40 @@ describe('Share Target Route Handlers', () => {
     })
 
     describe('validateUrl function', () => {
-        it('valid http URL returns true', () => {
+        it('http URL は true を返す', () => {
             expect(validateUrl('http://example.com')).toBe(true)
         })
 
-        it('valid https URL returns true', () => {
+        it('https URL は true を返す', () => {
             expect(validateUrl('https://example.com/path?query=1#hash')).toBe(true)
         })
 
-        it('invalid url format returns false', () => {
+        it('URL形式が不正な場合は false を返す', () => {
             expect(validateUrl('not-a-url')).toBe(false)
         })
 
-        it('javascript scheme returns false', () => {
+        it('javascript スキームは false を返す', () => {
             expect(validateUrl('javascript:alert(1)')).toBe(false)
         })
 
-        it('data scheme returns false', () => {
+        it('data スキームは false を返す', () => {
             expect(validateUrl('data:text/html,<h1>test</h1>')).toBe(false)
         })
 
-        it('ftp scheme returns false', () => {
+        it('ftp スキームは false を返す', () => {
             expect(validateUrl('ftp://example.com')).toBe(false)
         })
 
-        it('file scheme returns false', () => {
+        it('file スキームは false を返す', () => {
             expect(validateUrl('file:///etc/passwd')).toBe(false)
         })
 
-        it('empty string returns false', () => {
+        it('空文字は false を返す', () => {
             expect(validateUrl('')).toBe(false)
         })
 
         // new URL() automatically trims spaces, so this returns true, which is acceptable
-        it('URL with leading/trailing spaces returns true because new URL trims it', () => {
+        it('前後スペース付きURLは new URL の仕様により true を返す', () => {
             expect(validateUrl(' https://example.com ')).toBe(true)
         })
     })
