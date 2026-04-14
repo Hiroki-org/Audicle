@@ -122,6 +122,8 @@ export function generateShuffledIndices(
   length: number,
   currentIndex?: number,
 ): number[] {
+  if (length <= 0) return [];
+
   const indices = Array.from({ length }, (_, i) => i);
   // Fisher-Yates shuffle
   for (let i = indices.length - 1; i > 0; i--) {
@@ -379,11 +381,7 @@ export function PlaylistPlaybackProvider({
           if (prevState.repeatMode === "all") {
             // 再シャッフルして先頭から
             const newShuffled = generateShuffledIndices(prevState.items.length);
-            const firstShuffledIndex = newShuffled[0];
-            if (firstShuffledIndex === undefined) {
-              return prevState;
-            }
-            nextIndex = firstShuffledIndex;
+            nextIndex = newShuffled[0];
             const nextItem = prevState.items[nextIndex];
             if (nextItem?.article?.url && prevState.playlistId) {
               router.push(
