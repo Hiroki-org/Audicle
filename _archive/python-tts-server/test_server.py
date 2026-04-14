@@ -4,9 +4,10 @@ Edge TTS Server テスト用スクリプト
 サーバーが正常に動作しているかテストします
 """
 
-import requests
-import tempfile
 import os
+import tempfile
+
+import requests
 
 SERVER_URL = "http://localhost:8001"
 
