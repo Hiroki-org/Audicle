@@ -594,8 +594,23 @@ describe("usePlayback", () => {
       });
     });
 
-    it('setPlaybackRate() が状態と localStorage と audio の playbackRate を更新すること', () => {
-      const { result } = renderHook(() => usePlayback({ chunks: [] }));
+    it('setPlaybackRate() が状態と localStorage と audio の playbackRate を更新すること', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      getAudioChunk.mockResolvedValue(null);
+      audioCache.get.mockResolvedValue("blob:mock-audio-url");
+
+      const mockChunks = [
+        { id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" },
+      ];
+      const { result } = renderHook(() => usePlayback({ chunks: mockChunks }));
+
+      await act(async () => {
+        await result.current.play();
+      });
+
+      const audioInstance = global.Audio.mock.results[global.Audio.mock.results.length - 1]?.value;
+      expect(audioInstance).toBeDefined();
 
       act(() => {
         result.current.setPlaybackRate(1.5);
@@ -603,12 +618,7 @@ describe("usePlayback", () => {
 
       expect(result.current.playbackRate).toBe(1.5);
       expect(window.localStorage.setItem).toHaveBeenCalledWith('audicle-playback-rate', '1.5');
-
-      // The audio instance should also receive the updated rate if it exists
-      const audioInstance = global.Audio.mock.results[0]?.value;
-      if (audioInstance) {
-        expect(audioInstance.playbackRate).toBe(1.5);
-      }
+      expect(audioInstance.playbackRate).toBe(1.5);
     });
 
     it('playbackSpeed プロパティの変更が playbackRate に反映されること', () => {
@@ -626,15 +636,31 @@ describe("usePlayback", () => {
   });
 
   describe('onArticleEnd and Error handling paths', () => {
+    let originalFetch: typeof global.fetch | undefined;
+
     beforeEach(() => {
       jest.useFakeTimers();
-      // fetchをモック
-      global.fetch = jest.fn(() => Promise.resolve({ ok: true }));
+      originalFetch = global.fetch;
+
+      if (typeof global.fetch === 'undefined') {
+        Object.defineProperty(global, 'fetch', {
+          value: jest.fn(),
+          writable: true,
+          configurable: true,
+        });
+      }
+
+      jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
     });
 
     afterEach(() => {
       jest.useRealTimers();
       jest.restoreAllMocks();
+      Object.defineProperty(global, 'fetch', {
+        value: originalFetch,
+        writable: true,
+        configurable: true,
+      });
     });
 
     it('最後のチャンクの再生終了時に onArticleEnd が呼ばれ、Supabase キャッシュ更新の fetch が走ること', async () => {
@@ -669,9 +695,7 @@ describe("usePlayback", () => {
           audioInstance.onended();
         }
         // sleep のタイマーを進める
-        jest.runAllTimers();
-        // promise の解決を待つ
-        await Promise.resolve();
+        await jest.runAllTimersAsync();
       });
 
       expect(onArticleEndMock).toHaveBeenCalledTimes(1);
@@ -702,7 +726,6 @@ describe("usePlayback", () => {
       // Hook の play() を呼び出し、内部で Audio インスタンスが作成されるようにする
       const playPromise = act(async () => {
         // play を呼ぶ前に mock を差し替える
-        const originalPlay = global.Audio.mock.results[0]?.value?.play;
         if (global.Audio.mock.results[0]) {
             global.Audio.mock.results[0].value.play = jest.fn().mockRejectedValue({
                 name: 'NotAllowedError',
@@ -763,6 +786,7 @@ describe("usePlayback", () => {
       const audioInstance = global.Audio.mock.results[global.Audio.mock.results.length - 1].value;
 
       // onerror イベントを発火させる
+      const originalMediaError = global.MediaError;
       await act(async () => {
         audioInstance.error = {
           code: 4, // MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
@@ -775,6 +799,7 @@ describe("usePlayback", () => {
           audioInstance.onerror(new Event('error'));
         }
       });
+      global.MediaError = originalMediaError;
 
       await waitFor(() => {
          expect(result.current.error).toBe("一部の音声が再生できませんでした。次の部分から再開します。");
