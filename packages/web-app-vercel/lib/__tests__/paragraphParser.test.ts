@@ -1,7 +1,6 @@
 import {
     parseHTMLToParagraphs,
-    // 内部関数をテスト用にエクスポートする必要があるため、
-    // テストファイルを別の形式で作成
+    resizeChunksIfNeeded,
 } from '../paragraphParser';
 
 /**
@@ -154,6 +153,23 @@ describe('paragraphParser', () => {
             // 1つのチャンクのまま
             expect(paragraphs.length).toBe(1);
             expect(paragraphs[0].cleanedText).toBe(shortText);
+        });
+
+        it('should split oversized paragraphs when resizeChunksIfNeeded is called directly', () => {
+            const oversized = 'あ'.repeat(1700); // 約5100バイト
+            const resized = resizeChunksIfNeeded([
+                {
+                    id: '0',
+                    type: 'p',
+                    originalText: oversized,
+                    cleanedText: oversized,
+                },
+            ]);
+
+            expect(resized.length).toBeGreaterThan(1);
+            for (const chunk of resized) {
+                expect(Buffer.byteLength(chunk.cleanedText, 'utf-8')).toBeLessThanOrEqual(4800);
+            }
         });
 
         it('should handle mixed Japanese and English text', () => {
