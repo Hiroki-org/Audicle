@@ -164,14 +164,18 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     # Accumulate parts into chunks
     chunks = []
     current_chunk = ""
+    current_chunk_len = 0
 
     for part in parts:
-        if len((current_chunk + part).encode('utf-8')) > limit:
+        part_len = len(part.encode('utf-8'))
+        if current_chunk_len + part_len > limit:
              if current_chunk:
                  chunks.append(current_chunk)
              current_chunk = part
+             current_chunk_len = part_len
         else:
              current_chunk += part
+             current_chunk_len += part_len
 
     if current_chunk:
         chunks.append(current_chunk)
