@@ -1,0 +1,5 @@
+🎯 **What:** The `generateShuffledIndices` function in `packages/web-app-vercel/contexts/PlaylistPlaybackContext.tsx` handles negative lengths properly by returning an empty array. However, this edge case was not tested in `packages/web-app-vercel/contexts/__tests__/PlaylistPlaybackContext.test.tsx`. A new test case for negative lengths has been added.
+
+📊 **Coverage:** The test coverage now includes the negative length scenario (e.g., length of `-5`) alongside empty array (length `0`) and positive values, ensuring that the early return statement functions reliably for any `length <= 0`.
+
+✨ **Result:** Increased testing confidence in the `generateShuffledIndices` pure function without changing its internal implementation.
