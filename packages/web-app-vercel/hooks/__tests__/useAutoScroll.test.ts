@@ -36,12 +36,12 @@ describe("useAutoScroll", () => {
     jest.useRealTimers();
   });
 
-  it("should scroll element into view when currentChunkId changes (window scroll)", () => {
+  it("should scroll element into view when activeChunkIndex changes (window scroll)", () => {
     jest.useFakeTimers();
 
     renderHook(() =>
       useAutoScroll({
-        currentChunkId: "chunk-1",
+        activeChunkIndex: "chunk-1",
         enabled: true,
         delay: 0,
       })
@@ -97,7 +97,7 @@ describe("useAutoScroll", () => {
 
     renderHook(() =>
       useAutoScroll({
-        currentChunkId: "chunk-2",
+        activeChunkIndex: "chunk-2",
         containerRef,
         enabled: true,
         delay: 0,
@@ -126,7 +126,7 @@ describe("useAutoScroll", () => {
 
     renderHook(() =>
       useAutoScroll({
-        currentChunkId: "chunk-1",
+        activeChunkIndex: "chunk-1",
         enabled: false,
         delay: 0,
       })
@@ -145,7 +145,7 @@ describe("useAutoScroll", () => {
 
     renderHook(() =>
       useAutoScroll({
-        currentChunkId: "non-existent-chunk",
+        activeChunkIndex: "non-existent-chunk",
         enabled: true,
         delay: 0,
       })
@@ -169,7 +169,7 @@ describe("useAutoScroll", () => {
 
     renderHook(() =>
       useAutoScroll({
-        currentChunkId: 'chunk-1',
+        activeChunkIndex: 'chunk-1',
         enabled: true,
         delay: 0,
       })
@@ -197,7 +197,7 @@ describe("useAutoScroll", () => {
 
     renderHook(() =>
       useAutoScroll({
-        currentChunkId: 'chunk-1',
+        activeChunkIndex: 'chunk-1',
         enabled: true,
         delay: 0,
       })
@@ -247,7 +247,7 @@ describe('useAutoScrollWithCache', () => {
     jest.useRealTimers();
   });
 
-  it('should cache elements and evict by insertion order when cache is full', () => {
+  it('should cache elements and use LRU eviction', () => {
     jest.useFakeTimers();
     const querySelectorSpy = jest.spyOn(document, 'querySelector');
 
@@ -255,7 +255,7 @@ describe('useAutoScrollWithCache', () => {
       (props) => useAutoScrollWithCache(props),
       {
         initialProps: {
-          currentChunkId: 'chunk-1',
+          activeChunkIndex: 'chunk-1',
           enabled: true,
           delay: 0,
           cacheSize: 2,
@@ -269,28 +269,29 @@ describe('useAutoScrollWithCache', () => {
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
 
     // chunk-2を追加（キャッシュサイズ: 2）
-    rerender({ currentChunkId: 'chunk-2', enabled: true, delay: 0, cacheSize: 2 });
+    rerender({ activeChunkIndex: 'chunk-2', enabled: true, delay: 0, cacheSize: 2 });
     act(() => { jest.runAllTimers(); });
     expect(querySelectorSpy).toHaveBeenCalledTimes(2);
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(2);
 
     // 再度chunk-1を要求 -> キャッシュヒットしてDOM検索されないはず
-    rerender({ currentChunkId: 'chunk-1', enabled: true, delay: 0, cacheSize: 2 });
+    rerender({ activeChunkIndex: 'chunk-1', enabled: true, delay: 0, cacheSize: 2 });
     act(() => { jest.runAllTimers(); });
     // querySelectorは呼ばれない
     expect(querySelectorSpy).toHaveBeenCalledTimes(2);
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(3);
 
-    // chunk-3を追加（キャッシュサイズ: 2） -> 挿入順で先頭のchunk-1が追い出される
-    rerender({ currentChunkId: 'chunk-3', enabled: true, delay: 0, cacheSize: 2 });
+    // chunk-3を追加（キャッシュサイズ: 2） -> chunk-2が追い出される (LRU)
+    // Wait, chunk-1 was just accessed, so chunk-1 is newest, chunk-2 is oldest.
+    rerender({ activeChunkIndex: 'chunk-3', enabled: true, delay: 0, cacheSize: 2 });
     act(() => { jest.runAllTimers(); });
     expect(querySelectorSpy).toHaveBeenCalledTimes(3);
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(4);
 
-    // chunk-2はキャッシュ済みなのでDOM検索されない
-    rerender({ currentChunkId: 'chunk-2', enabled: true, delay: 0, cacheSize: 2 });
+    // 再度chunk-2を要求 -> キャッシュミスしてDOM検索されるはず
+    rerender({ activeChunkIndex: 'chunk-2', enabled: true, delay: 0, cacheSize: 2 });
     act(() => { jest.runAllTimers(); });
-    expect(querySelectorSpy).toHaveBeenCalledTimes(3);
+    expect(querySelectorSpy).toHaveBeenCalledTimes(4);
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(5);
   });
 
@@ -299,7 +300,7 @@ describe('useAutoScrollWithCache', () => {
 
     renderHook(() =>
       useAutoScrollWithCache({
-        currentChunkId: 'non-existent-chunk',
+        activeChunkIndex: 'non-existent-chunk',
         enabled: true,
         delay: 0,
       })
@@ -321,7 +322,7 @@ describe('useAutoScrollWithCache', () => {
 
     renderHook(() =>
       useAutoScrollWithCache({
-        currentChunkId: 'chunk-1',
+        activeChunkIndex: 'chunk-1',
         enabled: false,
         delay: 0,
       })
