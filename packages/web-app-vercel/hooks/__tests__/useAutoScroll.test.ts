@@ -247,7 +247,7 @@ describe('useAutoScrollWithCache', () => {
     jest.useRealTimers();
   });
 
-  it('should cache elements and use LRU eviction', () => {
+  it('should cache elements and evict by insertion order when cache is full', () => {
     jest.useFakeTimers();
     const querySelectorSpy = jest.spyOn(document, 'querySelector');
 
@@ -281,14 +281,13 @@ describe('useAutoScrollWithCache', () => {
     expect(querySelectorSpy).toHaveBeenCalledTimes(2);
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(3);
 
-    // chunk-3を追加（キャッシュサイズ: 2） -> chunk-2が追い出される (LRU)
-    // Wait, chunk-1 was just accessed, so chunk-1 is newest, chunk-2 is oldest.
+    // chunk-3を追加（キャッシュサイズ: 2） -> 挿入順で先頭のchunk-1が追い出される
     rerender({ currentChunkId: 'chunk-3', enabled: true, delay: 0, cacheSize: 2 });
     act(() => { jest.runAllTimers(); });
     expect(querySelectorSpy).toHaveBeenCalledTimes(3);
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(4);
 
-    // 再度chunk-2を要求 -> キャッシュミスしてDOM検索されるはず
+    // chunk-2はキャッシュ済みなのでDOM検索されない
     rerender({ currentChunkId: 'chunk-2', enabled: true, delay: 0, cacheSize: 2 });
     act(() => { jest.runAllTimers(); });
     expect(querySelectorSpy).toHaveBeenCalledTimes(3);
