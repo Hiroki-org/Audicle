@@ -85,7 +85,7 @@ async def execute_benchmark(pool, playlist_id, all_bm_ids):
     worker_tasks = []
     chunk_size = ITEMS_PER_WORKER
 
-    start_time = time.perf_counter()
+    start_time = time.time()
 
     for i in range(CONCURRENCY):
         chunk = all_bm_ids[i*chunk_size : (i+1)*chunk_size]
@@ -93,9 +93,9 @@ async def execute_benchmark(pool, playlist_id, all_bm_ids):
 
     await asyncio.gather(*worker_tasks)
 
-    end_time = time.perf_counter()
+    end_time = time.time()
     duration = end_time - start_time
-    total_items = len(all_bm_ids)
+    total_items = CONCURRENCY * ITEMS_PER_WORKER
 
     print(f"Benchmark finished in {duration:.2f} seconds.")
     print(f"Throughput: {total_items / duration:.2f} items/sec")
@@ -123,15 +123,15 @@ async def verify_positions(pool, playlist_id):
             print("✅ No duplicate positions.")
 
         if count > 0:
-            min_pos = pos_list[0]
-            max_pos = pos_list[-1]
+            min_pos = min(pos_list)
+            max_pos = max(pos_list)
             print(f"Position range: {min_pos} to {max_pos}")
 
             # Check for gaps
             if max_pos - min_pos + 1 == count:
-                print("✅ Positions are contiguous.")
+                 print("✅ Positions are contiguous.")
             else:
-                print("⚠️ Positions have gaps.")
+                 print("⚠️ Positions have gaps.")
 
 
 async def cleanup_data(pool, playlist_id, user_email):
@@ -187,8 +187,7 @@ async def run_benchmark():
     except Exception as e:
         print(f"An error occurred during the benchmark: {e}")
     finally:
-        if pool and playlist_id and user_email:
-            await cleanup_data(pool, playlist_id, user_email)
+        await cleanup_data(pool, playlist_id, user_email)
         
         if pool:
             print("Closing DB pool...")
