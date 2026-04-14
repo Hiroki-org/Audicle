@@ -147,14 +147,14 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
 
         # Check if next part matches the separator pattern (is a delimiter)
         if i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
-             current += parts[i+1]
-             i += 1
+            current += parts[i+1]
+            i += 1
 
-             # Handle consecutive delimiters (e.g., "Hello!!!")
-             # Keep appending as long as they match the pattern
-             while i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
-                 current += parts[i+1]
-                 i += 1
+            # Handle consecutive delimiters (e.g., "Hello!!!")
+            # Keep appending as long as they match the pattern
+            while i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
+                current += parts[i+1]
+                i += 1
 
         merged_parts.append(current)
         i += 1
@@ -168,14 +168,23 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
 
     for part in parts:
         part_len = len(part.encode('utf-8'))
+
+        if part_len > limit:
+            if current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = ""
+                current_chunk_len = 0
+            chunks.extend(_chunk_text(part, limit, next_separators))
+            continue
+
         if current_chunk_len + part_len > limit:
-             if current_chunk:
-                 chunks.append(current_chunk)
-             current_chunk = part
-             current_chunk_len = part_len
+            if current_chunk:
+                chunks.append(current_chunk)
+            current_chunk = part
+            current_chunk_len = part_len
         else:
-             current_chunk += part
-             current_chunk_len += part_len
+            current_chunk += part
+            current_chunk_len += part_len
 
     if current_chunk:
         chunks.append(current_chunk)
