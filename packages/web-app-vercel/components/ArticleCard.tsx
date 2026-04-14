@@ -43,6 +43,7 @@ export const ArticleCard = memo(function ArticleCard({
                 data-testid="playlist-article"
                 className="after:content-[''] after:absolute after:inset-0 after:z-10 focus:outline-none focus:underline"
                 onClick={(e) => {
+                  // 修飾キー付きクリックはブラウザ標準動作（新規タブなど）を優先する
                   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
                     return;
                   }
