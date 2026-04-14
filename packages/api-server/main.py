@@ -166,32 +166,34 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     current_chunk = ""
     current_size = 0
 
+    def flush_current_chunk() -> None:
+        nonlocal current_chunk, current_size
+        if current_chunk:
+            final_chunks.append(current_chunk)
+            current_chunk = ""
+            current_size = 0
+
+    def append_chunk_part(chunk_part: str) -> None:
+        nonlocal current_chunk, current_size
+        chunk_part_size = len(chunk_part.encode('utf-8'))
+
+        # Recursively split oversized parts and re-accumulate so we keep packing efficiency.
+        if chunk_part_size > limit:
+            sub_parts = _chunk_text(chunk_part, limit, next_separators)
+            for sub_part in sub_parts:
+                append_chunk_part(sub_part)
+            return
+
+        if current_size + chunk_part_size > limit:
+            flush_current_chunk()
+
+        current_chunk += chunk_part
+        current_size += chunk_part_size
+
     for part in parts:
-        part_size = len(part.encode('utf-8'))
+        append_chunk_part(part)
 
-        # If a single part is larger than the limit, we need to split it further
-        if part_size > limit:
-            # First, flush the current_chunk if any
-            if current_chunk:
-                final_chunks.append(current_chunk)
-                current_chunk = ""
-                current_size = 0
-
-            # Then, recursively process this large part
-            final_chunks.extend(_chunk_text(part, limit, next_separators))
-        elif current_size + part_size > limit:
-            # Adding this part would exceed the limit, so flush current_chunk
-            if current_chunk:
-                final_chunks.append(current_chunk)
-            current_chunk = part
-            current_size = part_size
-        else:
-            # Add part to current_chunk
-            current_chunk += part
-            current_size += part_size
-
-    if current_chunk:
-        final_chunks.append(current_chunk)
+    flush_current_chunk()
 
     return final_chunks
 
