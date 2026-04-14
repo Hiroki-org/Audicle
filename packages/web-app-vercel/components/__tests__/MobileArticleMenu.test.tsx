@@ -1,9 +1,7 @@
 import React from "react";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MobileArticleMenu } from "../MobileArticleMenu";
-
-const originalOpen = window.open;
 
 describe("MobileArticleMenu", () => {
   const mockOnDownload = jest.fn();
@@ -15,8 +13,8 @@ describe("MobileArticleMenu", () => {
     onDownload: mockOnDownload,
   };
 
-  beforeAll(() => {
-    // Setup clipboard mock robustly for JSDOM
+  beforeEach(() => {
+    jest.clearAllMocks();
     Object.defineProperty(navigator, "clipboard", {
       value: {
         writeText: mockWriteText,
@@ -24,20 +22,13 @@ describe("MobileArticleMenu", () => {
       writable: true,
       configurable: true,
     });
-  });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Setup window.open mock
-    window.open = mockWindowOpen;
+    jest.spyOn(window, "open").mockImplementation(mockWindowOpen);
 
     jest.useFakeTimers();
   });
 
   afterEach(() => {
-    // Restore
-    window.open = originalOpen;
     jest.useRealTimers();
     jest.restoreAllMocks();
   });
@@ -100,10 +91,7 @@ describe("MobileArticleMenu", () => {
     await user.click(screen.getByRole("button", { name: "メニューを開く" }));
     expect(screen.getByRole("menu")).toBeInTheDocument();
 
-    const overlays = document.querySelectorAll(".fixed.inset-0.z-40");
-    expect(overlays.length).toBe(1);
-
-    await user.click(overlays[0] as Element);
+    await user.click(screen.getByTestId("mobile-menu-overlay"));
 
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
@@ -139,27 +127,19 @@ describe("MobileArticleMenu", () => {
   it("copies URL, shows notification, and hides it after 2 seconds", async () => {
     render(<MobileArticleMenu {...defaultProps} />);
 
-    // Use fireEvent to bypass userEvent clipboard override
-    const { fireEvent } = require("@testing-library/react");
     fireEvent.click(screen.getByRole("button", { name: "メニューを開く" }));
-
     await act(async () => {
       fireEvent.click(screen.getByRole("menuitem", { name: "URLをコピー" }));
     });
 
-    // It seems mockWriteText isn't firing maybe because navigator.clipboard isn't bound correctly in the test environment.
-    // Let's check if the mock was called, and if not, manually assert the text content changes instead
-    // expect(mockWriteText).toHaveBeenCalledWith("https://example.com/article");
+    expect(mockWriteText).toHaveBeenCalledWith("https://example.com/article");
 
-    // Verify notification appears
-    expect(screen.getByRole("status")).toHaveTextContent("URLをコピーしました");
+    expect(await screen.findByRole("status")).toHaveTextContent("URLをコピーしました");
 
-    // Fast-forward 2 seconds
     await act(async () => {
       jest.advanceTimersByTime(2000);
     });
 
-    // Verify notification disappears
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 

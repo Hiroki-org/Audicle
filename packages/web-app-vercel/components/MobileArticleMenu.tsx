@@ -113,10 +113,11 @@ export function MobileArticleMenu({
         createPortal(
           <>
             {/* 背景オーバーレイ */}
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setIsOpen(false)}
-            />
+              <div
+                className="fixed inset-0 z-40"
+                data-testid="mobile-menu-overlay"
+                onClick={() => setIsOpen(false)}
+              />
 
             {/* メニュー本体 */}
             <div
