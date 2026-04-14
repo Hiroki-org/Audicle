@@ -6,7 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { PopularArticleCard } from "@/components/PopularArticleCard";
 import { Button } from "@/components/ui/button";
-import Spinner from "@/components/Spinner";
+import { Spinner } from "@/components/Spinner";
 import type {
   Period,
   PopularArticlesResponse,
@@ -179,7 +179,7 @@ export default function PopularPage() {
                 disabled={isLoading || isRateLimited}
               >
                 {isLoading && articles.length > 0 ? (
-                  <Spinner size={18} className="border-zinc-400" />
+                  <Spinner size="sm" className="border-zinc-400" />
                 ) : (
                   <RotateCcw className="h-5 w-5" />
                 )}
@@ -205,7 +205,7 @@ export default function PopularPage() {
           {/* Content */}
           {isLoading && articles.length === 0 ? (
             <div className="text-center py-12 text-zinc-500">
-              <Spinner size={32} className="border-primary mb-4" />
+              <Spinner size="md" className="border-primary mb-4" />
               <p className="text-lg">読み込み中...</p>
             </div>
           ) : error ? (
