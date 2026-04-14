@@ -98,7 +98,6 @@ SENTENCE_SPLIT_REGEX = re.compile(r'([。！？\n])')
 COMMA_SPLIT_REGEX = re.compile(r'(、)')
 
 def _force_split(text: str, limit: int) -> List[str]:
-    """Split text by byte limit without separator awareness."""
     chunks = []
     start = 0
     while start < len(text):
@@ -112,39 +111,33 @@ def _force_split(text: str, limit: int) -> List[str]:
     return chunks
 
 def _apply_separator(text: str, sep_pattern: Pattern) -> List[str]:
-    """Split text by separator and merge matched delimiters into the previous segment."""
     parts = [s for s in sep_pattern.split(text) if s]
     merged_parts = []
     i = 0
     while i < len(parts):
         current = parts[i]
-        i += 1
-        while i < len(parts) and sep_pattern.fullmatch(parts[i]):
-            current += parts[i]
-            i += 1
+        if i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
+             current += parts[i+1]
+             i += 1
+             while i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
+                 current += parts[i+1]
+                 i += 1
         merged_parts.append(current)
+        i += 1
     return merged_parts
 
 def _accumulate_chunks(parts: List[str], limit: int) -> List[str]:
-    """Pack parts into chunks that do not exceed `limit` bytes."""
     chunks = []
     current_chunk = ""
-    current_size = 0
-
     for part in parts:
-        part_size = len(part.encode('utf-8'))
-        if current_size + part_size > limit:
-            if current_chunk:
-                chunks.append(current_chunk)
-            current_chunk = part
-            current_size = part_size
+        if len((current_chunk + part).encode('utf-8')) > limit:
+             if current_chunk:
+                 chunks.append(current_chunk)
+             current_chunk = part
         else:
-            current_chunk += part
-            current_size += part_size
-
+             current_chunk += part
     if current_chunk:
         chunks.append(current_chunk)
-
     return chunks
 
 def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
