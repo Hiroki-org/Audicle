@@ -77,6 +77,89 @@ async def worker(pool, playlist_id, bookmark_ids):
                 except Exception as e:
                     print(f"Error inserting {bm_id}: {e}")
 
+
+async def execute_benchmark(pool, playlist_id, all_bm_ids):
+    print(f"Starting benchmark: {CONCURRENCY} workers, {ITEMS_PER_WORKER} items each.")
+
+    # Split bookmarks among workers
+    worker_tasks = []
+    chunk_size = ITEMS_PER_WORKER
+
+    start_time = time.time()
+
+    for i in range(CONCURRENCY):
+        chunk = all_bm_ids[i*chunk_size : (i+1)*chunk_size]
+        worker_tasks.append(worker(pool, playlist_id, chunk))
+
+    await asyncio.gather(*worker_tasks)
+
+    end_time = time.time()
+    duration = end_time - start_time
+    total_items = CONCURRENCY * ITEMS_PER_WORKER
+
+    print(f"Benchmark finished in {duration:.2f} seconds.")
+    print(f"Throughput: {total_items / duration:.2f} items/sec")
+
+
+async def verify_positions(pool, playlist_id):
+    # Verify positions
+    async with pool.acquire() as conn:
+        positions = await conn.fetch("""
+            SELECT position FROM playlist_items
+            WHERE playlist_id = $1
+            ORDER BY position
+        """, playlist_id)
+
+        pos_list = [r['position'] for r in positions]
+
+        count = len(pos_list)
+        unique_count = len(set(pos_list))
+
+        print(f"Total items inserted: {count}")
+
+        if count != unique_count:
+            print(f"❌ DUPLICATE POSITIONS DETECTED! Unique: {unique_count}, Total: {count}")
+        else:
+            print("✅ No duplicate positions.")
+
+        if count > 0:
+            min_pos = min(pos_list)
+            max_pos = max(pos_list)
+            print(f"Position range: {min_pos} to {max_pos}")
+
+            # Check for gaps
+            if max_pos - min_pos + 1 == count:
+                 print("✅ Positions are contiguous.")
+            else:
+                 print("⚠️ Positions have gaps.")
+
+
+async def cleanup_data(pool, playlist_id, user_email):
+    # Cleanup test data
+    if pool and playlist_id and user_email:
+        try:
+            print("Cleaning up test data...")
+            async with pool.acquire() as conn:
+                # Delete playlist items
+                await conn.execute("""
+                    DELETE FROM playlist_items WHERE playlist_id = $1
+                """, playlist_id)
+
+                # Delete bookmarks created by this benchmark run
+                await conn.execute("""
+                    DELETE FROM bookmarks WHERE owner_email = $1
+                """, user_email)
+
+                # Delete playlist
+                await conn.execute("""
+                    DELETE FROM playlists WHERE id = $1
+                """, playlist_id)
+
+            print("✅ Test data cleaned up successfully.")
+        except Exception as cleanup_error:
+            print(f"⚠️ Error during cleanup: {cleanup_error}")
+
+
 async def run_benchmark():
     if not asyncpg:
         print("❌ Error: 'asyncpg' library is required.")
@@ -98,84 +181,13 @@ async def run_benchmark():
         async with pool.acquire() as conn:
             playlist_id, all_bm_ids, user_email = await setup_data(conn)
 
-        print(f"Starting benchmark: {CONCURRENCY} workers, {ITEMS_PER_WORKER} items each.")
-
-        # Split bookmarks among workers
-        worker_tasks = []
-        chunk_size = ITEMS_PER_WORKER
-
-        start_time = time.time()
-
-        for i in range(CONCURRENCY):
-            chunk = all_bm_ids[i*chunk_size : (i+1)*chunk_size]
-            worker_tasks.append(worker(pool, playlist_id, chunk))
-
-        await asyncio.gather(*worker_tasks)
-
-        end_time = time.time()
-        duration = end_time - start_time
-        total_items = CONCURRENCY * ITEMS_PER_WORKER
-
-        print(f"Benchmark finished in {duration:.2f} seconds.")
-        print(f"Throughput: {total_items / duration:.2f} items/sec")
-
-        # Verify positions
-        async with pool.acquire() as conn:
-            positions = await conn.fetch("""
-                SELECT position FROM playlist_items
-                WHERE playlist_id = $1
-                ORDER BY position
-            """, playlist_id)
-
-            pos_list = [r['position'] for r in positions]
-
-            count = len(pos_list)
-            unique_count = len(set(pos_list))
-
-            print(f"Total items inserted: {count}")
-
-            if count != unique_count:
-                print(f"❌ DUPLICATE POSITIONS DETECTED! Unique: {unique_count}, Total: {count}")
-            else:
-                print("✅ No duplicate positions.")
-
-            if count > 0:
-                min_pos = min(pos_list)
-                max_pos = max(pos_list)
-                print(f"Position range: {min_pos} to {max_pos}")
-
-                # Check for gaps
-                if max_pos - min_pos + 1 == count:
-                     print("✅ Positions are contiguous.")
-                else:
-                     print("⚠️ Positions have gaps.")
+        await execute_benchmark(pool, playlist_id, all_bm_ids)
+        await verify_positions(pool, playlist_id)
 
     except Exception as e:
         print(f"An error occurred during the benchmark: {e}")
     finally:
-        # Cleanup test data
-        if pool and playlist_id and user_email:
-            try:
-                print("Cleaning up test data...")
-                async with pool.acquire() as conn:
-                    # Delete playlist items
-                    await conn.execute("""
-                        DELETE FROM playlist_items WHERE playlist_id = $1
-                    """, playlist_id)
-                    
-                    # Delete bookmarks created by this benchmark run
-                    await conn.execute("""
-                        DELETE FROM bookmarks WHERE owner_email = $1
-                    """, user_email)
-                    
-                    # Delete playlist
-                    await conn.execute("""
-                        DELETE FROM playlists WHERE id = $1
-                    """, playlist_id)
-                
-                print("✅ Test data cleaned up successfully.")
-            except Exception as cleanup_error:
-                print(f"⚠️ Error during cleanup: {cleanup_error}")
+        await cleanup_data(pool, playlist_id, user_email)
         
         if pool:
             print("Closing DB pool...")
