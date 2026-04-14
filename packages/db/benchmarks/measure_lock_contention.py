@@ -52,6 +52,33 @@ async def setup_data(conn):
 
     return playlist_id, bookmark_ids, user_email
 
+
+async def insert_batch_recursive(conn, playlist_id, bookmark_ids):
+    if not bookmark_ids:
+        return
+
+    if len(bookmark_ids) == 1:
+        bm_id = bookmark_ids[0]
+        try:
+            await conn.execute("""
+                INSERT INTO playlist_items (playlist_id, bookmark_id)
+                VALUES ($1, $2)
+            """, playlist_id, bm_id)
+        except Exception as e:
+            print(f"Error inserting {bm_id}: {e}")
+        return
+
+    try:
+        values = [(playlist_id, bm_id) for bm_id in bookmark_ids]
+        await conn.executemany("""
+            INSERT INTO playlist_items (playlist_id, bookmark_id)
+            VALUES ($1, $2)
+        """, values)
+    except Exception:
+        mid = len(bookmark_ids) // 2
+        await insert_batch_recursive(conn, playlist_id, bookmark_ids[:mid])
+        await insert_batch_recursive(conn, playlist_id, bookmark_ids[mid:])
+
 async def worker(pool, playlist_id, bookmark_ids):
     async with pool.acquire() as conn:
         try:
@@ -66,16 +93,8 @@ async def worker(pool, playlist_id, bookmark_ids):
                 VALUES ($1, $2)
             """, values)
         except Exception as batch_err:
-            print(f"Error inserting batch, falling back to individual inserts: {batch_err}")
-            # Fallback to individual inserts to maintain error granularity
-            for bm_id in bookmark_ids:
-                try:
-                    await conn.execute("""
-                        INSERT INTO playlist_items (playlist_id, bookmark_id)
-                        VALUES ($1, $2)
-                    """, playlist_id, bm_id)
-                except Exception as e:
-                    print(f"Error inserting {bm_id}: {e}")
+            print(f"Error inserting batch, falling back to divide-and-conquer: {batch_err}")
+            await insert_batch_recursive(conn, playlist_id, bookmark_ids)
 
 async def run_benchmark():
     if not asyncpg:
