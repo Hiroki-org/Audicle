@@ -75,7 +75,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "audio/mpeg")
         self.assertEqual(response.headers["content-disposition"], "attachment; filename=fallback.mp3")
         self.assertEqual(response.headers["x-fallback"], "true")
-        self.assertIn("Test error", response.headers["x-error"])
+        self.assertEqual(response.headers["x-error"], "synthesis_failed")
 
     @patch('main._split_text')
     @patch('main._synthesize_to_bytes', new_callable=AsyncMock)
@@ -92,7 +92,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "audio/mpeg")
         self.assertEqual(response.headers["content-disposition"], "attachment; filename=empty.mp3")
         self.assertEqual(response.headers["x-fallback"], "true")
-        self.assertIn("Test error", response.headers["x-error"])
+        self.assertEqual(response.headers["x-error"], "synthesis_failed")
 
     @patch('main._split_text')
     @patch('os.path.exists')
@@ -104,8 +104,10 @@ class TestSynthesizeSpeech(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         data = response.json()
-        self.assertIn("Split failed", data["detail"])
-        self.assertIn("Fallback disk read failed", data["detail"])
+        self.assertEqual(
+            data["detail"],
+            "Synthesis failed and fallback response generation also failed.",
+        )
 
 if __name__ == '__main__':
     unittest.main()

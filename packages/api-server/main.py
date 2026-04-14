@@ -8,7 +8,7 @@ import json
 import os
 import logging
 import re
-from typing import List, Pattern
+from typing import List, Pattern, cast
 import aiofiles
 from google.api_core.exceptions import GoogleAPICallError, RetryError
 from google.cloud import texttospeech
@@ -290,7 +290,7 @@ async def _synthesize_chunks_in_parallel(
 ) -> list[bytes]:
     global _tts_semaphore
     if _tts_semaphore is None:
-        max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
+        max_concurrency = MAX_CONCURRENT_TTS_REQUESTS
         _tts_semaphore = asyncio.Semaphore(max_concurrency)
 
     async def _synthesize_chunk(
@@ -307,24 +307,25 @@ async def _synthesize_chunks_in_parallel(
         for i, chunk in enumerate(text_chunks)
     ]
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    results: list[bytes | BaseException] = await asyncio.gather(
+        *tasks, return_exceptions=True
+    )
 
-    errors = [r for r in results if isinstance(r, Exception)]
+    errors = [r for r in results if isinstance(r, BaseException)]
     if errors:
-        for idx, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error(
-                    "Error synthesizing chunk %d: %s",
-                    idx + 1,
-                    str(result),
-                )
+        logger.error(
+            "Synthesis failed for %d/%d chunks: %s",
+            len(errors),
+            len(results),
+            "; ".join(f"{type(e).__name__}: {e}" for e in errors[:3]),
+        )
         raise RuntimeError(
             f"Synthesis failed for {len(errors)} out of {len(results)} chunks: "
             + "; ".join(f"{type(e).__name__}: {e}" for e in errors[:3])
             + (f" (and {len(errors) - 3} more)" if len(errors) > 3 else "")
         )
 
-    return results
+    return [cast(bytes, result) for result in results]
 
 
 async def _handle_synthesis_fallback(e: Exception) -> Response:
@@ -344,7 +345,7 @@ async def _handle_synthesis_fallback(e: Exception) -> Response:
                 headers={
                     "Content-Disposition": content_disposition,
                     "X-Fallback": "true",
-                    "X-Error": str(e),
+                    "X-Error": "synthesis_failed",
                 },
             )
         else:
@@ -356,7 +357,7 @@ async def _handle_synthesis_fallback(e: Exception) -> Response:
                 headers={
                     "Content-Disposition": content_disposition_empty,
                     "X-Fallback": "true",
-                    "X-Error": str(e),
+                    "X-Error": "synthesis_failed",
                 },
             )
 
@@ -364,10 +365,7 @@ async def _handle_synthesis_fallback(e: Exception) -> Response:
         logger.error("Fallback also failed: %s", str(fallback_error))
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Synthesis failed: {str(e)}. "
-                f"Fallback failed: {str(fallback_error)}"
-            ),
+            detail="Synthesis failed and fallback response generation also failed.",
         )
 
 
