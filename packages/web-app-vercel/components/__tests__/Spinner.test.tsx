@@ -1,11 +1,11 @@
 import React from "react";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { Spinner } from "../Spinner";
 
 describe("Spinner", () => {
   it("renders with default props correctly", () => {
-    const { container } = render(<Spinner />);
-    const spinnerElement = container.firstChild as HTMLElement;
+    render(<Spinner />);
+    const spinnerElement = screen.getByTestId("spinner");
 
     expect(spinnerElement).toBeInTheDocument();
 
@@ -27,23 +27,23 @@ describe("Spinner", () => {
   });
 
   it("renders with sm size", () => {
-    const { container } = render(<Spinner size="sm" />);
-    const spinnerElement = container.firstChild as HTMLElement;
+    render(<Spinner size="sm" />);
+    const spinnerElement = screen.getByTestId("spinner");
 
     expect(spinnerElement).toHaveClass("w-4", "h-4");
   });
 
   it("renders with lg size", () => {
-    const { container } = render(<Spinner size="lg" />);
-    const spinnerElement = container.firstChild as HTMLElement;
+    render(<Spinner size="lg" />);
+    const spinnerElement = screen.getByTestId("spinner");
 
     expect(spinnerElement).toHaveClass("w-12", "h-12");
   });
 
   it("renders with custom className", () => {
     const customClass = "test-custom-class text-red-500";
-    const { container } = render(<Spinner className={customClass} />);
-    const spinnerElement = container.firstChild as HTMLElement;
+    render(<Spinner className={customClass} />);
+    const spinnerElement = screen.getByTestId("spinner");
 
     // Should include the custom classes
     expect(spinnerElement).toHaveClass("test-custom-class", "text-red-500");
