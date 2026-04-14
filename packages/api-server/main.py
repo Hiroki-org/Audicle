@@ -97,6 +97,49 @@ _tts_semaphore = None
 SENTENCE_SPLIT_REGEX = re.compile(r'([。！？\n])')
 COMMA_SPLIT_REGEX = re.compile(r'(、)')
 
+def _force_split(text: str, limit: int) -> List[str]:
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + limit
+        while len(text[start:end].encode('utf-8')) > limit:
+            end -= 1
+        if end <= start:
+            end = start + 1
+        chunks.append(text[start:end])
+        start = end
+    return chunks
+
+def _apply_separator(text: str, sep_pattern: Pattern) -> List[str]:
+    parts = [s for s in sep_pattern.split(text) if s]
+    merged_parts = []
+    i = 0
+    while i < len(parts):
+        current = parts[i]
+        if i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
+             current += parts[i+1]
+             i += 1
+             while i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
+                 current += parts[i+1]
+                 i += 1
+        merged_parts.append(current)
+        i += 1
+    return merged_parts
+
+def _accumulate_chunks(parts: List[str], limit: int) -> List[str]:
+    chunks = []
+    current_chunk = ""
+    for part in parts:
+        if len((current_chunk + part).encode('utf-8')) > limit:
+             if current_chunk:
+                 chunks.append(current_chunk)
+             current_chunk = part
+        else:
+             current_chunk += part
+    if current_chunk:
+        chunks.append(current_chunk)
+    return chunks
+
 def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     """
     Recursively splits text into chunks smaller than `limit` bytes using `separators`.
@@ -107,76 +150,18 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
         separators: A list of regex patterns to split by, in order of priority.
                     Patterns should capture the delimiter (e.g., r'([。])') so it can be preserved.
     """
-    # Check if text fits in limit
     if len(text.encode('utf-8')) <= limit:
         return [text]
 
-    # If no separators left, force split by byte limit
     if not separators:
-        chunks = []
-        start = 0
-        while start < len(text):
-            end = start + limit
-            # Adjust end to avoid splitting multi-byte characters
-            # and ensure chunk size <= limit
-            while len(text[start:end].encode('utf-8')) > limit:
-                end -= 1
+        return _force_split(text, limit)
 
-            # Safety check to prevent infinite loop if a single char > limit (unlikely for UTF-8 and decent limit)
-            if end <= start:
-                end = start + 1
-
-            chunks.append(text[start:end])
-            start = end
-        return chunks
-
-    # Use first separator
     sep_pattern = separators[0]
     next_separators = separators[1:]
 
-    # Split text. Regex should capture delimiters so they are included in the list.
-    # e.g., re.split(r'([。])', "A。B") -> ["A", "。", "B"]
-    # Use compiled pattern split
-    parts = [s for s in sep_pattern.split(text) if s]
+    parts = _apply_separator(text, sep_pattern)
+    chunks = _accumulate_chunks(parts, limit)
 
-    # Merge punctuation/delimiters back to the previous sentence
-    merged_parts = []
-    i = 0
-    while i < len(parts):
-        current = parts[i]
-
-        # Check if next part matches the separator pattern (is a delimiter)
-        if i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
-             current += parts[i+1]
-             i += 1
-
-             # Handle consecutive delimiters (e.g., "Hello!!!")
-             # Keep appending as long as they match the pattern
-             while i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
-                 current += parts[i+1]
-                 i += 1
-
-        merged_parts.append(current)
-        i += 1
-
-    parts = merged_parts
-
-    # Accumulate parts into chunks
-    chunks = []
-    current_chunk = ""
-
-    for part in parts:
-        if len((current_chunk + part).encode('utf-8')) > limit:
-             if current_chunk:
-                 chunks.append(current_chunk)
-             current_chunk = part
-        else:
-             current_chunk += part
-
-    if current_chunk:
-        chunks.append(current_chunk)
-
-    # Recursively process any chunks that are still too big
     final_chunks = []
     for chunk in chunks:
         if len(chunk.encode('utf-8')) > limit:
