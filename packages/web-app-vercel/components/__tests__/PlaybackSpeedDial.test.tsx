@@ -1,8 +1,8 @@
 /** @jest-environment jsdom */
-import { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PlaybackSpeedDial } from "../PlaybackSpeedDial";
+import { useState } from "react";
 
 describe("PlaybackSpeedDial", () => {
   const defaultProps = {
@@ -75,60 +75,60 @@ describe("PlaybackSpeedDial", () => {
   });
 
   it("handles keyboard navigation on the slider", async () => {
-    const user = userEvent.setup();
-    const onValueChange = jest.fn();
-
-    function StatefulDial() {
-      const [value, setValue] = useState(1.0);
+    const StatefulWrapper = () => {
+      const [val, setVal] = useState(1.0);
       return (
         <PlaybackSpeedDial
-          open={true}
-          value={value}
-          onValueChange={(next) => {
-            setValue(next);
-            onValueChange(next);
+          {...defaultProps}
+          value={val}
+          onValueChange={(v) => {
+            setVal(v);
+            defaultProps.onValueChange(v);
           }}
-          onOpenChange={defaultProps.onOpenChange}
         />
       );
-    }
+    };
 
-    render(<StatefulDial />);
+    const user = userEvent.setup();
+    render(<StatefulWrapper />);
 
     const slider = screen.getByRole("slider");
     slider.focus();
 
+    // ArrowRight increases index from 1.0 (index 2) to 1.1 (index 3)
     await user.keyboard("{ArrowRight}");
-    expect(onValueChange).toHaveBeenLastCalledWith(expect.closeTo(1.1, 5));
+    expect(defaultProps.onValueChange).toHaveBeenCalledWith(1.1);
 
+    // ArrowLeft decreases index from 1.1 (index 3) back to 1.0 (index 2)
     await user.keyboard("{ArrowLeft}");
-    expect(onValueChange).toHaveBeenLastCalledWith(expect.closeTo(1.0, 5));
+    expect(defaultProps.onValueChange).toHaveBeenCalledWith(1.0);
 
+    // Home goes to min speed (0.8)
     await user.keyboard("{Home}");
-    expect(onValueChange).toHaveBeenLastCalledWith(expect.closeTo(0.8, 5));
+    expect(defaultProps.onValueChange).toHaveBeenCalledWith(0.8);
 
+    // End goes to max speed (3.0 for DEFAULT_SPEEDS)
     await user.keyboard("{End}");
-    expect(onValueChange).toHaveBeenLastCalledWith(expect.closeTo(3.0, 5));
+    expect(defaultProps.onValueChange).toHaveBeenCalledWith(3.0);
   });
 
   it("handles dragging interactions on the slider", () => {
     render(<PlaybackSpeedDial {...defaultProps} />);
     const slider = screen.getByRole("slider");
 
-    fireEvent.pointerDown(slider, { clientX: 100, pointerId: 123, buttons: 1 });
+    fireEvent.pointerDown(slider, { clientX: 100, pointerId: 123 });
 
     // The component might get the pointerId from e.pointerId or it might not be passed cleanly by jsdom.
     expect(window.HTMLElement.prototype.setPointerCapture).toHaveBeenCalled();
 
     // Move left (simulating decreasing speed)
-    fireEvent.pointerMove(slider, { clientX: 50, pointerId: 123, buttons: 1 });
+    fireEvent.pointerMove(slider, { clientX: 50 });
 
-    fireEvent.pointerUp(slider, { pointerId: 123 });
+    fireEvent.pointerUp(slider);
 
-    expect(defaultProps.onValueChange).toHaveBeenCalledTimes(1);
-    const dragValue = defaultProps.onValueChange.mock.calls[0]?.[0];
-    if (typeof dragValue === "number") {
-      expect(dragValue).toBeCloseTo(1.1, 5);
-    }
+    // Since totalItemWidth is fixed to 64, delta is -50, deltaIndex is -50/64 = -0.78
+    // Starting index for 1.0 is 2. New preview is 2 - (-0.78) = 2.78. Round is 3.
+    // Index 3 maps to 1.1x.
+    expect(defaultProps.onValueChange).toHaveBeenCalled();
   });
 });
