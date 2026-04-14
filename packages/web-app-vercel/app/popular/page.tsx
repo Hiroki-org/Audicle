@@ -179,7 +179,7 @@ export default function PopularPage() {
                 disabled={isLoading || isRateLimited}
               >
                 {isLoading && articles.length > 0 ? (
-                  <Spinner size="sm" className="border-zinc-400" />
+                  <Spinner size="sm" className="w-[18px] h-[18px] border-zinc-400" />
                 ) : (
                   <RotateCcw className="h-5 w-5" />
                 )}

@@ -1,5 +1,0 @@
-🧪 Add tests for Spinner component
-
-🎯 What: Added unit tests for the Spinner component and refactored the component implementation to use Tailwind size classes and a named export.
-📊 Coverage: The test file covers rendering with default props, specific size classes (sm, md, lg), and custom class names. Test coverage for the Spinner component is 100%.
-✨ Result: Increased test coverage and improved code consistency across the codebase by adopting utility classes and named exports.
