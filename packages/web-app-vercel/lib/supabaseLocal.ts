@@ -183,13 +183,13 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
     let sorted = [...items];
 
     if (sortField === 'title') {
-        sorted = [...items].sort((a, b) => {
+        sorted.sort((a, b) => {
             const at = a.article?.title || '';
             const bt = b.article?.title || '';
             return sortOrder === 'desc' ? bt.localeCompare(at) : at.localeCompare(bt);
         });
     } else if (['added_at', 'created_at', 'updated_at'].includes(sortField)) {
-        sorted = [...items].sort((a, b) => {
+        sorted.sort((a, b) => {
             const sField = sortField as keyof Article;
             const aDate = sortField === 'added_at' ? a.added_at : (a.article?.[sField] as string) || '';
             const bDate = sortField === 'added_at' ? b.added_at : (b.article?.[sField] as string) || '';
@@ -197,7 +197,7 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
         });
     } else {
         // position
-        sorted = [...items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+        sorted.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     }
 
     return {

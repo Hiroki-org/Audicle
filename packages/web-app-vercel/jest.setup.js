@@ -11,7 +11,7 @@ if (typeof global.structuredClone === 'undefined') {
 
 // React 18: act() を正しく扱うためのフラグ
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-// eslint-disable-next-line no-undef
+
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Next.js のグローバル変数をモック
@@ -183,4 +183,13 @@ global.URL.revokeObjectURL = jest.fn();
 // MessagePort をグローバルに定義 (undici 用)
 if (typeof global.MessagePort === 'undefined') {
   global.MessagePort = MessagePort;
+}
+
+// Polyfill markAsUncloneable for Undici v8 in Node 20 / JSDOM
+if (typeof globalThis !== 'undefined' && globalThis.core === undefined) {
+    if (!globalThis.webidl) globalThis.webidl = { util: {} };
+    if (!globalThis.webidl.util) globalThis.webidl.util = {};
+    if (!globalThis.webidl.util.markAsUncloneable) {
+        globalThis.webidl.util.markAsUncloneable = function(obj) { return obj; };
+    }
 }
