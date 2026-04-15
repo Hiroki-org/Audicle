@@ -369,6 +369,11 @@ describe("generateShuffledIndices", () => {
     expect(result).toEqual([]);
   });
 
+  test("handles negative length", () => {
+    const result = generateShuffledIndices(-5);
+    expect(result).toEqual([]);
+  });
+
   test("handles single element", () => {
     const result = generateShuffledIndices(1, 0);
     expect(result).toEqual([0]);

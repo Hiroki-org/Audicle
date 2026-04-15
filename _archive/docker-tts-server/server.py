@@ -8,8 +8,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import edge_tts
-import asyncio
-import io
 import tempfile
 import os
 from typing import Optional
