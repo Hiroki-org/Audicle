@@ -97,7 +97,7 @@ export default function ReaderView({
   // 自動スクロール: 再生中のチャンクが変わったら画面中央にスクロール
   // Chrome拡張版と同等の動作を提供
   useAutoScroll({
-    currentChunkId,
+    activeChunkIndex: currentChunkId,
     containerRef,
     enabled: true,
     delay: 0,
