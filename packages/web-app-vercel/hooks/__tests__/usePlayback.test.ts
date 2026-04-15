@@ -511,4 +511,284 @@ describe("usePlayback", () => {
       );
     });
   });
+
+  describe('pause() and stop()', () => {
+    it('pause() を呼ぶと音声が一時停止し isPlaying が false になること', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      getAudioChunk.mockResolvedValue(null);
+      audioCache.get.mockResolvedValue("blob:mock-audio-url");
+
+      const mockChunks = [{ id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" }];
+
+      const { result } = renderHook(() => usePlayback({ chunks: mockChunks }));
+
+      await act(async () => {
+        await result.current.play();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isPlaying).toBe(true);
+      });
+
+      act(() => {
+        result.current.pause();
+      });
+
+      expect(result.current.isPlaying).toBe(false);
+      expect(global.Audio.mock.results[0].value.paused).toBe(true);
+    });
+
+    it('stop() を呼ぶと音声が停止し状態がリセットされること', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      getAudioChunk.mockResolvedValue(null);
+      audioCache.get.mockResolvedValue("blob:mock-audio-url");
+
+      const mockChunks = [{ id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" }];
+
+      const { result } = renderHook(() => usePlayback({ chunks: mockChunks }));
+
+      await act(async () => {
+        await result.current.play();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isPlaying).toBe(true);
+      });
+
+      act(() => {
+        result.current.stop();
+      });
+
+      expect(result.current.isPlaying).toBe(false);
+      expect(result.current.currentIndex).toBe(-1);
+      const audioInstance = global.Audio.mock.results[0].value;
+      expect(audioInstance.paused).toBe(true);
+      expect(audioInstance.currentTime).toBe(0);
+    });
+  });
+
+  describe('playbackRate and seekToChunk', () => {
+    it('seekToChunk() が正しいチャンクのインデックスを再生すること', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      getAudioChunk.mockResolvedValue(null);
+      audioCache.get.mockResolvedValue("blob:mock-audio-url");
+
+      const mockChunks = [
+        { id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" },
+        { id: "chunk-2", text: "テスト2", cleanedText: "テスト2", type: "paragraph" },
+      ];
+
+      const { result } = renderHook(() => usePlayback({ chunks: mockChunks }));
+
+      await act(async () => {
+        await result.current.seekToChunk("chunk-2");
+      });
+
+      await waitFor(() => {
+        expect(result.current.currentIndex).toBe(1);
+        expect(result.current.currentChunkId).toBe("chunk-2");
+        expect(result.current.isPlaying).toBe(true);
+      });
+    });
+
+    it('setPlaybackRate() が状態と localStorage と audio の playbackRate を更新すること', () => {
+      const { result } = renderHook(() => usePlayback({ chunks: [] }));
+
+      act(() => {
+        result.current.setPlaybackRate(1.5);
+      });
+
+      expect(result.current.playbackRate).toBe(1.5);
+      expect(window.localStorage.setItem).toHaveBeenCalledWith('audicle-playback-rate', '1.5');
+
+      // The audio instance should also receive the updated rate if it exists
+      const audioInstance = global.Audio.mock.results[0]?.value;
+      if (audioInstance) {
+        expect(audioInstance.playbackRate).toBe(1.5);
+      }
+    });
+
+    it('playbackSpeed プロパティの変更が playbackRate に反映されること', () => {
+      const { result, rerender } = renderHook(
+        (props) => usePlayback(props),
+        { initialProps: { chunks: [], playbackSpeed: 1.0 } }
+      );
+
+      expect(result.current.playbackRate).toBe(1.0);
+
+      rerender({ chunks: [], playbackSpeed: 2.0 });
+
+      expect(result.current.playbackRate).toBe(2.0);
+    });
+  });
+
+  describe('onArticleEnd and Error handling paths', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      // fetchをモック
+      global.fetch = jest.fn(() => Promise.resolve({ ok: true }));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    });
+
+    it('最後のチャンクの再生終了時に onArticleEnd が呼ばれ、Supabase キャッシュ更新の fetch が走ること', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      getAudioChunk.mockResolvedValue(null);
+      audioCache.get.mockResolvedValue("blob:mock-audio-url");
+
+      const onArticleEndMock = jest.fn();
+      const mockChunks = [{ id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" }];
+
+      const { result } = renderHook(() => usePlayback({
+        chunks: mockChunks,
+        articleUrl: "https://example.com/test",
+        voiceModel: "ja-JP-Standard-B",
+        onArticleEnd: onArticleEndMock
+      }));
+
+      await act(async () => {
+        await result.current.play();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isPlaying).toBe(true);
+      });
+
+      const audioInstance = global.Audio.mock.results[0].value;
+
+      // onended ハンドラを発火させる
+      await act(async () => {
+        if (audioInstance.onended) {
+          audioInstance.onended();
+        }
+        // sleep のタイマーを進める
+        jest.runAllTimers();
+        // promise の解決を待つ
+        await Promise.resolve();
+      });
+
+      expect(onArticleEndMock).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith('/api/cache/update-completed', expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          articleUrl: "https://example.com/test",
+          voice: "ja-JP-Standard-B",
+          completed: true
+        })
+      }));
+      expect(result.current.isPlaying).toBe(false);
+    });
+
+
+    it('音声再生エラー時にエラーメッセージが設定され、NotAllowedError が処理されること', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      const { logger } = require("@/lib/logger");
+      getAudioChunk.mockResolvedValue(null);
+      audioCache.get.mockResolvedValue("blob:mock-audio-url");
+
+      const mockChunks = [{ id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" }];
+
+      const { result } = renderHook(() => usePlayback({ chunks: mockChunks }));
+
+      // Hook の play() を呼び出し、内部で Audio インスタンスが作成されるようにする
+      const playPromise = act(async () => {
+        // play を呼ぶ前に mock を差し替える
+        const originalPlay = global.Audio.mock.results[0]?.value?.play;
+        if (global.Audio.mock.results[0]) {
+            global.Audio.mock.results[0].value.play = jest.fn().mockRejectedValue({
+                name: 'NotAllowedError',
+                message: 'play failed'
+            });
+        } else {
+             // global.Audio mock was not instantiated yet. we overwrite the constructor implementation just for this test
+            global.Audio.mockImplementationOnce(() => {
+                const instance = new MockAudio();
+                instance.play = jest.fn().mockRejectedValue({
+                    name: 'NotAllowedError',
+                    message: 'play failed'
+                });
+                return instance;
+            });
+        }
+        await result.current.play();
+      });
+
+      await playPromise;
+
+      await waitFor(() => {
+        expect(result.current.error).toBe("音声の再生がブラウザにブロックされました。ページをクリックしてから再度お試しください。");
+      });
+
+      expect(logger.error).toHaveBeenCalledWith(
+        "再生処理全体でエラー (NotAllowedError)",
+        expect.any(Object)
+      );
+    });
+
+    it('onerror イベントで MEDIA_ERR_SRC_NOT_SUPPORTED が発生した際に 404 が処理され次のチャンクへ進むこと', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      const { logger } = require("@/lib/logger");
+      getAudioChunk.mockResolvedValue(null);
+      audioCache.get.mockResolvedValue("blob:mock-audio-url");
+
+      const mockChunks = [
+        { id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" },
+        { id: "chunk-2", text: "テスト2", cleanedText: "テスト2", type: "paragraph" }
+      ];
+
+      const { result } = renderHook(() => usePlayback({
+        chunks: mockChunks,
+        articleUrl: "https://example.com/test",
+        voiceModel: "ja-JP-Standard-B",
+      }));
+
+      await act(async () => {
+        await result.current.play();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isPlaying).toBe(true);
+      });
+
+      const audioInstance = global.Audio.mock.results[global.Audio.mock.results.length - 1].value;
+
+      // onerror イベントを発火させる
+      await act(async () => {
+        audioInstance.error = {
+          code: 4, // MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+          message: 'Not Supported'
+        };
+        // global object patch
+        global.MediaError = { MEDIA_ERR_SRC_NOT_SUPPORTED: 4 };
+
+        if (audioInstance.onerror) {
+          audioInstance.onerror(new Event('error'));
+        }
+      });
+
+      await waitFor(() => {
+         expect(result.current.error).toBe("一部の音声が再生できませんでした。次の部分から再開します。");
+      });
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Audio 404 detected"),
+        expect.any(Object)
+      );
+
+      expect(global.fetch).toHaveBeenCalledWith('/api/cache/remove', expect.objectContaining({
+        method: 'POST'
+      }));
+    });
+
+  });
 });
