@@ -66,16 +66,23 @@ async def worker(pool, playlist_id, bookmark_ids):
                 VALUES ($1, $2)
             """, values)
         except Exception as batch_err:
-            print(f"Error inserting batch, falling back to individual inserts: {batch_err}")
-            # Fallback to individual inserts to maintain error granularity
-            for bm_id in bookmark_ids:
-                try:
-                    await conn.execute("""
-                        INSERT INTO playlist_items (playlist_id, bookmark_id)
-                        VALUES ($1, $2)
-                    """, playlist_id, bm_id)
-                except Exception as e:
-                    print(f"Error inserting {bm_id}: {e}")
+            print(f"Error inserting batch, falling back to unnest batch insert: {batch_err}")
+            # Fallback to a single query using unnest to maintain performance while avoiding N+1
+            try:
+                # ON CONFLICT DO NOTHING handles duplicates, RETURNING lets us find what failed
+                inserted = await conn.fetch("""
+                    INSERT INTO playlist_items (playlist_id, bookmark_id)
+                    SELECT $1, unnest($2::uuid[])
+                    ON CONFLICT (playlist_id, bookmark_id) DO NOTHING
+                    RETURNING bookmark_id
+                """, playlist_id, bookmark_ids)
+
+                inserted_ids = {str(r['bookmark_id']) for r in inserted}
+                for bm_id in bookmark_ids:
+                    if bm_id not in inserted_ids:
+                        print(f"Error inserting {bm_id}: duplicate key value violates unique constraint")
+            except Exception as e:
+                print(f"Fallback batch insert failed entirely: {e}")
 
 async def run_benchmark():
     if not asyncpg:
