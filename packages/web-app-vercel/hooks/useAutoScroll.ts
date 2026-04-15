@@ -12,11 +12,11 @@ import { useEffect, useRef, useCallback } from "react";
  * - モバイルデバイス対応
  */
 
-interface UseAutoScrollProps {
+export interface AutoScrollProps {
     /**
      * 現在再生中のチャンクID
      */
-    currentChunkId?: string;
+    activeChunkIndex?: string;
 
     /**
      * スクロール対象となるコンテナ要素の参照
@@ -92,13 +92,13 @@ function scrollElementIntoView(
 }
 
 export function useAutoScroll({
-    currentChunkId,
+    activeChunkIndex,
     containerRef,
     enabled = true,
     delay = 100,
-}: UseAutoScrollProps) {
+}: AutoScrollProps) {
     useEffect(() => {
-        if (!enabled || !currentChunkId) {
+        if (!enabled || !activeChunkIndex) {
             return;
         }
 
@@ -106,21 +106,21 @@ export function useAutoScroll({
         const timer = setTimeout(() => {
             // data-audicle-id属性でチャンクを検索
             const element = document.querySelector(
-                `[data-audicle-id="${CSS.escape(currentChunkId)}"]`
+                `[data-audicle-id="${CSS.escape(activeChunkIndex)}"]`
             );
 
             if (!element) {
                 console.warn(
-                    `[useAutoScroll] チャンクが見つかりません: ${currentChunkId}`
+                    `[useAutoScroll] チャンクが見つかりません: ${activeChunkIndex}`
                 );
                 return;
             }
 
-            scrollElementIntoView(element, containerRef, currentChunkId);
+            scrollElementIntoView(element, containerRef, activeChunkIndex);
         }, delay);
 
         return () => clearTimeout(timer);
-    }, [currentChunkId, containerRef, enabled, delay]);
+    }, [activeChunkIndex, containerRef, enabled, delay]);
 }
 
 /**
@@ -128,12 +128,12 @@ export function useAutoScroll({
  * （現在は使用されていないが、性能最適化が必要な場合に使用可能）
  */
 export function useAutoScrollWithCache({
-    currentChunkId,
+    activeChunkIndex,
     containerRef,
     enabled = true,
     delay = 100,
     cacheSize = 10,
-}: UseAutoScrollProps & { cacheSize?: number }) {
+}: AutoScrollProps & { cacheSize?: number }) {
     const elementRefCache = useRef<Map<string, Element | null>>(new Map());
 
     // キャッシュサイズを制限する処理
@@ -149,35 +149,39 @@ export function useAutoScrollWithCache({
     }, [cacheSize]);
 
     useEffect(() => {
-        if (!enabled || !currentChunkId) {
+        if (!enabled || !activeChunkIndex) {
             return;
         }
 
         const timer = setTimeout(() => {
             // キャッシュから検索
-            let element = elementRefCache.current.get(currentChunkId);
+            let element = elementRefCache.current.get(activeChunkIndex);
+            if (element) {
+                elementRefCache.current.delete(activeChunkIndex);
+                elementRefCache.current.set(activeChunkIndex, element);
+            }
 
             if (!element) {
                 // キャッシュミス: DOM検索
                 element = document.querySelector(
-                    `[data-audicle-id="${CSS.escape(currentChunkId)}"]`
+                    `[data-audicle-id="${CSS.escape(activeChunkIndex)}"]`
                 );
 
                 if (element) {
-                    setCachedElement(currentChunkId, element);
+                    setCachedElement(activeChunkIndex, element);
                 }
             }
 
             if (!element) {
                 console.warn(
-                    `[useAutoScrollWithCache] チャンクが見つかりません: ${currentChunkId}`
+                    `[useAutoScrollWithCache] チャンクが見つかりません: ${activeChunkIndex}`
                 );
                 return;
             }
 
-            scrollElementIntoView(element, containerRef, currentChunkId);
+            scrollElementIntoView(element, containerRef, activeChunkIndex);
         }, delay);
 
         return () => clearTimeout(timer);
-    }, [currentChunkId, containerRef, enabled, delay, cacheSize, setCachedElement]);
+    }, [activeChunkIndex, containerRef, enabled, delay, cacheSize, setCachedElement]);
 }

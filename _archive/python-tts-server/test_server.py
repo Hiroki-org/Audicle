@@ -5,7 +5,6 @@ Edge TTS Server テスト用スクリプト
 """
 
 import requests
-import json
 import tempfile
 import os
 

@@ -43,8 +43,6 @@ export const ArticleCard = memo(function ArticleCard({
                 data-testid="playlist-article"
                 className="after:content-[''] after:absolute after:inset-0 after:z-10 focus:outline-none focus:underline"
                 onClick={(e) => {
-                  // If modifier keys are pressed (e.g. Cmd/Ctrl for new tab),
-                  // let the browser handle the default anchor behavior.
                   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
                     return;
                   }

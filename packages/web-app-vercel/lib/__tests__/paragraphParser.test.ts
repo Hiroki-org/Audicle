@@ -1,5 +1,6 @@
 import {
     parseHTMLToParagraphs,
+    resizeChunksIfNeeded,
     // 内部関数をテスト用にエクスポートする必要があるため、
     // テストファイルを別の形式で作成
 } from '../paragraphParser';
@@ -185,6 +186,29 @@ describe('paragraphParser', () => {
             if (paragraphs.length >= 2) {
                 expect(paragraphs[0].cleanedText.endsWith('。')).toBe(true);
             }
+        });
+    });
+
+    describe('resizeChunksIfNeeded', () => {
+        it('should return empty array for empty input', () => {
+            const result = resizeChunksIfNeeded([]);
+            expect(result).toEqual([]);
+        });
+
+        it('should handle paragraphs already meeting size requirements', () => {
+            const paragraphs = [
+                {
+                    id: 'test-1',
+                    type: 'p',
+                    originalText: 'Hello',
+                    cleanedText: 'Hello'
+                }
+            ];
+            const result = resizeChunksIfNeeded(paragraphs);
+            expect(result.length).toBe(1);
+            expect(result[0].id).toBe('para-0');
+            expect(result[0].isSplitChunk).toBe(false);
+            expect(result[0].originalText).toBe('Hello');
         });
     });
 });
