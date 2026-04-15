@@ -6,7 +6,6 @@ Edge TTS Server 起動スクリプト (Python版)
 
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 def main():
