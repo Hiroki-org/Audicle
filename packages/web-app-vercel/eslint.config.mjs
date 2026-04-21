@@ -2,6 +2,8 @@
 import js from "@eslint/js";
 import * as nextConfigPkg from "eslint-config-next";
 import typescriptParser from "@typescript-eslint/parser";
+import reactPlugin from "eslint-plugin-react";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
 import globals from "globals";
 
 // eslint-config uses fileURLToPath if needed. __filename and __dirname are not used here.
@@ -23,6 +25,10 @@ const eslintConfig = [
         ecmaFeatures: { jsx: true },
       },
       globals: { ...globals.browser, ...globals.node, React: true },
+    },
+    plugins: {
+      react: reactPlugin,
+      "react-hooks": reactHooksPlugin,
     },
     rules: {
       // Keep some rules relaxed for tests and scripts, other rules are inherited from recommended configs
