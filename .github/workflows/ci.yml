@@ -33,7 +33,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
 
       - name: Restore Playwright cache
@@ -65,7 +65,7 @@ jobs:
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Run lint
         run: npm run lint
@@ -122,7 +122,7 @@ jobs:
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Run unit tests
         run: npm run test:unit
@@ -147,7 +147,7 @@ jobs:
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Run integration tests
         run: npm run test:integration

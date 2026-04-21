@@ -22,7 +22,7 @@ jobs:
           cache: "npm"
           cache-dependency-path: packages/web-app-vercel/package-lock.json
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Seed test database
         run: npm run seed-test-data
@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: "20"
       - name: Install deps
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
@@ -66,7 +66,7 @@ jobs:
             npm-deps-${{ runner.os }}-node-20-
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Restore Playwright cache
         id: playwright-cache-pr
@@ -115,7 +115,7 @@ jobs:
             npm-deps-${{ runner.os }}-node-20-
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Run unit tests
         run: npm run test:unit
@@ -142,7 +142,7 @@ jobs:
             npm-deps-${{ runner.os }}-node-20-
       - name: Install dependencies
         if: steps.cache-deps-integration.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Run integration tests
         run: npm run test:integration
@@ -167,7 +167,7 @@ jobs:
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Build Next.js
         run: npm run build
@@ -214,7 +214,7 @@ jobs:
             npm-deps-${{ runner.os }}-node-20-
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Restore Playwright browsers
         id: playwright-cache-e2e
@@ -273,7 +273,7 @@ jobs:
             npm-deps-${{ runner.os }}-node-20-
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Restore Playwright browsers
         id: playwright-cache-e2e
@@ -325,7 +325,7 @@ jobs:
             npm-deps-${{ runner.os }}-node-20-
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: packages/web-app-vercel
       - name: Restore Playwright cache
         id: playwright-cache
