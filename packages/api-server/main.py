@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 import asyncio
 import subprocess
 import json
@@ -69,7 +69,7 @@ def _get_client() -> texttospeech.TextToSpeechClient:
 
 # Request models
 class ExtractRequest(BaseModel):
-    url: str
+    url: HttpUrl
 
 
 class SynthesizeRequest(BaseModel):
@@ -247,7 +247,7 @@ async def extract_content(request: ExtractRequest):
     try:
         # Node.jsスクリプトを実行してReadability.jsで本文抽出
         proc = await asyncio.create_subprocess_exec(
-            "node", "readability_script.js", request.url,
+            "node", "readability_script.js", str(request.url),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -258,7 +258,7 @@ async def extract_content(request: ExtractRequest):
             proc.kill()
             await proc.communicate()
             raise subprocess.TimeoutExpired(
-                ["node", "readability_script.js", request.url],
+                ["node", "readability_script.js", str(request.url)],
                 30
             )
 

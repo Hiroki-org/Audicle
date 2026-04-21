@@ -34,7 +34,7 @@ class TestExtractContent(unittest.TestCase):
 
         # Assertions
         mock_exec.assert_called_once_with(
-            "node", "readability_script.js", "http://example.com",
+            "node", "readability_script.js", "http://example.com/",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -92,6 +92,16 @@ class TestExtractContent(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()["detail"], "Internal server error: Unexpected database error")
+
+
+    def test_extract_invalid_url_injection(self):
+        # Using a URL that could be interpreted as an argument flag
+        response = self.client.post("/extract", json={"url": "-e console.log(1)"})
+        self.assertEqual(response.status_code, 422)  # Unprocessable Entity due to validation error
+
+        # Using a URL with shell injection characters
+        response = self.client.post("/extract", json={"url": "http://example.com; rm -rf /"})
+        self.assertEqual(response.status_code, 422)
 
 if __name__ == '__main__':
     unittest.main()
