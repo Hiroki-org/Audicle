@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@eslint/js": "^10.0.1",
     "@google/generative-ai": "^0.24.1",
     "@playwright/test": "^1.59.1",
     "@serwist/next": "^9.5.7",
