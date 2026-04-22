@@ -162,6 +162,12 @@ async function fetchWithTimeout(url: string, timeout: number = 8000): Promise<st
 
     try {
         while (redirectCount < maxRedirects) {
+            // SSRFチェック: fetchの直前で必ずチェックする (TOCTOU対策)
+            if (!(await isSafeUrl(currentUrl))) {
+                console.warn('[Extract API] Blocked unsafe URL access to:', currentUrl);
+                throw new SSRFBlockedError('Access to the URL is restricted for security reasons');
+            }
+
             // Use standard fetch (which now respects global dispatcher in Node 18+)
             const response = await fetch(currentUrl, {
                 signal: controller.signal,
@@ -196,12 +202,6 @@ async function fetchWithTimeout(url: string, timeout: number = 8000): Promise<st
                 // 相対パスの場合は絶対パスに変換
                 const nextUrlObj = new URL(location, currentUrl);
                 const nextUrl = nextUrlObj.toString();
-
-                // SSRFチェック（リダイレクト先もチェック）
-                if (!(await isSafeUrl(nextUrl))) {
-                    console.warn('[Extract API] Blocked unsafe redirect to:', nextUrl);
-                    throw new SSRFBlockedError('Access to the redirect URL is restricted for security reasons');
-                }
 
                 currentUrl = nextUrl;
                 redirectCount++;
