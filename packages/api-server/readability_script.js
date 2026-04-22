@@ -127,15 +127,14 @@ async function extractContent(url) {
       .filter((chunk) => chunk.length > 10) // 短すぎるチャンクを除外
       .slice(0, 50); // 最大50チャンクに制限
 
-  const result = {
+    const result = {
       title: article.title || "",
       chunks: chunks,
     };
 
     process.stdout.write(JSON.stringify(result) + "\n");
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    process.stderr.write(JSON.stringify({ error: message }) + "\n");
+    console.error(JSON.stringify({ error: error.message }));
     process.exit(1);
   }
 }
@@ -143,7 +142,7 @@ async function extractContent(url) {
 // コマンドライン引数からURLを取得
 const url = process.argv[2];
 if (!url) {
-  process.stderr.write(JSON.stringify({ error: "URL is required" }) + "\n");
+  console.error(JSON.stringify({ error: "URL is required" }));
   process.exit(1);
 }
 
