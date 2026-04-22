@@ -1,1 +1,7 @@
-submit test-playback-speed-dial "🧪 Add tests for PlaybackSpeedDial component"
+submit fix/ssrf-fetch-timeout-ci "🔒 Fix SSRF vulnerability in fetchWithTimeout and resolve CI dependency conflicts" "🔒 Fix SSRF vulnerability in fetchWithTimeout and resolve CI dependency conflicts" "🎯 **What**: Moved the `isSafeUrl` SSRF check directly inside `fetchWithTimeout` right before the `fetch` call. Also downgraded `eslint` to `^9.14.0` and `undici` to `^6.19.8` in `packages/web-app-vercel/package.json` to resolve CI build errors.
+
+⚠️ **Risk**: A Server-Side Request Forgery (SSRF) vulnerability existed because URL validation was separated from the `fetch` execution, potentially allowing malicious payloads or redirects to bypass validation and access internal networks (TOCTOU). Additionally, the CI build was failing due to conflicting peer dependencies (`eslint@10` vs `eslint-plugin-react`) and Node 20 incompatibility (`undici@8`).
+
+🛡️ **Solution**: Evaluated `isSafeUrl(currentUrl)` at the beginning of the `while` loop within `fetchWithTimeout`, throwing an `SSRFBlockedError` on failure. Removed the redundant redirect check, simplifying the logic while guaranteeing every fetched URL is securely validated. Updated `eslint` and `undici` to compatible versions to pass CI.
+
+✅ **Verification**: Ran `npm run test` locally to verify no functionality regressions. Ran `npm run build` locally to ensure the Next.js build passes. Validated via manual code review that validation properly precedes execution."
