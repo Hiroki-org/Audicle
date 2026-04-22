@@ -4,7 +4,8 @@ import { Readability } from '@mozilla/readability';
 import { normalizeArticleText } from '@/lib/parseArticle';
 import { parseHTML } from 'linkedom';
 import { ExtractResponse } from '@/types/api';
-import { isSafeUrl } from '@/lib/ssrf';
+import dns from 'dns';
+import ipaddr from 'ipaddr.js';
 
 // Node.js runtimeを明示的に指定（JSDOMはEdge Runtimeで動作しない）
 export const runtime = 'nodejs';
@@ -35,20 +36,17 @@ export async function POST(request: NextRequest) {
 
         // URLのバリデーション
         try {
-            new URL(url);
+            const parsedUrl = new URL(url);
+            if (!isSupportedProtocol(parsedUrl)) {
+                return NextResponse.json(
+                    { error: 'Access to this URL is restricted for security reasons' },
+                    { status: 403, headers: corsHeaders }
+                );
+            }
         } catch {
             return NextResponse.json(
                 { error: 'Invalid URL format' },
                 { status: 400, headers: corsHeaders }
-            );
-        }
-
-        // SSRFチェック (initial check)
-        if (!(await isSafeUrl(url))) {
-            console.warn('[Extract API] SSRF attempt blocked:', url);
-            return NextResponse.json(
-                { error: 'Access to this URL is restricted for security reasons' },
-                { status: 403, headers: corsHeaders }
             );
         }
 
@@ -112,7 +110,17 @@ export async function POST(request: NextRequest) {
 
         if (error instanceof SSRFBlockedError) {
             return NextResponse.json(
-                { error: 'Access to the redirect URL is restricted for security reasons' },
+                { error: 'Access to this URL is restricted for security reasons' },
+                { status: 403, headers: corsHeaders }
+            );
+        }
+
+        if (
+            error instanceof Error &&
+            error.cause instanceof SSRFBlockedError
+        ) {
+            return NextResponse.json(
+                { error: 'Access to this URL is restricted for security reasons' },
                 { status: 403, headers: corsHeaders }
             );
         }
@@ -134,7 +142,81 @@ export async function POST(request: NextRequest) {
 
 // Configure undici agent for custom fetch behavior
 // In test/CI environments, we might need to ignore SSL errors for internal services or proxies
-import { Agent, setGlobalDispatcher, getGlobalDispatcher } from 'undici';
+import { Agent, setGlobalDispatcher } from 'undici';
+
+type LookupAddress = { address: string; family: number };
+type LookupCallback = (..._args: [Error | null, string?, number?]) => void;
+type LookupFunction = (..._args: [string, unknown, LookupCallback]) => void;
+
+function isSupportedProtocol(url: URL): boolean {
+    return url.protocol === 'http:' || url.protocol === 'https:';
+}
+
+function isUnicastAddress(address: string): boolean {
+    try {
+        return ipaddr.parse(address).range() === 'unicast';
+    } catch {
+        return false;
+    }
+}
+
+function selectAddressByFamily(addresses: LookupAddress[], options: unknown): LookupAddress | null {
+    if (typeof options !== 'object' || options === null || !('family' in options)) {
+        return addresses[0] ?? null;
+    }
+
+    const family = (options as { family?: number }).family;
+    if (!family || family === 0) {
+        return addresses[0] ?? null;
+    }
+
+    return addresses.find(address => address.family === family) ?? null;
+}
+
+function createSsrfProtectedDispatcher(): Agent {
+    const connectOptions: {
+        rejectUnauthorized?: boolean;
+        lookup: LookupFunction;
+    } = {
+        lookup(hostname, options, callback) {
+            if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+                callback(new SSRFBlockedError(`Blocked unsafe hostname: ${hostname}`));
+                return;
+            }
+
+            dns.lookup(hostname, { all: true, verbatim: true }, (error, addresses) => {
+                if (error) {
+                    callback(error);
+                    return;
+                }
+
+                if (!addresses || addresses.length === 0) {
+                    callback(new SSRFBlockedError(`No DNS records found for hostname: ${hostname}`));
+                    return;
+                }
+
+                if (addresses.some(address => !isUnicastAddress(address.address))) {
+                    callback(new SSRFBlockedError(`Blocked non-public DNS resolution for hostname: ${hostname}`));
+                    return;
+                }
+
+                const selectedAddress = selectAddressByFamily(addresses, options);
+                if (!selectedAddress) {
+                    callback(new SSRFBlockedError(`No matching DNS address family for hostname: ${hostname}`));
+                    return;
+                }
+
+                callback(null, selectedAddress.address, selectedAddress.family);
+            });
+        },
+    };
+
+    if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
+        connectOptions.rejectUnauthorized = false;
+    }
+
+    return new Agent({ connect: connectOptions });
+}
 
 // Initialize global dispatcher if needed (safe to call multiple times)
 // This ensures fetch uses our custom agent settings
@@ -147,11 +229,13 @@ if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
     setGlobalDispatcher(agent);
 }
 
+const ssrfProtectedDispatcher = createSsrfProtectedDispatcher();
+
 /**
  * タイムアウト付きでURLをフェッチ
  * Vercelのサーバーレス関数は10秒制限があるため、8秒に設定
  *
- * NOTE: SSRF保護のため、リダイレクトは手動で処理し、ホップごとに `isSafeUrl` をチェックします。
+ * NOTE: SSRF保護のため、リダイレクトは手動で処理し、ホップごとに接続直前のDNS検証を行います。
  */
 async function fetchWithTimeout(url: string, timeout: number = 8000): Promise<string> {
     const controller = new AbortController();
@@ -162,16 +246,17 @@ async function fetchWithTimeout(url: string, timeout: number = 8000): Promise<st
 
     try {
         while (redirectCount < maxRedirects) {
-            // SSRFチェック: fetchの直前で必ずチェックする (TOCTOU対策)
-            if (!(await isSafeUrl(currentUrl))) {
-                console.warn('[Extract API] Blocked unsafe URL access to:', currentUrl);
+            const currentUrlObj = new URL(currentUrl);
+            if (!isSupportedProtocol(currentUrlObj)) {
                 throw new SSRFBlockedError('Access to the URL is restricted for security reasons');
             }
 
-            // Use standard fetch (which now respects global dispatcher in Node 18+)
+            // DNS lookup and TCP connection now share the same lookup result via dispatcher.lookup.
+            // This prevents DNS rebinding TOCTOU between safety checks and the actual fetch connection.
             const response = await fetch(currentUrl, {
                 signal: controller.signal,
                 redirect: 'manual', // 自動リダイレクトを無効化
+                dispatcher: ssrfProtectedDispatcher,
                 headers: {
                     'User-Agent':
                         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
