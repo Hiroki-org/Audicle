@@ -51,6 +51,7 @@ export class AudioCache {
 
     logger.cache("HIT", `${text.substring(0, 30)}...`);
 
+    // blob URL は再生成して返す（以前の URL が revoke 済みでも再生可能にする）
     if (cached.url.startsWith("blob:")) {
       URL.revokeObjectURL(cached.url);
     }
