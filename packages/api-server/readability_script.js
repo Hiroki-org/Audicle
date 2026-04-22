@@ -132,7 +132,7 @@ async function extractContent(url) {
       chunks: chunks,
     };
 
-    console.log(JSON.stringify(result));
+    process.stdout.write(JSON.stringify(result) + "\n");
   } catch (error) {
     console.error(JSON.stringify({ error: error.message }));
     process.exit(1);
