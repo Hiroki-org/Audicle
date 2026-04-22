@@ -38,6 +38,33 @@ export class AudioCache {
     return hash.toString(36);
   }
 
+  private tryGetFromCache(key: string, text: string): string | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+
+    const age = Date.now() - cached.timestamp;
+    if (age >= CACHE_EXPIRY) {
+      this.revoke(key);
+      return null;
+    }
+
+    logger.cache("HIT", `${text.substring(0, 30)}...`);
+
+    if (cached.url.startsWith("blob:")) {
+      URL.revokeObjectURL(cached.url);
+    }
+    const freshUrl = URL.createObjectURL(cached.blob);
+
+    this.cache.delete(key);
+    this.cache.set(key, {
+      ...cached,
+      url: freshUrl,
+      timestamp: Date.now(),
+    });
+
+    return freshUrl;
+  }
+
   // 音声を取得（キャッシュがあればそれを、なければ合成）
   async get(
     text: string,
@@ -47,36 +74,11 @@ export class AudioCache {
   ): Promise<string> {
     const key = this.getCacheKey(text, voiceModel, articleUrl);
 
-    // forceRegenerate フラグがある場合はキャッシュをスキップ
-    if (!forceRegenerate) {
-      // キャッシュチェック
-      const cached = this.cache.get(key);
-      if (cached) {
-        const age = Date.now() - cached.timestamp;
-        if (age < CACHE_EXPIRY) {
-          logger.cache("HIT", `${text.substring(0, 30)}...`);
-
-          // blob URL は再生成して返す（以前の URL が revoke 済みでも再生可能にする）
-          if (cached.url.startsWith("blob:")) {
-            URL.revokeObjectURL(cached.url);
-          }
-          const freshUrl = URL.createObjectURL(cached.blob);
-
-          // LRU戦略: 古いエントリを削除して最後に再追加することで最新にする
-          this.cache.delete(key);
-          this.cache.set(key, {
-            ...cached,
-            url: freshUrl,
-            timestamp: Date.now(),
-          });
-          return freshUrl;
-        } else {
-          // 期限切れのキャッシュを削除
-          this.revoke(key);
-        }
-      }
-    } else {
+    if (forceRegenerate) {
       logger.info("🔄 強制再生成モード", { text: text.substring(0, 30) });
+    } else {
+      const cachedUrl = this.tryGetFromCache(key, text);
+      if (cachedUrl) return cachedUrl;
     }
 
     // キャッシュミス - 新規合成
