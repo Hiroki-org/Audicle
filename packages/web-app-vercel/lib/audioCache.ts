@@ -42,7 +42,8 @@ export class AudioCache {
     const cached = this.cache.get(key);
     if (!cached) return null;
 
-    const age = Date.now() - cached.timestamp;
+    const now = Date.now();
+    const age = now - cached.timestamp;
     if (age >= CACHE_EXPIRY) {
       this.revoke(key);
       return null;
@@ -59,7 +60,7 @@ export class AudioCache {
     this.cache.set(key, {
       ...cached,
       url: freshUrl,
-      timestamp: Date.now(),
+      timestamp: now,
     });
 
     return freshUrl;
