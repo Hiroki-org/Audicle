@@ -7,13 +7,8 @@ import { createHmac } from "crypto";
 export function hashEmail(email: string): string {
   const secret = process.env.EMAIL_HASH_SECRET;
   if (!secret) {
-    // テスト環境、CI、または GitHub Actions で実行している場合は
-    // テスト用環境変数を使用して処理を続行する
-    if (
-      process.env.NODE_ENV !== "production" ||
-      process.env.CI === "true" ||
-      process.env.TEST_SESSION_TOKEN
-    ) {
+    // テスト環境（NODE_ENV !== "production"）でのみテスト用シークレットにフォールバック
+    if (process.env.NODE_ENV !== "production") {
       const testSecret = process.env.TEST_EMAIL_HASH_SECRET;
       if (!testSecret) {
         throw new Error(
