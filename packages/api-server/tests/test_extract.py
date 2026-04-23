@@ -94,14 +94,18 @@ class TestExtractContent(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "Internal server error: Unexpected database error")
 
 
-    def test_extract_invalid_url_injection(self):
+    @patch('asyncio.create_subprocess_exec', new_callable=AsyncMock)
+    def test_extract_invalid_url_injection(self, mock_exec):
         # Using a URL that could be interpreted as an argument flag
+        # Pydantic's HttpUrl validation rejects this before subprocess is invoked
         response = self.client.post("/extract", json={"url": "-e console.log(1)"})
         self.assertEqual(response.status_code, 422)  # Unprocessable Entity due to validation error
+        mock_exec.assert_not_called()
 
-        # Using a URL with shell injection characters
+        # Using a URL with invalid characters rejected by HttpUrl validation
         response = self.client.post("/extract", json={"url": "http://example.com; rm -rf /"})
         self.assertEqual(response.status_code, 422)
+        mock_exec.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

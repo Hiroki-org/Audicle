@@ -245,9 +245,10 @@ async def root():
 async def extract_content(request: ExtractRequest):
     """URLから本文を抽出する"""
     try:
+        url_str = str(request.url)
         # Node.jsスクリプトを実行してReadability.jsで本文抽出
         proc = await asyncio.create_subprocess_exec(
-            "node", "readability_script.js", str(request.url),
+            "node", "readability_script.js", url_str,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -258,7 +259,7 @@ async def extract_content(request: ExtractRequest):
             proc.kill()
             await proc.communicate()
             raise subprocess.TimeoutExpired(
-                ["node", "readability_script.js", str(request.url)],
+                ["node", "readability_script.js", url_str],
                 30
             )
 
