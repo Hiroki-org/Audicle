@@ -89,9 +89,6 @@
     "tsx": "^4.21.0",
     "typescript": "^6"
   },
-  "overrides": {
-    "eslint": "^8.57.0"
-  },
   "resolutions": {
     "eslint": "^8.57.0"
   }
