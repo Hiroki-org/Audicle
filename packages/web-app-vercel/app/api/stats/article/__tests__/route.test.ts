@@ -132,6 +132,26 @@ describe("/api/stats/article route", () => {
     });
   });
 
+  it("returns 200 with accessCount 1 when data.access_count is 0 (falsy fallback)", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: { access_count: 0 },
+      error: null,
+    });
+
+    const request = createRequest(validBody);
+    const response = await POST(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    // Note: || operator treats 0 as falsy, so it falls back to 1
+    // Consider using ?? instead of || if 0 should be preserved
+    expect(json).toEqual({
+      success: true,
+      accessCount: 1,
+      cacheHitRate: 71.43,
+    });
+  });
+
   it("returns 401 when user is not authenticated", async () => {
     (auth as jest.Mock).mockResolvedValueOnce(null);
 
@@ -186,6 +206,7 @@ describe("/api/stats/article route", () => {
     const json = await response.json();
 
     expect(response.status).toBe(500);
+    expect(json).toEqual({ error: "Internal server error" });
 
     consoleSpy.mockRestore();
   });
@@ -203,6 +224,7 @@ describe("/api/stats/article route", () => {
     const json = await response.json();
 
     expect(response.status).toBe(500);
+    expect(json).toEqual({ error: "Internal server error" });
 
     consoleSpy.mockRestore();
   });
