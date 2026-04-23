@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import ReaderView from "@/components/ReaderView";
+import { DesktopPlayerControls } from "@/components/DesktopPlayerControls";
+import { MobilePlayerControls } from "@/components/MobilePlayerControls";
 import { PlaylistSelectorModal } from "@/components/PlaylistSelectorModal";
 import { PlaylistCompletionScreen } from "@/components/PlaylistCompletionScreen";
 import { usePlaylistPlayback } from "@/contexts/PlaylistPlaybackContext";
@@ -15,7 +17,6 @@ import { extractContent, parseApiErrorMessage } from "@/lib/api";
 import { articleStorage } from "@/lib/articleStorage";
 import { logger } from "@/lib/logger";
 import { useDownload } from "@/hooks/useDownload";
-import { MobileArticleMenu } from "@/components/MobileArticleMenu";
 import { PlaybackSpeedDial } from "@/components/PlaybackSpeedDial";
 import { recordArticleStats } from "@/lib/articleStats";
 import { parseHTMLToParagraphs } from "@/lib/paragraphParser";
@@ -25,19 +26,7 @@ import { UserSettings, DEFAULT_SETTINGS } from "@/types/settings";
 import { createReaderUrl } from "@/lib/urlBuilder";
 import { zIndex } from "@/lib/zIndex";
 import { getPlaylistSortKey } from "@/lib/playlist-utils";
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Plus,
-  ListPlus,
-  ExternalLink,
-  Download,
-  Repeat,
-  Repeat1,
-  Shuffle,
-} from "lucide-react";
+
 import type { RepeatMode } from "@/contexts/PlaylistPlaybackContext";
 
 // リピートモードのラベルマップ
@@ -98,7 +87,7 @@ export default function ReaderPageClient() {
   const [detectedLanguage, setDetectedLanguage] =
     useState<DetectedLanguage>("unknown");
   const [effectiveVoiceModel, setEffectiveVoiceModel] = useState<string>(
-    DEFAULT_SETTINGS.voice_model
+    DEFAULT_SETTINGS.voice_model,
   );
   const [articleId, setArticleId] = useState<string | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
@@ -119,7 +108,7 @@ export default function ReaderPageClient() {
 
   // プレイリスト再生のための追加状態
   const [currentPlaylistIndex, setCurrentPlaylistIndex] = useState<number>(
-    indexFromQuery ? parseInt(indexFromQuery, 10) : 0
+    indexFromQuery ? parseInt(indexFromQuery, 10) : 0,
   );
   const [isPlaylistMode] = useState<boolean>(!!playlistIdFromQuery);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
@@ -189,7 +178,8 @@ export default function ReaderPageClient() {
         if (playlistState.shuffle) {
           // シャッフルモード: シャッフルキューの最後かどうか確認
           const shuffledIndices = playlistState.shuffledIndices;
-          const currentShufflePos = shuffledIndices.indexOf(currentPlaylistIndex);
+          const currentShufflePos =
+            shuffledIndices.indexOf(currentPlaylistIndex);
           isAtEnd = currentShufflePos >= shuffledIndices.length - 1;
         } else {
           isAtEnd = currentPlaylistIndex >= playlistState.totalCount - 1;
@@ -314,7 +304,7 @@ export default function ReaderPageClient() {
                 thumbnail_url: null,
                 last_read_position: 0,
               }),
-            }
+            },
           );
 
           if (itemResponse.ok) {
@@ -352,7 +342,7 @@ export default function ReaderPageClient() {
 
         // デフォルトプレイリストに追加した場合のみキャッシュ無効化
         const modifiedPlaylist = playlists.find(
-          (p) => p.id === selectedPlaylistId
+          (p) => p.id === selectedPlaylistId,
         );
 
         if (userEmail && modifiedPlaylist?.is_default) {
@@ -380,7 +370,7 @@ export default function ReaderPageClient() {
         setIsLoading(false);
       }
     },
-    [router, selectedPlaylistId, queryClient, userEmail, playlists]
+    [router, selectedPlaylistId, queryClient, userEmail, playlists],
   );
 
   // サーバーから記事（IDまたはURLで指定）を取得してステートにセットし、localStorageに保存するヘルパー
@@ -433,7 +423,10 @@ export default function ReaderPageClient() {
         });
         if (!extractRes.ok) {
           const errorText = await extractRes.text();
-          const errorMessage = parseApiErrorMessage(errorText, "記事の読み込みに失敗しました");
+          const errorMessage = parseApiErrorMessage(
+            errorText,
+            "記事の読み込みに失敗しました",
+          );
           logger.error("抽出APIに失敗しました", { status: extractRes.status });
           setError(errorMessage);
           return;
@@ -443,7 +436,7 @@ export default function ReaderPageClient() {
           convertParagraphsToChunks(data.content);
 
         setTitle(
-          isPlaylistMode ? resolvedTitle : data.title || resolvedTitle || ""
+          isPlaylistMode ? resolvedTitle : data.title || resolvedTitle || "",
         );
         setChunks(chunksWithId);
         setDetectedLanguage(detectedLanguage);
@@ -473,7 +466,7 @@ export default function ReaderPageClient() {
         setIsLoading(false);
       }
     },
-    []
+    [],
   );
 
   // ユーザー設定を読み込む
@@ -505,7 +498,7 @@ export default function ReaderPageClient() {
 
   useEffect(() => {
     setEffectiveVoiceModel(
-      selectVoiceModel(settings.voice_model, detectedLanguage)
+      selectVoiceModel(settings.voice_model, detectedLanguage),
     );
   }, [settings.voice_model, detectedLanguage]);
 
@@ -555,7 +548,7 @@ export default function ReaderPageClient() {
           "localStorageに記事が見つかりません。サーバーから取得を試みます",
           {
             id: articleIdFromQuery,
-          }
+          },
         );
         // localStorageに記事が見つからない場合、サーバーから取得してstateにセット
         fetchArticleAndSetState({ id: articleIdFromQuery });
@@ -630,7 +623,7 @@ export default function ReaderPageClient() {
             "記事がlocalStorageに見つかりません。サーバーからフェッチします",
             {
               articleId: item.article_id,
-            }
+            },
           );
 
           // localStorageに記事が見つからない場合、サーバーから取得してstateにセット
@@ -819,7 +812,7 @@ export default function ReaderPageClient() {
 
       const startIndex = indexFromQuery ? parseInt(indexFromQuery, 10) : 0;
       initializeFromPlaylist(playlistIdFromQuery, startIndex).catch((err) =>
-        logger.error("Failed to initialize playlist from query", err)
+        logger.error("Failed to initialize playlist from query", err),
       );
     }
   }, [
@@ -875,7 +868,7 @@ export default function ReaderPageClient() {
         router.push(readerUrl);
       }
     },
-    [playlistIdFromQuery, playlistState, router, currentPlaylistIndex]
+    [playlistIdFromQuery, playlistState, router, currentPlaylistIndex],
   );
 
   // プレイリストのインデックスを循環させるユーティリティ
@@ -885,7 +878,7 @@ export default function ReaderPageClient() {
       if (len === 0) return 0;
       return ((index % len) + len) % len;
     },
-    [playlistState.items.length]
+    [playlistState.items.length],
   );
 
   // 再生速度変更ハンドラー（デスクトップ版とモバイル版で共通）
@@ -893,7 +886,7 @@ export default function ReaderPageClient() {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setPlaybackRate(parseFloat(e.target.value));
     },
-    [setPlaybackRate]
+    [setPlaybackRate],
   );
 
   return (
@@ -998,165 +991,28 @@ export default function ReaderPageClient() {
 
           {/* 再生コントロール: デスクトップ用の下部固定バー (SM以上) */}
           {chunks.length > 0 && (
-            <div
-              className={`hidden sm:flex sm:fixed sm:bottom-0 sm:left-0 sm:right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 p-4 shadow-lg z-[${zIndex.desktopControls}]`}
-              data-testid="audio-player-desktop"
-            >
-              <div className="max-w-4xl mx-auto flex items-center gap-4 px-2 sm:px-6">
-                {/* 左側: 再生速度ダイアル */}
-                <button
-                  onClick={() => setIsSpeedModalOpen(true)}
-                  className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                  data-testid="speed-button"
-                  title="再生速度を変更"
-                >
-                  <span className="hidden sm:inline">
-                    {playbackRate.toFixed(1)}x
-                  </span>
-                </button>
-
-                {/* 中央: 再生/一時停止 (flex-1で中央) */}
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    {playlistState.isPlaylistMode && (
-                      <button
-                        onClick={toggleShuffle}
-                        className={`p-2 rounded-full transition-colors ${
-                          playlistState.shuffle
-                            ? "text-green-500 hover:bg-green-500/10"
-                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        }`}
-                        data-testid="desktop-shuffle-button"
-                        title={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
-                        aria-label={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
-                      >
-                        <Shuffle className="size-5" />
-                      </button>
-                    )}
-
-                    {playlistState.isPlaylistMode && (
-                      <button
-                        onClick={() => {
-                          if (isPlaylistContextReady && canMovePrevious) {
-                            navigateToPlaylistItem(
-                              wrapIndex(currentPlaylistIndex - 1)
-                            );
-                          }
-                        }}
-                        disabled={!isPlaylistContextReady || !canMovePrevious}
-                        className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        data-testid="desktop-prev-button"
-                        title="前の記事"
-                        aria-label="前の記事"
-                      >
-                        <SkipBack className="size-5" />
-                      </button>
-                    )}
-
-                    <button
-                      onClick={isPlaying ? pause : play}
-                      disabled={isPlaybackLoading}
-                      className="w-12 h-12 p-0 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-2xl"
-                      data-testid={
-                        isPlaybackLoading
-                          ? "playback-loading"
-                          : isPlaying
-                            ? "pause-button"
-                            : "play-button"
-                      }
-                      title={
-                        isPlaybackLoading
-                          ? "処理中..."
-                          : isPlaying
-                            ? "一時停止"
-                            : "再生"
-                      }
-                    >
-                      {isPlaying ? (
-                        <Pause className="size-5" />
-                      ) : (
-                        <Play className="size-5" />
-                      )}
-                    </button>
-
-                    {playlistState.isPlaylistMode && (
-                      <button
-                        onClick={() => {
-                          if (isPlaylistContextReady && canMoveNext) {
-                            navigateToPlaylistItem(
-                              wrapIndex(currentPlaylistIndex + 1)
-                            );
-                          }
-                        }}
-                        disabled={!isPlaylistContextReady || !canMoveNext}
-                        className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        data-testid="desktop-next-button"
-                        title="次の記事"
-                        aria-label="次の記事"
-                      >
-                        <SkipForward className="size-5" />
-                      </button>
-                    )}
-
-                    {playlistState.isPlaylistMode && (
-                      <button
-                        onClick={toggleRepeatMode}
-                        className={`p-2 rounded-full transition-colors ${
-                          playlistState.repeatMode !== "off"
-                            ? "text-green-500 hover:bg-green-500/10"
-                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        }`}
-                        data-testid="desktop-repeat-button"
-                        title={repeatModeLabels[playlistState.repeatMode]}
-                        aria-label={repeatModeLabels[playlistState.repeatMode]}
-                      >
-                        {playlistState.repeatMode === "one" ? (
-                          <Repeat1 className="size-5" />
-                        ) : (
-                          <Repeat className="size-5" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 右側: プレイリスト追加 + 元記事リンク・ダウンロード（アイコン化） */}
-                <div className="flex items-center gap-1 sm:gap-2">
-                  {articleId && (
-                    <button
-                      onClick={() => setIsPlaylistModalOpen(true)}
-                      className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                      data-testid="playlist-add-button"
-                      title="プレイリストに追加"
-                    >
-                      <ListPlus className="size-5" />
-                    </button>
-                  )}
-
-                  {url && (
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                      title="元記事を開く"
-                    >
-                      <ExternalLink className="size-5" />
-                    </a>
-                  )}
-                  {/* Desktop-only: full-article download button */}
-                  <button
-                    onClick={() => startDownload()}
-                    disabled={downloadStatus === "downloading"}
-                    className="hidden sm:inline-flex p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full disabled:opacity-50 transition-colors"
-                    title="記事をダウンロード"
-                    data-testid="download-button"
-                  >
-                    <Download className="size-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <DesktopPlayerControls
+              playbackRate={playbackRate}
+              setIsSpeedModalOpen={setIsSpeedModalOpen}
+              playlistState={playlistState}
+              toggleShuffle={toggleShuffle}
+              isPlaylistContextReady={isPlaylistContextReady}
+              canMovePrevious={canMovePrevious}
+              canMoveNext={canMoveNext}
+              navigateToPlaylistItem={navigateToPlaylistItem}
+              wrapIndex={wrapIndex}
+              currentPlaylistIndex={currentPlaylistIndex}
+              isPlaying={isPlaying}
+              play={play}
+              pause={pause}
+              isPlaybackLoading={isPlaybackLoading}
+              toggleRepeatMode={toggleRepeatMode}
+              articleId={articleId}
+              setIsPlaylistModalOpen={setIsPlaylistModalOpen}
+              url={url}
+              startDownload={startDownload}
+              downloadStatus={downloadStatus}
+            />
           )}
         </div>
       </header>
@@ -1210,148 +1066,28 @@ export default function ReaderPageClient() {
 
       {/* モバイル版再生コントロール: 画面下部 - 1行レイアウト */}
       {chunks.length > 0 && (
-        <div
-          className={`sm:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 p-4 shadow-lg z-[${zIndex.mobileControls}]`}
-          data-testid="audio-player"
-        >
-          <div className="flex items-center">
-            {/* 左側: 再生速度ボタン */}
-            <button
-              onClick={() => setIsSpeedModalOpen(true)}
-              className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              data-testid="speed-button-mobile"
-              title="再生速度を変更"
-            >
-              <span>{playbackRate.toFixed(1)}x</span>
-            </button>
-
-            {/* 中央: 再生停止ボタン (flex-1で中央を確保) */}
-            <div className="flex-1 flex justify-center items-center">
-              {/* Prev - Play - Next (center aligned) */}
-              {playlistState.isPlaylistMode && (
-                <button
-                  onClick={toggleShuffle}
-                  className={`p-2 rounded-full transition-colors ${
-                    playlistState.shuffle
-                      ? "text-green-500 hover:bg-green-500/10"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  }`}
-                  data-testid="mobile-shuffle-button"
-                  title={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
-                  aria-label={playlistState.shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
-                >
-                  <Shuffle className="size-4" />
-                </button>
-              )}
-
-              {playlistState.isPlaylistMode && (
-                <button
-                  onClick={() => {
-                    if (isPlaylistContextReady && canMovePrevious) {
-                      navigateToPlaylistItem(
-                        wrapIndex(currentPlaylistIndex - 1)
-                      );
-                    }
-                  }}
-                  disabled={!isPlaylistContextReady || !canMovePrevious}
-                  className="mr-2 p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="前の記事"
-                  aria-label="前の記事"
-                >
-                  <SkipBack className="size-5" />
-                </button>
-              )}
-
-              <button
-                onClick={isPlaying ? pause : play}
-                disabled={isPlaybackLoading}
-                className="px-6 py-3 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2 text-lg"
-                data-testid={
-                  isPlaybackLoading
-                    ? "playback-loading"
-                    : isPlaying
-                      ? "pause-button"
-                      : "play-button"
-                }
-                title={
-                  isPlaybackLoading
-                    ? "処理中..."
-                    : isPlaying
-                      ? "一時停止"
-                      : "再生"
-                }
-              >
-                {isPlaying ? (
-                  <Pause className="size-6" />
-                ) : (
-                  <Play className="size-6" />
-                )}
-              </button>
-
-              {playlistState.isPlaylistMode && (
-                <button
-                  onClick={() => {
-                    if (isPlaylistContextReady && canMoveNext) {
-                      navigateToPlaylistItem(
-                        wrapIndex(currentPlaylistIndex + 1)
-                      );
-                    }
-                  }}
-                  disabled={!isPlaylistContextReady || !canMoveNext}
-                  className="ml-2 p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="次の記事"
-                  aria-label="次の記事"
-                >
-                  <SkipForward className="size-5" />
-                </button>
-              )}
-
-              {playlistState.isPlaylistMode && (
-                <button
-                  onClick={toggleRepeatMode}
-                  className={`p-2 rounded-full transition-colors ${
-                    playlistState.repeatMode !== "off"
-                      ? "text-green-500 hover:bg-green-500/10"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  }`}
-                  data-testid="mobile-repeat-button"
-                  title={repeatModeLabels[playlistState.repeatMode]}
-                  aria-label={repeatModeLabels[playlistState.repeatMode]}
-                >
-                  {playlistState.repeatMode === "one" ? (
-                    <Repeat1 className="size-4" />
-                  ) : (
-                    <Repeat className="size-4" />
-                  )}
-                </button>
-              )}
-            </div>
-
-            {/* Mobile controls: Prev/Next are placed with Play center; duplicates removed */}
-
-            {/* 右側: プレイリスト追加ボタンとモバイルメニュー */}
-            <div className="flex items-center gap-2">
-              {articleId && (
-                <button
-                  onClick={() => setIsPlaylistModalOpen(true)}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  data-testid="playlist-add-button"
-                  title="プレイリストに追加"
-                >
-                  <Plus className="size-5 text-gray-600 dark:text-gray-400" />
-                </button>
-              )}
-
-              {url && (
-                <MobileArticleMenu
-                  articleUrl={url}
-                  onDownload={startDownload}
-                  isDownloading={downloadStatus === "downloading"}
-                />
-              )}
-            </div>
-          </div>
-        </div>
+        <MobilePlayerControls
+          playbackRate={playbackRate}
+          setIsSpeedModalOpen={setIsSpeedModalOpen}
+          playlistState={playlistState}
+          toggleShuffle={toggleShuffle}
+          isPlaylistContextReady={isPlaylistContextReady}
+          canMovePrevious={canMovePrevious}
+          canMoveNext={canMoveNext}
+          navigateToPlaylistItem={navigateToPlaylistItem}
+          wrapIndex={wrapIndex}
+          currentPlaylistIndex={currentPlaylistIndex}
+          isPlaying={isPlaying}
+          play={play}
+          pause={pause}
+          isPlaybackLoading={isPlaybackLoading}
+          toggleRepeatMode={toggleRepeatMode}
+          articleId={articleId}
+          setIsPlaylistModalOpen={setIsPlaylistModalOpen}
+          url={url}
+          startDownload={startDownload}
+          downloadStatus={downloadStatus}
+        />
       )}
     </div>
   );
