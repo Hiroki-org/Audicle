@@ -12,9 +12,12 @@ import {
 import React from "react";
 
 // Mock next-auth/react
+import { useSession } from "next-auth/react";
 jest.mock("next-auth/react", () => ({
   useSession: jest.fn(),
 }));
+
+const mockUseSession = useSession as jest.Mock;
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -34,8 +37,7 @@ describe("usePlaylists hooks", () => {
       },
     });
     jest.clearAllMocks();
-    const { useSession } = require("next-auth/react");
-    useSession.mockReturnValue(mockSession);
+    mockUseSession.mockReturnValue(mockSession);
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -58,8 +60,7 @@ describe("usePlaylists hooks", () => {
     });
 
     it("should not fetch when userEmail is undefined", async () => {
-      const { useSession } = require("next-auth/react");
-      useSession.mockReturnValue({ data: null, status: "unauthenticated" });
+      mockUseSession.mockReturnValue({ data: null, status: "unauthenticated" });
 
       const { result } = renderHook(() => usePlaylists(), { wrapper });
 
