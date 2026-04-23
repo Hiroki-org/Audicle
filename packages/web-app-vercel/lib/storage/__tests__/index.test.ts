@@ -1,6 +1,3 @@
-import { R2StorageProvider } from "../r2-provider";
-import { VercelBlobProvider } from "../vercel-blob-provider";
-
 describe("getStorageProvider", () => {
   const originalEnv = process.env;
 
@@ -18,6 +15,7 @@ describe("getStorageProvider", () => {
     delete process.env.STORAGE_PROVIDER;
 
     const storageIndex = await import("../index");
+    const { VercelBlobProvider } = await import("../vercel-blob-provider");
     const provider = storageIndex.getStorageProvider();
 
     expect(provider).toBeInstanceOf(VercelBlobProvider);
@@ -27,6 +25,7 @@ describe("getStorageProvider", () => {
     process.env.STORAGE_PROVIDER = "vercel-blob";
 
     const storageIndex = await import("../index");
+    const { VercelBlobProvider } = await import("../vercel-blob-provider");
     const provider = storageIndex.getStorageProvider();
 
     expect(provider).toBeInstanceOf(VercelBlobProvider);
@@ -40,6 +39,7 @@ describe("getStorageProvider", () => {
     process.env.R2_BUCKET_NAME = "test-bucket";
 
     const storageIndex = await import("../index");
+    const { R2StorageProvider } = await import("../r2-provider");
     const provider = storageIndex.getStorageProvider();
 
     expect(provider).toBeInstanceOf(R2StorageProvider);
