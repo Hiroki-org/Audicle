@@ -1,3 +1,6 @@
+import { R2StorageProvider } from "../r2-provider";
+import { VercelBlobProvider } from "../vercel-blob-provider";
+
 describe("getStorageProvider", () => {
   const originalEnv = process.env;
 
@@ -17,7 +20,7 @@ describe("getStorageProvider", () => {
     const storageIndex = await import("../index");
     const provider = storageIndex.getStorageProvider();
 
-    expect(provider.constructor.name).toBe("VercelBlobProvider");
+    expect(provider).toBeInstanceOf(VercelBlobProvider);
   });
 
   it('STORAGE_PROVIDERが"vercel-blob"の場合、VercelBlobProviderを返すこと', async () => {
@@ -26,7 +29,7 @@ describe("getStorageProvider", () => {
     const storageIndex = await import("../index");
     const provider = storageIndex.getStorageProvider();
 
-    expect(provider.constructor.name).toBe("VercelBlobProvider");
+    expect(provider).toBeInstanceOf(VercelBlobProvider);
   });
 
   it('STORAGE_PROVIDERが"r2"の場合、R2StorageProviderを返すこと', async () => {
@@ -39,7 +42,7 @@ describe("getStorageProvider", () => {
     const storageIndex = await import("../index");
     const provider = storageIndex.getStorageProvider();
 
-    expect(provider.constructor.name).toBe("R2StorageProvider");
+    expect(provider).toBeInstanceOf(R2StorageProvider);
   });
 
   it("一度作成されたプロバイダーインスタンスをキャッシュすること", async () => {
