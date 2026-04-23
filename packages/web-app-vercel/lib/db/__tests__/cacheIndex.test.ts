@@ -41,4 +41,16 @@ describe('isCachedInIndex', () => {
         } as unknown as CacheIndex;
         expect(isCachedInIndex(mockIndex, 'hash1')).toBe(false);
     });
+
+    it('returns false if cached_chunks is undefined', () => {
+        const mockIndex = {
+            article_url: 'https://example.com',
+            voice: 'en-US-Standard-A',
+            cached_chunks: undefined,
+            completed_playback: false,
+            read_count: 0,
+            last_accessed: new Date().toISOString(),
+        } as unknown as CacheIndex;
+        expect(isCachedInIndex(mockIndex, 'hash1')).toBe(false);
+    });
 });
