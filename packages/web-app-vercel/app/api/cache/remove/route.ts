@@ -21,8 +21,6 @@ export async function POST(request: NextRequest) {
         // Supabaseインデックスから削除
         await removeCachedChunk(articleUrl, voice, textHash);
 
-        console.log('[Cache Remove API] ✅ Removed from index:', { articleUrl, voice, textHash });
-
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('[Cache Remove API] Error:', error);

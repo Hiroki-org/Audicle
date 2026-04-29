@@ -52,8 +52,6 @@ export async function POST(request: NextRequest) {
             })
         );
 
-        console.log('[KV Update] ✅ completedPlayback updated:', { articleUrl, voice, completed });
-
         return NextResponse.json({
             success: true,
             articleUrl,
