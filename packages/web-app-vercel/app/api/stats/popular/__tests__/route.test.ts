@@ -216,7 +216,6 @@ describe('GET /api/stats/popular', () => {
 
         const data = await res.json();
         expect(data.error).toBe('Failed to fetch popular articles');
-        expect(data.details).toBe('Database error');
 
         consoleSpy.mockRestore();
     });

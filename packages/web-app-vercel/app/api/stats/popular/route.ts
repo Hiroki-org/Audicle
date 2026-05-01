@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
         if (error) {
             console.error('Supabase query error:', error);
             return NextResponse.json(
-                { error: 'Failed to fetch popular articles', details: error.message },
+                { error: 'Failed to fetch popular articles' },
                 { status: 500 }
             );
         }
