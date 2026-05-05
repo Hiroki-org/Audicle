@@ -1534,46 +1534,38 @@ function progressiveFetch(callback) {
 
 // バックグラウンドで残りの音声を読み込み（前後両方向、バッチリクエスト）
 function fetchRemainingInBackground(priorityStartIndex) {
-  const queuedIndices = new Set();
   const batches = [];
-  let currentBatch = [];
+  let currentForwardBatch = [];
+  const backwardBatches = [];
+  let currentBackwardBatch = [];
 
-  const addBatch = () => {
-    if (currentBatch.length > 0) {
-      batches.push([...currentBatch]);
-      currentBatch = [];
-    }
-  };
-
-  // 前方向（priorityStartIndex以降）を優先でバッチに追加
+  // 単一のパスで unCachedIndices を処理
   for (const i of unCachedIndices) {
-    if (i >= priorityStartIndex && !queuedIndices.has(i)) {
-      const item = playbackQueue[i];
-      if (item && item.text) {
-        queuedIndices.add(i);
-        currentBatch.push({ index: i, text: item.text });
-        if (currentBatch.length === batchSize) {
-          addBatch();
+    const item = playbackQueue[i];
+    if (item && item.text) {
+      if (i >= priorityStartIndex) {
+        currentForwardBatch.push({ index: i, text: item.text });
+        if (currentForwardBatch.length === batchSize) {
+          batches.push(currentForwardBatch);
+          currentForwardBatch = [];
+        }
+      } else if (i < queueIndex) {
+        currentBackwardBatch.push({ index: i, text: item.text });
+        if (currentBackwardBatch.length === batchSize) {
+          backwardBatches.push(currentBackwardBatch);
+          currentBackwardBatch = [];
         }
       }
     }
   }
-  addBatch();
 
-  // 後方向（queueIndexより前）を後回しでバッチに追加
-  for (const i of unCachedIndices) {
-    if (i < queueIndex && !queuedIndices.has(i)) {
-      const item = playbackQueue[i];
-      if (item && item.text) {
-        queuedIndices.add(i);
-        currentBatch.push({ index: i, text: item.text });
-        if (currentBatch.length === batchSize) {
-          addBatch();
-        }
-      }
-    }
+  if (currentForwardBatch.length > 0) batches.push(currentForwardBatch);
+  if (currentBackwardBatch.length > 0) backwardBatches.push(currentBackwardBatch);
+
+  // 後方向のバッチを前方向のバッチの後に追加
+  for (let i = 0; i < backwardBatches.length; i++) {
+    batches.push(backwardBatches[i]);
   }
-  addBatch();
 
   // バッチをリクエストキューに追加
   batches.forEach((batch) => {
