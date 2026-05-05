@@ -56,6 +56,23 @@ class TestExtractContent(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "Extraction failed: Readability error")
 
     @patch('asyncio.create_subprocess_exec', new_callable=AsyncMock)
+    def test_extract_subprocess_oserror(self, mock_exec):
+        mock_exec.side_effect = OSError("failed to start subprocess")
+
+        response = self.client.post("/extract", json={"url": "http://example.com"})
+
+        mock_exec.assert_called_once_with(
+            "node", "readability_script.js", "http://example.com/",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(
+            response.json()["detail"],
+            "Internal server error: failed to start subprocess",
+        )
+
+    @patch('asyncio.create_subprocess_exec', new_callable=AsyncMock)
     def test_extract_timeout_error(self, mock_exec):
         mock_proc = MagicMock()
         # Mock communicate to raise TimeoutError on the first call (inside wait_for)
