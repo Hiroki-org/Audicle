@@ -201,7 +201,7 @@ describe('GET /api/stats/popular', () => {
         }
     });
 
-    it('returns 500 when Supabase query fails', async () => {
+    it('returns sanitized 500 when Supabase query fails', async () => {
         (auth as jest.Mock).mockResolvedValue({ user: { email: 'test@example.com' } });
 
         mockQueryObj.then.mockImplementation((resolve) => {
@@ -216,6 +216,7 @@ describe('GET /api/stats/popular', () => {
 
         const data = await res.json();
         expect(data.error).toBe('Failed to fetch popular articles');
+        expect(data.details).toBeUndefined();
 
         consoleSpy.mockRestore();
     });
