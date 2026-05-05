@@ -99,7 +99,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
     def test_fallback_failure(self, mock_exists, mock_split):
         mock_split.side_effect = Exception("Split failed")
         def side_effect_func(path):
-            if path == "fallback.mp3":
+            if path == main.FALLBACK_PATH:
                 raise Exception("Fallback disk read failed")
             return True
         mock_exists.side_effect = side_effect_func
@@ -110,6 +110,8 @@ class TestSynthesizeSpeech(unittest.TestCase):
         data = response.json()
         self.assertIn("Split failed", data["detail"])
         self.assertIn("Fallback disk read failed", data["detail"])
+        mock_split.assert_called_once_with("Hello world")
+        mock_exists.assert_any_call(main.FALLBACK_PATH)
 
 
     @patch('main._split_text')
@@ -134,6 +136,10 @@ class TestSynthesizeSpeech(unittest.TestCase):
         self.assertEqual(response.headers["content-disposition"], "attachment; filename=fallback.mp3")
         self.assertEqual(response.headers["x-fallback"], "true")
         self.assertIn("Complete synthesis failure", response.headers["x-error"])
+        mock_split.assert_called_once_with("Hello world")
+        mock_synthesize.assert_called_once_with("Hello world", "test-voice")
+        mock_exists.assert_any_call(main.FALLBACK_PATH)
+        mock_aiofiles_open.assert_called_once_with(main.FALLBACK_PATH, "rb")
 
 if __name__ == '__main__':
     unittest.main()
