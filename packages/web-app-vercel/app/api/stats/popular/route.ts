@@ -20,13 +20,12 @@ interface PopularArticlesResponse {
     total: number;
 }
 
-const validPeriods = ['today', 'week', 'month', 'all'] as const;
-const validPeriodSet = new Set<string>(validPeriods);
+export const VALID_PERIODS = ['today', 'week', 'month', 'all'] as const;
+export type Period = typeof VALID_PERIODS[number];
+const VALID_PERIODS_SET = new Set<string>(VALID_PERIODS);
 
-type Period = (typeof validPeriods)[number];
-
-function isPeriod(value: string | null): value is Period {
-    return value !== null && validPeriodSet.has(value);
+function isPeriod(value: unknown): value is Period {
+    return typeof value === 'string' && VALID_PERIODS_SET.has(value);
 }
 
 /**
