@@ -1,10 +1,10 @@
 import React from 'react';
 import { render, renderHook, act } from '@testing-library/react';
 import { AudioPlaybackProvider, useAudioPlayback } from '../AudioPlaybackContext';
-import { usePlayback } from '@/hooks/usePlayback';
+import { usePlayback } from '../../hooks/usePlayback';
 
 // Mock the usePlayback hook
-jest.mock('@/hooks/usePlayback');
+jest.mock('../../hooks/usePlayback');
 
 const mockUsePlayback = usePlayback as jest.MockedFunction<typeof usePlayback>;
 
