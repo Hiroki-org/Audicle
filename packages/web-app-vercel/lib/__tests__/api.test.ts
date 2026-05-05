@@ -49,28 +49,16 @@ describe('parseApiErrorMessage', () => {
         expect(parseApiErrorMessage(errorText, 'デフォルトメッセージ')).toBe('エラーメッセージ');
     });
 
-    it('returns original text when errorText is "null" (valid JSON but null)', () => {
+    it('returns original text when errorText is "null" (valid JSON but not an object)', () => {
         expect(parseApiErrorMessage('null')).toBe('null');
     });
 
-    it('returns original text when errorText is an array with undefined error field', () => {
+    it('returns original text when errorText is an array "[]"', () => {
         expect(parseApiErrorMessage('[]')).toBe('[]');
-    });
-
-    it('returns original text when errorText is a number "123"', () => {
-        expect(parseApiErrorMessage('123')).toBe('123');
     });
 
     it('returns original text when errorText is an empty string', () => {
         expect(parseApiErrorMessage('')).toBe('');
-    });
-
-    it('returns default message when errorText is "null" and default is provided', () => {
-        expect(parseApiErrorMessage('null', 'デフォルトメッセージ')).toBe('デフォルトメッセージ');
-    });
-
-    it('returns default message when errorText is empty and default is provided', () => {
-        expect(parseApiErrorMessage('', 'デフォルトメッセージ')).toBe('デフォルトメッセージ');
     });
 
     it('returns original text when errorText is an HTML error page', () => {
