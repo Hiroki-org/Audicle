@@ -1543,7 +1543,7 @@ function fetchRemainingInBackground(priorityStartIndex) {
   for (const i of unCachedIndices) {
     const item = playbackQueue[i];
     if (item && item.text) {
-      if (i >= priorityStartIndex) {
+      if (i >= queueIndex) {
         currentForwardBatch.push({ index: i, text: item.text });
         if (currentForwardBatch.length === batchSize) {
           batches.push(currentForwardBatch);
@@ -1563,9 +1563,7 @@ function fetchRemainingInBackground(priorityStartIndex) {
   if (currentBackwardBatch.length > 0) backwardBatches.push(currentBackwardBatch);
 
   // 後方向のバッチを前方向のバッチの後に追加
-  for (let i = 0; i < backwardBatches.length; i++) {
-    batches.push(backwardBatches[i]);
-  }
+  batches.push(...backwardBatches);
 
   // バッチをリクエストキューに追加
   batches.forEach((batch) => {
