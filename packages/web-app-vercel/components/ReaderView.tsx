@@ -63,22 +63,6 @@ export default function ReaderView({
     });
   }, [articleUrl, chunkCount]);
 
-  const primaryHeading = useMemo(
-    () => chunks.find((chunk) => /^h[1-3]$/.test(chunk.type))?.text,
-    [chunks]
-  );
-
-  const articleTitle = useMemo(() => {
-    if (primaryHeading) return primaryHeading;
-    if (!articleUrl) return "記事ビュー";
-    try {
-      const url = new URL(articleUrl);
-      return url.hostname;
-    } catch {
-      return "記事ビュー";
-    }
-  }, [primaryHeading, articleUrl]);
-
   // ダウンロード機能
   const {
     status: downloadStatus,
