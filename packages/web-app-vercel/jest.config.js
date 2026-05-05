@@ -11,6 +11,7 @@ const customJestConfig = {
     "^@/lib/(.*)$": "<rootDir>/lib/$1",
     "^@/app/(.*)$": "<rootDir>/app/$1",
     "^@/components/(.*)$": "<rootDir>/components/$1",
+    "^@/hooks/(.*)$": "<rootDir>/hooks/$1",
     "^@/types/(.*)$": "<rootDir>/types/$1",
     "^until-async$": "<rootDir>/__mocks__/until-async.js",
   },

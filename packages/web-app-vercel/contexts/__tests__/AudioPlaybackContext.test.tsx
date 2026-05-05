@@ -1,6 +1,7 @@
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { AudioPlaybackProvider, useAudioPlayback } from '../AudioPlaybackContext';
+import type { AudioPlaybackContextType } from '../AudioPlaybackContext';
 import { usePlayback } from '@/hooks/usePlayback';
 
 // Mock the usePlayback hook
@@ -30,7 +31,7 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: jest.fn(),
     });
 
-    let contextValue: any;
+    let contextValue: AudioPlaybackContextType | undefined;
 
     function TestComponent() {
       contextValue = useAudioPlayback();
@@ -43,13 +44,13 @@ describe('AudioPlaybackContext', () => {
       </AudioPlaybackProvider>
     );
 
-    expect(contextValue.source).toBeNull();
-    expect(contextValue.isPlaying).toBe(false);
-    expect(contextValue.isLoading).toBe(false);
-    expect(contextValue.error).toBe('');
-    expect(contextValue.currentIndex).toBe(-1);
-    expect(contextValue.playbackRate).toBe(1);
-    expect(typeof contextValue.setSource).toBe('function');
+    expect(contextValue!.source).toBeNull();
+    expect(contextValue!.isPlaying).toBe(false);
+    expect(contextValue!.isLoading).toBe(false);
+    expect(contextValue!.error).toBe('');
+    expect(contextValue!.currentIndex).toBe(-1);
+    expect(contextValue!.playbackRate).toBe(1);
+    expect(typeof contextValue!.setSource).toBe('function');
   });
 
   it('should throw an error when useAudioPlayback is used outside of AudioPlaybackProvider', () => {
@@ -83,14 +84,14 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: jest.fn(),
     });
 
-    let contextValue: any;
+    let contextValue: AudioPlaybackContextType | undefined;
 
     function TestComponent() {
       contextValue = useAudioPlayback();
       return <div>Test</div>;
     }
 
-    const { rerender } = render(
+    render(
       <AudioPlaybackProvider>
         <TestComponent />
       </AudioPlaybackProvider>
@@ -107,16 +108,10 @@ describe('AudioPlaybackContext', () => {
     };
 
     act(() => {
-      contextValue.setSource(mockSource);
+      contextValue!.setSource(mockSource);
     });
 
-    rerender(
-      <AudioPlaybackProvider>
-        <TestComponent />
-      </AudioPlaybackProvider>
-    );
-
-    expect(contextValue.source).toEqual(mockSource);
+    expect(contextValue!.source).toEqual(mockSource);
 
     // Verify that usePlayback was called with the updated properties
     expect(mockUsePlayback).toHaveBeenCalledWith({
@@ -144,6 +139,7 @@ describe('AudioPlaybackContext', () => {
       isLoading: false,
       error: '',
       currentIndex: -1,
+      currentChunkId: undefined,
       playbackRate: 1,
       play: mockPlay,
       pause: mockPause,
@@ -154,7 +150,7 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: mockSetPlaybackRate,
     });
 
-    let contextValue: any;
+    let contextValue: AudioPlaybackContextType | undefined;
 
     function TestComponent() {
       contextValue = useAudioPlayback();
@@ -167,25 +163,25 @@ describe('AudioPlaybackContext', () => {
       </AudioPlaybackProvider>
     );
 
-    contextValue.play();
+    contextValue!.play();
     expect(mockPlay).toHaveBeenCalledTimes(1);
 
-    contextValue.pause();
+    contextValue!.pause();
     expect(mockPause).toHaveBeenCalledTimes(1);
 
-    contextValue.stop();
+    contextValue!.stop();
     expect(mockStop).toHaveBeenCalledTimes(1);
 
-    contextValue.next();
+    contextValue!.next();
     expect(mockNext).toHaveBeenCalledTimes(1);
 
-    contextValue.previous();
+    contextValue!.previous();
     expect(mockPrevious).toHaveBeenCalledTimes(1);
 
-    contextValue.seekToChunk('chunk-1');
+    contextValue!.seekToChunk('chunk-1');
     expect(mockSeekToChunk).toHaveBeenCalledWith('chunk-1');
 
-    contextValue.setPlaybackRate(1.5);
+    contextValue!.setPlaybackRate(1.5);
     expect(mockSetPlaybackRate).toHaveBeenCalledWith(1.5);
   });
 });
