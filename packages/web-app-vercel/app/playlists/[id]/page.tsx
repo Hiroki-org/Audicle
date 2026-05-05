@@ -160,9 +160,11 @@ export default function PlaylistDetailPage() {
 
   // プレイリストのアイテムをMap化してO(1)で検索できるようにする
   const itemsMap = useMemo(() => {
-    const map = new Map<string, NonNullable<NonNullable<typeof playlist>['items']>[number]>();
+    const map = new Map<string, PlaylistItemWithArticle>();
     playlist?.items?.forEach(item => {
-      if (item.article_id) map.set(item.article_id, item);
+      if (item.article_id && !map.has(item.article_id)) {
+        map.set(item.article_id, item);
+      }
     });
     return map;
   }, [playlist?.items]);
