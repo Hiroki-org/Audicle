@@ -5,6 +5,8 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import { setArticlesCache } from "@/lib/local-cache";
 
+const originalFetch = global.fetch;
+
 // Mock next-auth/react
 jest.mock("next-auth/react", () => ({
   useSession: jest.fn(),
@@ -25,6 +27,13 @@ describe("useDefaultPlaylistItems hook", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    if (!global.fetch) {
+      Object.defineProperty(global, "fetch", {
+        configurable: true,
+        writable: true,
+        value: jest.fn(),
+      });
+    }
     fetchMock = jest
       .spyOn(global, "fetch")
       .mockRejectedValue(new Error("fetch mock not configured"));
@@ -39,6 +48,9 @@ describe("useDefaultPlaylistItems hook", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    if (!originalFetch) {
+      delete (global as typeof globalThis & { fetch?: typeof fetch }).fetch;
+    }
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
