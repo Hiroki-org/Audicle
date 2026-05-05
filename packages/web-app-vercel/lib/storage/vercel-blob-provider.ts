@@ -26,6 +26,12 @@ export class VercelBlobProvider implements StorageProvider {
         return this.publicBaseUrl;
     }
 
+    private getBlobUrl(key: string): string {
+        const baseUrl = this.requirePublicBaseUrl();
+        const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+        return `${baseUrl}/${encodedKey}`;
+    }
+
     async generatePresignedPutUrl(key: string, _expiresIn: number): Promise<string> {
         const blob = await put(key, new Blob([]), {
             access: "public",
@@ -36,8 +42,7 @@ export class VercelBlobProvider implements StorageProvider {
     }
 
     async generatePresignedGetUrl(key: string, _expiresIn: number): Promise<string> {
-        const baseUrl = this.requirePublicBaseUrl();
-        return `${baseUrl}/${key}`;
+        return this.getBlobUrl(key);
     }
 
     async uploadObject(key: string, data: ArrayBuffer | Buffer, contentType: string, _expiresIn?: number): Promise<string> {
@@ -53,12 +58,12 @@ export class VercelBlobProvider implements StorageProvider {
     }
 
     async deleteObject(key: string): Promise<void> {
-        await del(key);
+        await del(this.getBlobUrl(key));
     }
 
     async headObject(key: string): Promise<{ exists: boolean; size?: number }> {
         try {
-            const response = await head(key);
+            const response = await head(this.getBlobUrl(key));
             return { exists: true, size: response.size };
         } catch {
             return { exists: false };

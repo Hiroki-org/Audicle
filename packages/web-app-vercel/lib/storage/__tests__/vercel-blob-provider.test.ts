@@ -18,30 +18,31 @@ describe("VercelBlobProvider", () => {
         provider = new VercelBlobProvider();
     });
 
-    afterAll(() => {
+    afterEach(() => {
         process.env = originalEnv;
     });
 
     describe("Initialization", () => {
-        it("should parse storeId from BLOB_READ_WRITE_TOKEN", () => {
-            expect((provider as any).publicBaseUrl).toBe("https://12345.public.blob.vercel-storage.com");
+        it("should parse storeId from BLOB_READ_WRITE_TOKEN", async () => {
+            const url = await provider.generatePresignedGetUrl("test.mp3", 3600);
+            expect(url).toBe("https://12345.public.blob.vercel-storage.com/test.mp3");
         });
 
-        it("should have undefined publicBaseUrl if token is missing", () => {
+        it("should throw if token is missing", async () => {
             delete process.env.BLOB_READ_WRITE_TOKEN;
             const newProvider = new VercelBlobProvider();
-            expect((newProvider as any).publicBaseUrl).toBeUndefined();
+            await expect(newProvider.generatePresignedGetUrl("test.mp3", 3600)).rejects.toThrow("BLOB_READ_WRITE_TOKEN is required to construct Vercel Blob URLs");
         });
 
-        it("should have undefined publicBaseUrl if token format is invalid", () => {
+        it("should throw if token format is invalid", async () => {
             process.env.BLOB_READ_WRITE_TOKEN = "invalid_token";
             const newProvider = new VercelBlobProvider();
-            expect((newProvider as any).publicBaseUrl).toBeUndefined();
+            await expect(newProvider.generatePresignedGetUrl("test.mp3", 3600)).rejects.toThrow("BLOB_READ_WRITE_TOKEN is required to construct Vercel Blob URLs");
         });
     });
 
     describe("generatePresignedPutUrl", () => {
-        it("should call put with empty Blob and return url", async () => {
+        it("should upload an empty public blob and return its url", async () => {
             (put as jest.Mock).mockResolvedValueOnce({ url: "https://example.com/put-url" });
             const url = await provider.generatePresignedPutUrl("test-key", 3600);
             expect(put).toHaveBeenCalledWith("test-key", expect.any(Blob), {
@@ -51,12 +52,22 @@ describe("VercelBlobProvider", () => {
             });
             expect(url).toBe("https://example.com/put-url");
         });
+
+        it("should throw if put rejects", async () => {
+            (put as jest.Mock).mockRejectedValueOnce(new Error("Upload failed"));
+            await expect(provider.generatePresignedPutUrl("test-key", 3600)).rejects.toThrow("Upload failed");
+        });
     });
 
     describe("generatePresignedGetUrl", () => {
         it("should generate URL based on publicBaseUrl", async () => {
             const url = await provider.generatePresignedGetUrl("test-key.mp3", 3600);
             expect(url).toBe("https://12345.public.blob.vercel-storage.com/test-key.mp3");
+        });
+
+        it("should URL-encode key path segments", async () => {
+            const url = await provider.generatePresignedGetUrl("path/to/my file.mp3", 3600);
+            expect(url).toBe("https://12345.public.blob.vercel-storage.com/path/to/my%20file.mp3");
         });
 
         it("should throw error if publicBaseUrl is missing", async () => {
@@ -95,9 +106,9 @@ describe("VercelBlobProvider", () => {
     });
 
     describe("deleteObject", () => {
-        it("should call del with the key", async () => {
+        it("should call del with the full blob URL", async () => {
             await provider.deleteObject("test-key.mp3");
-            expect(del).toHaveBeenCalledWith("test-key.mp3");
+            expect(del).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/test-key.mp3");
         });
     });
 
@@ -105,14 +116,14 @@ describe("VercelBlobProvider", () => {
         it("should return exists true and size if head succeeds", async () => {
             (head as jest.Mock).mockResolvedValueOnce({ size: 1024 });
             const result = await provider.headObject("test-key.mp3");
-            expect(head).toHaveBeenCalledWith("test-key.mp3");
+            expect(head).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/test-key.mp3");
             expect(result).toEqual({ exists: true, size: 1024 });
         });
 
         it("should return exists false if head throws", async () => {
             (head as jest.Mock).mockRejectedValueOnce(new Error("Not found"));
             const result = await provider.headObject("test-key.mp3");
-            expect(head).toHaveBeenCalledWith("test-key.mp3");
+            expect(head).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/test-key.mp3");
             expect(result).toEqual({ exists: false });
         });
     });
