@@ -64,9 +64,11 @@ describe('AudioPlaybackContext', () => {
       return <div>Test</div>;
     }
 
-    expect(() => render(<TestComponent />)).toThrow('useAudioPlayback must be used within AudioPlaybackProvider');
-
-    consoleSpy.mockRestore();
+    try {
+      expect(() => render(<TestComponent />)).toThrow('useAudioPlayback must be used within AudioPlaybackProvider');
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 
   it('should pass source properties to usePlayback when source is set', () => {
@@ -150,6 +152,7 @@ describe('AudioPlaybackContext', () => {
       isLoading: false,
       error: '',
       currentIndex: -1,
+      currentChunkId: undefined,
       playbackRate: 1,
       play: mockPlay,
       pause: mockPause,
