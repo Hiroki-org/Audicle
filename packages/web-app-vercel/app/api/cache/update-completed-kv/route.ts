@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
         await kv.hset(
             metadataKey,
             serializeArticleMetadata({
-                ...metadata,
                 completedPlayback: completed,
                 lastUpdated: new Date().toISOString(),
             })

@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { removeCachedChunk } from '@/lib/db/cacheIndex';
 import { calculateTextHash } from '@/lib/textHash';
+import { auth } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
     try {
+        const session = await auth();
+        if (!session?.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { articleUrl, voice, text, index } = await request.json();
 
         if (!articleUrl || !voice || !text || index === undefined) {
