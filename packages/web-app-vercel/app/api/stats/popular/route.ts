@@ -20,7 +20,14 @@ interface PopularArticlesResponse {
     total: number;
 }
 
-type Period = 'today' | 'week' | 'month' | 'all';
+const validPeriods = ['today', 'week', 'month', 'all'] as const;
+const validPeriodSet = new Set<string>(validPeriods);
+
+type Period = (typeof validPeriods)[number];
+
+function isPeriod(value: string | null): value is Period {
+    return value !== null && validPeriodSet.has(value);
+}
 
 /**
  * 期間に応じた日付計算
@@ -68,10 +75,7 @@ export async function GET(request: NextRequest) {
         // クエリパラメータの取得
         const searchParams = request.nextUrl.searchParams;
         const periodParam = searchParams.get('period');
-        const period: Period =
-            (periodParam === 'today' || periodParam === 'week' || periodParam === 'month' || periodParam === 'all')
-            ? periodParam
-            : 'week';
+        const period: Period = isPeriod(periodParam) ? periodParam : 'week';
 
         const domain = searchParams.get('domain');
         const limitParam = searchParams.get('limit');
