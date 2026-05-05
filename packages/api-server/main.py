@@ -366,8 +366,9 @@ async def synthesize_speech(request: SynthesizeRequest):
         try:
             logger.info("Attempting fallback: returning test audio file")
 
-            if os.path.exists(FALLBACK_PATH):
-                async with aiofiles.open(FALLBACK_PATH, "rb") as fallback_file:
+            fallback_path = FALLBACK_PATH
+            if os.path.exists(fallback_path):
+                async with aiofiles.open(fallback_path, "rb") as fallback_file:
                     fallback_audio = await fallback_file.read()
 
                 content_disposition = "attachment; filename=fallback.mp3"

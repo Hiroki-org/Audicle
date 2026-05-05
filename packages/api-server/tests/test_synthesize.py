@@ -106,12 +106,13 @@ class TestSynthesizeSpeech(unittest.TestCase):
 
         response = self.client.post("/synthesize", json={"text": "Hello world", "voice": "test-voice"})
 
+        mock_split.assert_called_once_with("Hello world")
+        mock_exists.assert_any_call(main.FALLBACK_PATH)
+
         self.assertEqual(response.status_code, 500)
         data = response.json()
         self.assertIn("Split failed", data["detail"])
         self.assertIn("Fallback disk read failed", data["detail"])
-        mock_split.assert_called_once_with("Hello world")
-        mock_exists.assert_any_call(main.FALLBACK_PATH)
 
 
     @patch('main._split_text')
@@ -130,16 +131,17 @@ class TestSynthesizeSpeech(unittest.TestCase):
 
         response = self.client.post("/synthesize", json={"text": "Hello world", "voice": "test-voice"})
 
+        mock_split.assert_called_once_with("Hello world")
+        mock_synthesize.assert_called_once_with("Hello world", "test-voice")
+        mock_exists.assert_any_call(main.FALLBACK_PATH)
+        mock_aiofiles_open.assert_called_once_with(main.FALLBACK_PATH, "rb")
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"fallback_audio_complete")
         self.assertEqual(response.headers["content-type"], "audio/mpeg")
         self.assertEqual(response.headers["content-disposition"], "attachment; filename=fallback.mp3")
         self.assertEqual(response.headers["x-fallback"], "true")
         self.assertIn("Complete synthesis failure", response.headers["x-error"])
-        mock_split.assert_called_once_with("Hello world")
-        mock_synthesize.assert_called_once_with("Hello world", "test-voice")
-        mock_exists.assert_any_call(main.FALLBACK_PATH)
-        mock_aiofiles_open.assert_called_once_with(main.FALLBACK_PATH, "rb")
 
 if __name__ == '__main__':
     unittest.main()
