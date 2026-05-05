@@ -158,16 +158,25 @@ export default function PlaylistDetailPage() {
     ]
   );
 
+  // プレイリストのアイテムをMap化してO(1)で検索できるようにする
+  const itemsMap = useMemo(() => {
+    const map = new Map<string, NonNullable<NonNullable<typeof playlist>['items']>[number]>();
+    playlist?.items?.forEach(item => {
+      if (item.article_id) map.set(item.article_id, item);
+    });
+    return map;
+  }, [playlist?.items]);
+
   const handlePlaylistAdd = useCallback(
     (articleId: string) => {
-      const item = playlist?.items?.find((item) => item.article_id === articleId);
+      const item = itemsMap.get(articleId);
       if (item) {
         setSelectedArticleId(articleId);
         setSelectedArticleTitle(item.article?.title || "");
         setIsPlaylistModalOpen(true);
       }
     },
-    [playlist?.items]
+    [itemsMap]
   );
 
   const handleArticleClick = useCallback(
