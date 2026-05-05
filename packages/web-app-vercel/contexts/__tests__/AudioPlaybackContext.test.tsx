@@ -1,7 +1,6 @@
 import React from 'react';
-import { render, act } from '@testing-library/react';
+import { render, renderHook, act } from '@testing-library/react';
 import { AudioPlaybackProvider, useAudioPlayback } from '../AudioPlaybackContext';
-import type { AudioPlaybackContextType } from '../AudioPlaybackContext';
 import { usePlayback } from '@/hooks/usePlayback';
 
 // Mock the usePlayback hook
@@ -10,6 +9,10 @@ jest.mock('@/hooks/usePlayback');
 const mockUsePlayback = usePlayback as jest.MockedFunction<typeof usePlayback>;
 
 describe('AudioPlaybackContext', () => {
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AudioPlaybackProvider>{children}</AudioPlaybackProvider>
+  );
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -31,26 +34,15 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: jest.fn(),
     });
 
-    let contextValue: AudioPlaybackContextType | undefined;
+    const { result } = renderHook(() => useAudioPlayback(), { wrapper });
 
-    function TestComponent() {
-      contextValue = useAudioPlayback();
-      return <div>Test</div>;
-    }
-
-    render(
-      <AudioPlaybackProvider>
-        <TestComponent />
-      </AudioPlaybackProvider>
-    );
-
-    expect(contextValue!.source).toBeNull();
-    expect(contextValue!.isPlaying).toBe(false);
-    expect(contextValue!.isLoading).toBe(false);
-    expect(contextValue!.error).toBe('');
-    expect(contextValue!.currentIndex).toBe(-1);
-    expect(contextValue!.playbackRate).toBe(1);
-    expect(typeof contextValue!.setSource).toBe('function');
+    expect(result.current.source).toBeNull();
+    expect(result.current.isPlaying).toBe(false);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.error).toBe('');
+    expect(result.current.currentIndex).toBe(-1);
+    expect(result.current.playbackRate).toBe(1);
+    expect(typeof result.current.setSource).toBe('function');
   });
 
   it('should throw an error when useAudioPlayback is used outside of AudioPlaybackProvider', () => {
@@ -84,18 +76,7 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: jest.fn(),
     });
 
-    let contextValue: AudioPlaybackContextType | undefined;
-
-    function TestComponent() {
-      contextValue = useAudioPlayback();
-      return <div>Test</div>;
-    }
-
-    render(
-      <AudioPlaybackProvider>
-        <TestComponent />
-      </AudioPlaybackProvider>
-    );
+    const { result } = renderHook(() => useAudioPlayback(), { wrapper });
 
     const mockSource = {
       chunks: [{ id: 'chunk-1', text: 'Hello', cleanedText: 'Hello', type: 'paragraph' as const }],
@@ -108,10 +89,10 @@ describe('AudioPlaybackContext', () => {
     };
 
     act(() => {
-      contextValue!.setSource(mockSource);
+      result.current.setSource(mockSource);
     });
 
-    expect(contextValue!.source).toEqual(mockSource);
+    expect(result.current.source).toEqual(mockSource);
 
     // Verify that usePlayback was called with the updated properties
     expect(mockUsePlayback).toHaveBeenCalledWith({
@@ -150,38 +131,27 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: mockSetPlaybackRate,
     });
 
-    let contextValue: AudioPlaybackContextType | undefined;
+    const { result } = renderHook(() => useAudioPlayback(), { wrapper });
 
-    function TestComponent() {
-      contextValue = useAudioPlayback();
-      return <div>Test</div>;
-    }
-
-    render(
-      <AudioPlaybackProvider>
-        <TestComponent />
-      </AudioPlaybackProvider>
-    );
-
-    contextValue!.play();
+    result.current.play();
     expect(mockPlay).toHaveBeenCalledTimes(1);
 
-    contextValue!.pause();
+    result.current.pause();
     expect(mockPause).toHaveBeenCalledTimes(1);
 
-    contextValue!.stop();
+    result.current.stop();
     expect(mockStop).toHaveBeenCalledTimes(1);
 
-    contextValue!.next();
+    result.current.next();
     expect(mockNext).toHaveBeenCalledTimes(1);
 
-    contextValue!.previous();
+    result.current.previous();
     expect(mockPrevious).toHaveBeenCalledTimes(1);
 
-    contextValue!.seekToChunk('chunk-1');
+    result.current.seekToChunk('chunk-1');
     expect(mockSeekToChunk).toHaveBeenCalledWith('chunk-1');
 
-    contextValue!.setPlaybackRate(1.5);
+    result.current.setPlaybackRate(1.5);
     expect(mockSetPlaybackRate).toHaveBeenCalledWith(1.5);
   });
 });
