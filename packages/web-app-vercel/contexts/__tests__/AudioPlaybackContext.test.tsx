@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, renderHook, act } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { AudioPlaybackProvider, useAudioPlayback } from '../AudioPlaybackContext';
 import { usePlayback } from '../../hooks/usePlayback';
 
@@ -9,10 +9,6 @@ jest.mock('../../hooks/usePlayback');
 const mockUsePlayback = usePlayback as jest.MockedFunction<typeof usePlayback>;
 
 describe('AudioPlaybackContext', () => {
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <AudioPlaybackProvider>{children}</AudioPlaybackProvider>
-  );
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -34,15 +30,29 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: jest.fn(),
     });
 
-    const { result } = renderHook(() => useAudioPlayback(), { wrapper });
+    let contextValue: any;
 
-    expect(result.current.source).toBeNull();
-    expect(result.current.isPlaying).toBe(false);
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.error).toBe('');
-    expect(result.current.currentIndex).toBe(-1);
-    expect(result.current.playbackRate).toBe(1);
-    expect(typeof result.current.setSource).toBe('function');
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    expect(contextValue.source).toBeNull();
+    expect(contextValue.isPlaying).toBe(false);
+    expect(contextValue.isLoading).toBe(false);
+    expect(contextValue.error).toBe('');
+    expect(contextValue.currentIndex).toBe(-1);
+    expect(contextValue.playbackRate).toBe(1);
+    expect(typeof contextValue.setSource).toBe('function');
   });
 
   it('should throw an error when useAudioPlayback is used outside of AudioPlaybackProvider', () => {
@@ -76,7 +86,21 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: jest.fn(),
     });
 
-    const { result } = renderHook(() => useAudioPlayback(), { wrapper });
+    let contextValue: any;
+
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    const { rerender } = render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
 
     const mockSource = {
       chunks: [{ id: 'chunk-1', text: 'Hello', cleanedText: 'Hello', type: 'paragraph' as const }],
@@ -89,10 +113,16 @@ describe('AudioPlaybackContext', () => {
     };
 
     act(() => {
-      result.current.setSource(mockSource);
+      contextValue.setSource(mockSource);
     });
 
-    expect(result.current.source).toEqual(mockSource);
+    rerender(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    expect(contextValue.source).toEqual(mockSource);
 
     // Verify that usePlayback was called with the updated properties
     expect(mockUsePlayback).toHaveBeenCalledWith({
@@ -120,7 +150,6 @@ describe('AudioPlaybackContext', () => {
       isLoading: false,
       error: '',
       currentIndex: -1,
-      currentChunkId: undefined,
       playbackRate: 1,
       play: mockPlay,
       pause: mockPause,
@@ -131,27 +160,41 @@ describe('AudioPlaybackContext', () => {
       setPlaybackRate: mockSetPlaybackRate,
     });
 
-    const { result } = renderHook(() => useAudioPlayback(), { wrapper });
+    let contextValue: any;
 
-    result.current.play();
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    contextValue.play();
     expect(mockPlay).toHaveBeenCalledTimes(1);
 
-    result.current.pause();
+    contextValue.pause();
     expect(mockPause).toHaveBeenCalledTimes(1);
 
-    result.current.stop();
+    contextValue.stop();
     expect(mockStop).toHaveBeenCalledTimes(1);
 
-    result.current.next();
+    contextValue.next();
     expect(mockNext).toHaveBeenCalledTimes(1);
 
-    result.current.previous();
+    contextValue.previous();
     expect(mockPrevious).toHaveBeenCalledTimes(1);
 
-    result.current.seekToChunk('chunk-1');
+    contextValue.seekToChunk('chunk-1');
     expect(mockSeekToChunk).toHaveBeenCalledWith('chunk-1');
 
-    result.current.setPlaybackRate(1.5);
+    contextValue.setPlaybackRate(1.5);
     expect(mockSetPlaybackRate).toHaveBeenCalledWith(1.5);
   });
 });
