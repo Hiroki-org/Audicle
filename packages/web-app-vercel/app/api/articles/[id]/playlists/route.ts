@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { requireAuth } from '@/lib/api-auth'
-import type { Playlist } from '@/types/playlist'
+import type { Playlist, PlaylistWithItems } from '@/types/playlist'
 import { resolveArticleId } from '@/lib/api-helpers'
 
 export async function GET(
@@ -40,10 +40,10 @@ export async function GET(
             )
         }
 
-        // Remove the nested playlist_items array before returning
-        const formattedPlaylists = playlists ? (playlists as any[]).map(p => {
-            const { playlist_items, ...rest } = p;
-            return rest;
+        // レスポンスからネストされた playlist_items を除去して返却
+        const formattedPlaylists = playlists ? (playlists as PlaylistWithItems[]).map(playlist => {
+            const { playlist_items: _playlistItems, ...rest } = playlist
+            return rest
         }) : []
 
         return NextResponse.json(formattedPlaylists as Playlist[])
