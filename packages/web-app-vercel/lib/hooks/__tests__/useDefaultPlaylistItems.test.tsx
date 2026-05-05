@@ -15,25 +15,30 @@ jest.mock("@/lib/local-cache", () => ({
   setArticlesCache: jest.fn(),
 }));
 
-// Mock fetch
-global.fetch = jest.fn();
-
 describe("useDefaultPlaylistItems hook", () => {
   let queryClient: QueryClient;
+  let fetchMock: jest.SpiedFunction<typeof fetch>;
   const mockSession = {
     data: { user: { email: "test@example.com" } },
     status: "authenticated",
   };
 
   beforeEach(() => {
+    jest.clearAllMocks();
+    fetchMock = jest
+      .spyOn(global, "fetch")
+      .mockRejectedValue(new Error("fetch mock not configured"));
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
       },
     });
-    jest.clearAllMocks();
     (useSession as jest.Mock).mockReturnValue(mockSession);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -47,16 +52,16 @@ describe("useDefaultPlaylistItems hook", () => {
       items: [{ id: "item-1", article: { id: "article-1", title: "Test Article" } }],
     };
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => mockData,
-    });
+    } as Response);
 
     const { result } = renderHook(() => useDefaultPlaylistItems(), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(global.fetch).toHaveBeenCalledWith("/api/playlists/default");
+    expect(fetchMock).toHaveBeenCalledWith("/api/playlists/default");
     expect(result.current.data).toEqual({
       playlistId: mockData.id,
       playlistName: mockData.name,
@@ -64,17 +69,49 @@ describe("useDefaultPlaylistItems hook", () => {
     });
 
     // Check useEffect side-effect
-    expect(setArticlesCache).toHaveBeenCalledWith("test@example.com", {
+    await waitFor(() =>
+      expect(setArticlesCache).toHaveBeenCalledWith("test@example.com", {
+        playlistId: mockData.id,
+        playlistName: mockData.name,
+        items: mockData.items,
+      })
+    );
+  });
+
+  it("should use empty items when default playlist response omits items", async () => {
+    const mockData = {
+      id: "playlist-1",
+      name: "Default Playlist",
+    };
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockData,
+    } as Response);
+
+    const { result } = renderHook(() => useDefaultPlaylistItems(), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toEqual({
       playlistId: mockData.id,
       playlistName: mockData.name,
-      items: mockData.items,
+      items: [],
     });
+
+    await waitFor(() =>
+      expect(setArticlesCache).toHaveBeenCalledWith("test@example.com", {
+        playlistId: mockData.id,
+        playlistName: mockData.name,
+        items: [],
+      })
+    );
   });
 
   it("should handle API error (ok: false) and not call setArticlesCache", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    fetchMock.mockResolvedValueOnce({
       ok: false,
-    });
+    } as Response);
 
     const { result } = renderHook(() => useDefaultPlaylistItems(), { wrapper });
 
@@ -93,7 +130,20 @@ describe("useDefaultPlaylistItems hook", () => {
     const { result } = renderHook(() => useDefaultPlaylistItems(), { wrapper });
 
     expect(result.current.fetchStatus).toBe("idle");
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(setArticlesCache).not.toHaveBeenCalled();
+  });
+
+  it("should not fetch if session user has no email", async () => {
+    (useSession as jest.Mock).mockReturnValue({
+      data: { user: {} },
+      status: "authenticated",
+    });
+
+    const { result } = renderHook(() => useDefaultPlaylistItems(), { wrapper });
+
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(setArticlesCache).not.toHaveBeenCalled();
   });
 });
