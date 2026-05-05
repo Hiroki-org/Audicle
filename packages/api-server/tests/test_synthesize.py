@@ -56,7 +56,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
 
     @patch('main._split_text')
     @patch('main._synthesize_to_bytes', new_callable=AsyncMock)
-    @patch('os.path.exists')
+    @patch('main.os.path.exists')
     @patch('aiofiles.open')
     def test_partial_chunk_failure_fallback_file(self, mock_aiofiles_open, mock_exists, mock_synthesize, mock_split):
         mock_split.return_value = ["Hello ", "world"]
@@ -79,7 +79,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
 
     @patch('main._split_text')
     @patch('main._synthesize_to_bytes', new_callable=AsyncMock)
-    @patch('os.path.exists')
+    @patch('main.os.path.exists')
     def test_partial_chunk_failure_no_fallback_file(self, mock_exists, mock_synthesize, mock_split):
         mock_split.return_value = ["Hello ", "world"]
         mock_synthesize.side_effect = [b"mocked_", Exception("Test error")]
@@ -95,10 +95,14 @@ class TestSynthesizeSpeech(unittest.TestCase):
         self.assertIn("Test error", response.headers["x-error"])
 
     @patch('main._split_text')
-    @patch('os.path.exists')
+    @patch('main.os.path.exists')
     def test_fallback_failure(self, mock_exists, mock_split):
         mock_split.side_effect = Exception("Split failed")
-        mock_exists.side_effect = Exception("Fallback disk read failed")
+        def side_effect_func(path):
+            if path == "fallback.mp3":
+                raise Exception("Fallback disk read failed")
+            return True
+        mock_exists.side_effect = side_effect_func
 
         response = self.client.post("/synthesize", json={"text": "Hello world", "voice": "test-voice"})
 
@@ -106,6 +110,30 @@ class TestSynthesizeSpeech(unittest.TestCase):
         data = response.json()
         self.assertIn("Split failed", data["detail"])
         self.assertIn("Fallback disk read failed", data["detail"])
+
+
+    @patch('main._split_text')
+    @patch('main._synthesize_to_bytes', new_callable=AsyncMock)
+    @patch('main.os.path.exists')
+    @patch('aiofiles.open')
+    def test_synthesis_exception_fallback(self, mock_aiofiles_open, mock_exists, mock_synthesize, mock_split):
+        mock_split.return_value = ["Hello world"]
+        mock_synthesize.side_effect = Exception("Complete synthesis failure")
+        mock_exists.return_value = True
+
+        mock_file_context = MagicMock()
+        mock_file_context.read = AsyncMock(return_value=b"fallback_audio_complete")
+        mock_aiofiles_open.return_value.__aenter__ = AsyncMock(return_value=mock_file_context)
+        mock_aiofiles_open.return_value.__aexit__ = AsyncMock()
+
+        response = self.client.post("/synthesize", json={"text": "Hello world", "voice": "test-voice"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"fallback_audio_complete")
+        self.assertEqual(response.headers["content-type"], "audio/mpeg")
+        self.assertEqual(response.headers["content-disposition"], "attachment; filename=fallback.mp3")
+        self.assertEqual(response.headers["x-fallback"], "true")
+        self.assertIn("Complete synthesis failure", response.headers["x-error"])
 
 if __name__ == '__main__':
     unittest.main()
