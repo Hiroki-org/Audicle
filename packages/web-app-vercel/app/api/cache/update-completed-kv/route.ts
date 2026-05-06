@@ -46,13 +46,10 @@ export async function POST(request: NextRequest) {
         await kv.hset(
             metadataKey,
             serializeArticleMetadata({
-                ...metadata,
                 completedPlayback: completed,
                 lastUpdated: new Date().toISOString(),
             })
         );
-
-        console.log('[KV Update] ✅ completedPlayback updated:', { articleUrl, voice, completed });
 
         return NextResponse.json({
             success: true,

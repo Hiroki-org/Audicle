@@ -24,8 +24,6 @@ export async function POST(request: NextRequest) {
 
         await updateCompletedPlayback(articleUrl, voice, completed);
 
-        console.log('[Cache Update Completed] ✅ Updated:', { articleUrl, voice, completed });
-
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('[Cache Update Completed API] Error:', error);
