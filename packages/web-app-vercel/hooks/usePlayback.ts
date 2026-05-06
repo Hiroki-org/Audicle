@@ -271,6 +271,12 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
   );
 
   const prefetchFromCurrentPosition = useCallback(() => {
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState !== "visible"
+    ) {
+      return;
+    }
     if (!isPlaying || currentIndex < 0) return;
     void prefetchAudio(currentIndex + 1).catch((error) => {
       logger.warn("Failed to prefetch audio around visibility change", error);

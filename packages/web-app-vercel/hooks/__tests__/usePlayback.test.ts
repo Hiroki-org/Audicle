@@ -86,6 +86,10 @@ describe("usePlayback", () => {
       },
       writable: true,
     });
+    Object.defineProperty(document, "visibilityState", {
+      value: "visible",
+      configurable: true,
+    });
   });
 
   afterEach(() => {
@@ -199,6 +203,10 @@ describe("usePlayback", () => {
     audioCache.prefetch.mockClear();
 
     act(() => {
+      Object.defineProperty(document, "visibilityState", {
+        value: "visible",
+        configurable: true,
+      });
       document.dispatchEvent(new Event("visibilitychange"));
     });
 
@@ -207,6 +215,44 @@ describe("usePlayback", () => {
       "ja-JP-Standard-B",
       "https://example.com/test",
     );
+  });
+
+  it("非表示への遷移では visibilitychange の先読み補充を行わないこと", async () => {
+    const { audioCache } = require("@/lib/audioCache");
+    const { getAudioChunk } = require("@/lib/indexedDB");
+
+    getAudioChunk.mockResolvedValue(null);
+    audioCache.get.mockResolvedValue("blob:mock-audio-url");
+    audioCache.prefetch.mockResolvedValue(undefined);
+
+    const mockChunks = createMockChunks(12);
+    const { result } = renderHook(() =>
+      usePlayback({
+        chunks: mockChunks,
+        articleUrl: "https://example.com/test",
+        voiceModel: "ja-JP-Standard-B",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.play();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPlaying).toBe(true);
+    });
+
+    audioCache.prefetch.mockClear();
+
+    act(() => {
+      Object.defineProperty(document, "visibilityState", {
+        value: "hidden",
+        configurable: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(audioCache.prefetch).not.toHaveBeenCalled();
   });
 
   it("複数回の再生リクエストが同時に発生した場合、2回目以降がスキップされることを確認", async () => {
