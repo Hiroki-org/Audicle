@@ -1,4 +1,5 @@
 import { AudioCache } from '../audioCache';
+import { synthesizeSpeech } from '../api';
 
 // Mock synthesizeSpeech
 jest.mock('../api', () => ({
@@ -10,6 +11,8 @@ describe('AudioCache', () => {
 
     beforeEach(() => {
         cache = new AudioCache();
+        (synthesizeSpeech as jest.Mock).mockReset();
+        (synthesizeSpeech as jest.Mock).mockResolvedValue(new Blob(['test'], { type: 'audio/wav' }));
         // Clear cache before each test
         cache.clear();
     });
@@ -104,12 +107,68 @@ describe('AudioCache', () => {
         });
 
         it('should not call synthesizeSpeech on cache hit', async () => {
-            const { synthesizeSpeech } = require('../api');
             // Clear mocks to have a clean slate for this test
             (synthesizeSpeech as jest.Mock).mockClear();
 
             await cache.get('test text', 'voice1', 'url1'); // First call, miss
             await cache.get('test text', 'voice1', 'url1'); // Second call, hit
+            expect(synthesizeSpeech).toHaveBeenCalledTimes(1);
+        });
+
+        it('should share one in-flight synthesis for concurrent requests with the same key', async () => {
+            let resolveSpeech!: (_blob: Blob) => void;
+            (synthesizeSpeech as jest.Mock).mockReturnValueOnce(
+                new Promise<Blob>((resolve) => {
+                    resolveSpeech = resolve;
+                })
+            );
+
+            const first = cache.get('same text', 'voice1', 'url1');
+            const second = cache.get('same text', 'voice1', 'url1');
+
+            expect(synthesizeSpeech).toHaveBeenCalledTimes(1);
+
+            resolveSpeech(new Blob(['deduped'], { type: 'audio/wav' }));
+
+            await expect(Promise.all([first, second])).resolves.toEqual([
+                expect.stringMatching(/^blob:/),
+                expect.stringMatching(/^blob:/),
+            ]);
+            expect(synthesizeSpeech).toHaveBeenCalledTimes(1);
+        });
+
+        it('should remove a failed in-flight request so a later call can retry', async () => {
+            const error = new Error('synthesis failed');
+            (synthesizeSpeech as jest.Mock)
+                .mockRejectedValueOnce(error)
+                .mockResolvedValueOnce(new Blob(['retry'], { type: 'audio/wav' }));
+
+            await expect(cache.get('retry text', 'voice1', 'url1')).rejects.toThrow('synthesis failed');
+
+            const retryUrl = await cache.get('retry text', 'voice1', 'url1');
+
+            expect(retryUrl).toMatch(/^blob:/);
+            expect(synthesizeSpeech).toHaveBeenCalledTimes(2);
+        });
+
+        it('should track an in-flight result that finishes after clear so it remains revocable', async () => {
+            let resolveSpeech!: (_blob: Blob) => void;
+            (synthesizeSpeech as jest.Mock)
+                .mockReturnValueOnce(
+                    new Promise<Blob>((resolve) => {
+                        resolveSpeech = resolve;
+                    })
+                )
+                .mockResolvedValueOnce(new Blob(['unexpected-resynthesis'], { type: 'audio/wav' }));
+
+            const pending = cache.get('clear text', 'voice1', 'url1');
+
+            cache.clear();
+            resolveSpeech(new Blob(['stale'], { type: 'audio/wav' }));
+
+            await expect(pending).resolves.toMatch(/^blob:/);
+            await expect(cache.get('clear text', 'voice1', 'url1')).resolves.toMatch(/^blob:/);
+
             expect(synthesizeSpeech).toHaveBeenCalledTimes(1);
         });
     });
