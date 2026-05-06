@@ -126,6 +126,8 @@ export default function ReaderPageClient() {
 
   // 自動再生の参照フラグ（useEffectの無限ループを防ぐため）
   const hasInitiatedAutoplayRef = useRef(false);
+  // 直前に再生していた記事URLを追跡（記事切り替え時のみ停止するため）
+  const prevArticleUrlRef = useRef<string>("");
 
   const chunkCount = chunks.length;
 
@@ -144,7 +146,7 @@ export default function ReaderPageClient() {
     });
   }, [url, chunkCount]);
 
-  // グローバル再生制御（ページ遷移で止めない）
+  // グローバル再生制御
   const {
     setSource: setPlaybackSource,
     isPlaying,
@@ -221,6 +223,7 @@ export default function ReaderPageClient() {
   ]);
 
   // 記事データが揃ったらグローバルプレーヤーのsourceを更新
+  // 記事URLが切り替わった場合は先に再生を停止してから新しいソースをセットする
   useEffect(() => {
     if (!isClient) return;
     if (!url || chunks.length === 0) return;
@@ -231,6 +234,12 @@ export default function ReaderPageClient() {
     } catch {
       author = undefined;
     }
+
+    // 再生速度・音声モデル変更など同一記事内の設定変更では停止しない
+    if (prevArticleUrlRef.current && prevArticleUrlRef.current !== url) {
+      stop();
+    }
+    prevArticleUrlRef.current = url;
 
     setPlaybackSource({
       chunks,
@@ -250,7 +259,16 @@ export default function ReaderPageClient() {
     title,
     handleArticleEnd,
     setPlaybackSource,
+    stop,
   ]);
+
+  // コンポーネントのアンマウント時（リーダー画面から離れるとき）に再生を停止する
+  useEffect(() => {
+    return () => {
+      stop();
+      setPlaybackSource(null);
+    };
+  }, [stop, setPlaybackSource]);
 
   // ダウンロード機能（モバイルメニュー用）はReaderViewに集約されています
   const { status: downloadStatus, startDownload } = useDownload({
