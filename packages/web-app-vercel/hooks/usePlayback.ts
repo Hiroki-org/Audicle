@@ -255,6 +255,21 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
   }, [seekToSeconds]);
 
 
+  // 音声URLを取得するヘルパー（IndexedDB → APIの順で試みる）
+  const fetchAudioUrl = useCallback(
+    async (index: number, forceRegenerate: boolean = false): Promise<string> => {
+      const chunk = chunks[index];
+      if (articleUrl && !forceRegenerate) {
+        const cachedChunk = await getAudioChunk(articleUrl, index, voiceModel);
+        if (cachedChunk) {
+          return URL.createObjectURL(cachedChunk.audioData);
+        }
+      }
+      return audioCache.get(chunk.cleanedText, voiceModel, articleUrl, forceRegenerate);
+    },
+    [chunks, articleUrl, voiceModel]
+  );
+
   // 先読み処理（クリーンアップ済みテキストを使用）
   const prefetchAudio = useCallback(
     async (startIndex: number) => {
@@ -315,37 +330,8 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
           await sleep(getPauseDuration("heading"));
         }
 
-        let audioUrl: string;
-        if (articleUrl) {
-          logger.info(`💾 IndexedDB: チャンク ${index + 1} をチェック中`);
-          const cachedChunk = await getAudioChunk(
-            articleUrl,
-            index,
-            voiceModel
-          );
-          if (cachedChunk) {
-            logger.info(`✅ IndexedDB: キャッシュヒット チャンク ${index + 1}`);
-            audioUrl = URL.createObjectURL(cachedChunk.audioData);
-          } else {
-            logger.info(`❌ IndexedDB: キャッシュミス チャンク ${index + 1}。バックエンドAPIを呼び出します。`, {
-              articleUrl: articleUrl ?? null,
-              chunkIndex: index,
-            });
-            audioUrl = await audioCache.get(
-              chunk.cleanedText,
-              voiceModel,
-              articleUrl
-            );
-          }
-        } else {
-          logger.info(
-            "🌐 articleUrl が未設定のため、IndexedDBをスキップしてバックエンドAPIを呼び出します。",
-            {
-              chunkIndex: index,
-            }
-          );
-          audioUrl = await audioCache.get(chunk.cleanedText, voiceModel);
-        }
+        logger.info(`💾 音声取得: チャンク ${index + 1}/${chunks.length}`);
+        const audioUrl = await fetchAudioUrl(index);
 
         // 先読み
         prefetchAudio(index + 1);
@@ -361,6 +347,9 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
           // noop
         }
 
+        // 古いハンドラをクリアしてから src をセット（旧ハンドラが誤発火するのを防ぐ）
+        audio.onended = null;
+        audio.onerror = null;
         audio.src = audioUrl;
         currentAudioUrlRef.current = audioUrl;
 
@@ -382,7 +371,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
           const mediaError = audio.error;
 
           if (mediaError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-            logger.warn("⚠️ Audio 404 detected (LRU deletion), skipping to the next chunk.", {
+            logger.warn("⚠️ Audio 404 detected (LRU deletion), attempting to re-fetch audio.", {
               chunkIndex: index,
               text: chunk.cleanedText.substring(0, 50),
               errorCode: mediaError.code,
@@ -409,9 +398,40 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
               });
             }
 
-            setError("一部の音声が再生できませんでした。次の部分から再開します。");
-            // 次のチャンクへ進む
-            handleAudioEnded(index);
+            // ハンドラを一旦クリアして再取得を試みる
+            audio.onended = null;
+            audio.onerror = null;
+            if (currentAudioUrlRef.current?.startsWith("blob:")) {
+              URL.revokeObjectURL(currentAudioUrlRef.current);
+            }
+            audio.src = "";
+            currentAudioUrlRef.current = null;
+
+            try {
+              logger.info(`🔄 音声を強制再取得中: チャンク ${index + 1}`);
+              const newUrl = await fetchAudioUrl(index, true);
+              audio.src = newUrl;
+              currentAudioUrlRef.current = newUrl;
+              audio.playbackRate = isNaN(rate) ? DEFAULT_PLAYBACK_RATE : rate;
+              await audio.play();
+              // 再取得成功：ハンドラを再登録
+              audio.onended = () => handleAudioEnded(index);
+              audio.onerror = async (e2) => {
+                const err2 = audio.error;
+                const errorMessage2 = `音声の再生に失敗しました (Code: ${err2?.code})`;
+                logger.error("音声再生エラー（再取得後）", { error: err2, event: e2, chunkIndex: index });
+                setError(errorMessage2);
+                setIsPlaying(false);
+              };
+              logger.info(`✅ 再取得成功: チャンク ${index + 1}`);
+            } catch (refetchErr) {
+              logger.warn(`⚠️ 再取得失敗: チャンク ${index + 1}、次のチャンクへスキップします。`, refetchErr);
+              setError("一部の音声が再生できませんでした。次の部分から再開します。");
+              // 次のチャンクへ進む
+              void playFromIndexRef.current(index + 1).catch((skipErr) => {
+                logger.error("次チャンクへのスキップ中にエラー", skipErr);
+              });
+            }
             return;
           }
 
@@ -443,18 +463,70 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
             chunkIndex: index,
           });
           setError("");
+          setIsPlaying(false);
         } else if (error.name === "NotAllowedError") {
           setError(
             "音声の再生がブラウザにブロックされました。ページをクリックしてから再度お試しください。"
           );
           logger.error("再生処理全体でエラー (NotAllowedError)", err);
+          setIsPlaying(false);
+        } else if (error.name === "NotSupportedError") {
+          // play() が NotSupportedError をスローした場合（src が無効）、強制再取得を試みる
+          logger.warn("⚠️ NotSupportedError が発生しました。音声を強制再取得します。", {
+            chunkIndex: index,
+            errorMessage: error.message,
+          });
+          const audio = audioRef.current;
+          if (audio) {
+            audio.onended = null;
+            audio.onerror = null;
+            if (currentAudioUrlRef.current?.startsWith("blob:")) {
+              URL.revokeObjectURL(currentAudioUrlRef.current);
+            }
+            audio.src = "";
+            currentAudioUrlRef.current = null;
+          }
+          try {
+            const chunk = chunks[index];
+            const newUrl = await fetchAudioUrl(index, true);
+            if (audio) {
+              audio.src = newUrl;
+              currentAudioUrlRef.current = newUrl;
+              const rate2 = parseFloat(localStorage.getItem(PLAYBACK_RATE_STORAGE_KEY) || "");
+              audio.playbackRate = isNaN(rate2) ? DEFAULT_PLAYBACK_RATE : rate2;
+              await audio.play();
+              setIsPlaying(true);
+              audio.onended = () => handleAudioEnded(index);
+              audio.onerror = async (e3) => {
+                const err3 = audio.error;
+                logger.error("音声再生エラー（NotSupportedError後の再取得後）", { error: err3, event: e3, chunkIndex: index });
+                setError(`音声の再生に失敗しました (Code: ${err3?.code})`);
+                setIsPlaying(false);
+              };
+              setCurrentIndex(index);
+              onChunkChange?.(chunk.id);
+              logger.info(`✅ NotSupportedError後の再取得成功: チャンク ${index + 1}`);
+              // 再取得・再生成功のため setIsPlaying(false) は呼ばない
+            } else {
+              setIsPlaying(false);
+            }
+          } catch (refetchErr2) {
+            logger.warn(`⚠️ NotSupportedError後の再取得失敗: チャンク ${index + 1}、次のチャンクへスキップします。`, refetchErr2);
+            setError("一部の音声が再生できませんでした。次の部分から再開します。");
+            setIsPlaying(false);
+            // isPlayingRequestInProgressRef をリセットしてから次チャンクへ
+            isPlayingRequestInProgressRef.current = false;
+            void playFromIndexRef.current(index + 1).catch((skipErr) => {
+              logger.error("次チャンクへのスキップ中にエラー", skipErr);
+            });
+          }
         } else {
           setError(
             err instanceof Error ? err.message : "不明なエラーが発生しました"
           );
           logger.error("再生処理全体でエラー", err);
+          setIsPlaying(false);
         }
-        setIsPlaying(false);
       } finally {
         setIsLoading(false);
         isPlayingRequestInProgressRef.current = false;
@@ -466,6 +538,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       voiceModel,
       onChunkChange,
       prefetchAudio,
+      fetchAudioUrl,
       handleAudioEnded,
       installPositionStateUpdater,
     ]

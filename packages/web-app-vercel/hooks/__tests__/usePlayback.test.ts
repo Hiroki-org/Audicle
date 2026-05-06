@@ -734,11 +734,12 @@ describe("usePlayback", () => {
       );
     });
 
-    it('onerror イベントで MEDIA_ERR_SRC_NOT_SUPPORTED が発生した際に 404 が処理され次のチャンクへ進むこと', async () => {
+    it('onerror イベントで MEDIA_ERR_SRC_NOT_SUPPORTED が発生した際に再取得を試みて成功した場合、再生が継続されること', async () => {
       const { audioCache } = require("@/lib/audioCache");
       const { getAudioChunk } = require("@/lib/indexedDB");
       const { logger } = require("@/lib/logger");
       getAudioChunk.mockResolvedValue(null);
+      // 1回目（初回再生）と2回目（再取得）どちらも成功
       audioCache.get.mockResolvedValue("blob:mock-audio-url");
 
       const mockChunks = [
@@ -768,7 +769,6 @@ describe("usePlayback", () => {
           code: 4, // MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
           message: 'Not Supported'
         };
-        // global object patch
         global.MediaError = { MEDIA_ERR_SRC_NOT_SUPPORTED: 4 };
 
         if (audioInstance.onerror) {
@@ -776,15 +776,82 @@ describe("usePlayback", () => {
         }
       });
 
+      // 再取得成功 → エラーメッセージは設定されない
       await waitFor(() => {
-         expect(result.current.error).toBe("一部の音声が再生できませんでした。次の部分から再開します。");
+        expect(result.current.error).toBe("");
       });
 
+      // 警告ログが呼ばれたことを確認
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining("Audio 404 detected"),
         expect.any(Object)
       );
 
+      // キャッシュ削除 fetch が呼ばれたことを確認
+      expect(global.fetch).toHaveBeenCalledWith('/api/cache/remove', expect.objectContaining({
+        method: 'POST'
+      }));
+
+      // 再取得が行われたことを確認（2回目の audioCache.get 呼び出し）
+      expect(audioCache.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('onerror イベントで MEDIA_ERR_SRC_NOT_SUPPORTED が発生し再取得も失敗した場合、エラーが設定されて次のチャンクへスキップすること', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      const { logger } = require("@/lib/logger");
+      getAudioChunk.mockResolvedValue(null);
+      // 1回目（初回再生）は成功、2回目（再取得）は失敗
+      audioCache.get
+        .mockResolvedValueOnce("blob:mock-audio-url")
+        .mockRejectedValueOnce(new Error("Re-fetch failed"));
+
+      const mockChunks = [
+        { id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" },
+        { id: "chunk-2", text: "テスト2", cleanedText: "テスト2", type: "paragraph" }
+      ];
+
+      const { result } = renderHook(() => usePlayback({
+        chunks: mockChunks,
+        articleUrl: "https://example.com/test",
+        voiceModel: "ja-JP-Standard-B",
+      }));
+
+      await act(async () => {
+        await result.current.play();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isPlaying).toBe(true);
+      });
+
+      const audioInstance = global.Audio.mock.results[global.Audio.mock.results.length - 1].value;
+
+      // onerror イベントを発火させる
+      await act(async () => {
+        audioInstance.error = {
+          code: 4, // MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+          message: 'Not Supported'
+        };
+        global.MediaError = { MEDIA_ERR_SRC_NOT_SUPPORTED: 4 };
+
+        if (audioInstance.onerror) {
+          audioInstance.onerror(new Event('error'));
+        }
+      });
+
+      // 再取得失敗 → エラーメッセージが設定される
+      await waitFor(() => {
+        expect(result.current.error).toBe("一部の音声が再生できませんでした。次の部分から再開します。");
+      });
+
+      // 警告ログが呼ばれたことを確認
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Audio 404 detected"),
+        expect.any(Object)
+      );
+
+      // キャッシュ削除 fetch が呼ばれたことを確認
       expect(global.fetch).toHaveBeenCalledWith('/api/cache/remove', expect.objectContaining({
         method: 'POST'
       }));
