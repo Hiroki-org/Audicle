@@ -171,7 +171,7 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
         part_len = len(part.encode('utf-8'))
         if current_chunk_len + part_len > limit:
              if current_chunk:
-                 chunks.append(current_chunk)
+                 chunks.append((current_chunk, current_chunk_len))
              current_chunk = part
              current_chunk_len = part_len
         else:
@@ -179,12 +179,12 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
              current_chunk_len += part_len
 
     if current_chunk:
-        chunks.append(current_chunk)
+        chunks.append((current_chunk, current_chunk_len))
 
     # Recursively process any chunks that are still too big
     final_chunks = []
-    for chunk in chunks:
-        if len(chunk.encode('utf-8')) > limit:
+    for chunk, chunk_len in chunks:
+        if chunk_len > limit:
             final_chunks.extend(_chunk_text(chunk, limit, next_separators))
         else:
             final_chunks.append(chunk)
