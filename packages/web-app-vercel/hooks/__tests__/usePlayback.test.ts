@@ -60,6 +60,15 @@ class MockAudio {
   }
 }
 
+function createMockChunks(count: number): Chunk[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `chunk-${index + 1}`,
+    text: `テストチャンク${index + 1}`,
+    cleanedText: `テストチャンク${index + 1}`,
+    type: "paragraph",
+  }));
+}
+
 describe("usePlayback", () => {
   let mockAudioInstance: MockAudio;
   const originalAudio = global.Audio;
@@ -76,6 +85,10 @@ describe("usePlayback", () => {
         setItem: jest.fn(),
       },
       writable: true,
+    });
+    Object.defineProperty(document, "visibilityState", {
+      value: "visible",
+      configurable: true,
     });
   });
 
@@ -128,6 +141,118 @@ describe("usePlayback", () => {
 
     // 音声ソースが設定されていることを確認
     expect(mockAudioInstance.src).toBe("blob:mock-audio-url");
+  });
+
+  it("再生開始時にバックグラウンド再生向けの大きいバッファを先読みすること", async () => {
+    const { audioCache } = require("@/lib/audioCache");
+    const { getAudioChunk } = require("@/lib/indexedDB");
+
+    getAudioChunk.mockResolvedValue(null);
+    audioCache.get.mockResolvedValue("blob:mock-audio-url");
+    audioCache.prefetch.mockResolvedValue(undefined);
+
+    const mockChunks = createMockChunks(12);
+    const { result } = renderHook(() =>
+      usePlayback({
+        chunks: mockChunks,
+        articleUrl: "https://example.com/test",
+        voiceModel: "ja-JP-Standard-B",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.play();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPlaying).toBe(true);
+    });
+
+    expect(audioCache.prefetch).toHaveBeenCalledWith(
+      mockChunks.slice(1, 11).map((chunk) => chunk.cleanedText),
+      "ja-JP-Standard-B",
+      "https://example.com/test",
+    );
+  });
+
+  it("表示状態が変わったときに現在位置から先読みを補充すること", async () => {
+    const { audioCache } = require("@/lib/audioCache");
+    const { getAudioChunk } = require("@/lib/indexedDB");
+
+    getAudioChunk.mockResolvedValue(null);
+    audioCache.get.mockResolvedValue("blob:mock-audio-url");
+    audioCache.prefetch.mockResolvedValue(undefined);
+
+    const mockChunks = createMockChunks(12);
+    const { result } = renderHook(() =>
+      usePlayback({
+        chunks: mockChunks,
+        articleUrl: "https://example.com/test",
+        voiceModel: "ja-JP-Standard-B",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.play();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPlaying).toBe(true);
+    });
+
+    audioCache.prefetch.mockClear();
+
+    act(() => {
+      Object.defineProperty(document, "visibilityState", {
+        value: "visible",
+        configurable: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(audioCache.prefetch).toHaveBeenCalledWith(
+      mockChunks.slice(1, 11).map((chunk) => chunk.cleanedText),
+      "ja-JP-Standard-B",
+      "https://example.com/test",
+    );
+  });
+
+  it("非表示への遷移では visibilitychange の先読み補充を行わないこと", async () => {
+    const { audioCache } = require("@/lib/audioCache");
+    const { getAudioChunk } = require("@/lib/indexedDB");
+
+    getAudioChunk.mockResolvedValue(null);
+    audioCache.get.mockResolvedValue("blob:mock-audio-url");
+    audioCache.prefetch.mockResolvedValue(undefined);
+
+    const mockChunks = createMockChunks(12);
+    const { result } = renderHook(() =>
+      usePlayback({
+        chunks: mockChunks,
+        articleUrl: "https://example.com/test",
+        voiceModel: "ja-JP-Standard-B",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.play();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPlaying).toBe(true);
+    });
+
+    audioCache.prefetch.mockClear();
+
+    act(() => {
+      Object.defineProperty(document, "visibilityState", {
+        value: "hidden",
+        configurable: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(audioCache.prefetch).not.toHaveBeenCalled();
   });
 
   it("複数回の再生リクエストが同時に発生した場合、2回目以降がスキップされることを確認", async () => {
