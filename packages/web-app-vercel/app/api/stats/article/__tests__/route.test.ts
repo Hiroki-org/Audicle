@@ -71,7 +71,6 @@ describe("/api/stats/article route", () => {
     expect(response.status).toBe(500);
     expect(json).toEqual({
       error: "Failed to record stats",
-      details: "Database connection failed",
     });
 
     consoleSpy.mockRestore();

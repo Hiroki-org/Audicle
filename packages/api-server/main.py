@@ -85,6 +85,7 @@ class ExtractResponse(BaseModel):
 
 # Google Cloud TTS APIの最大リクエストバイト数
 MAX_TTS_BYTES = 5000
+FALLBACK_PATH = "fallback.mp3"
 
 # Maximum number of concurrent TTS API requests
 # This prevents hitting Google Cloud TTS API rate limits
@@ -182,11 +183,11 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
 
     # Recursively process any chunks that are still too big
     final_chunks = []
-    for chunk, chunk_len in chunks:
+    for chunk_text, chunk_len in chunks:
         if chunk_len > limit:
-            final_chunks.extend(_chunk_text(chunk, limit, next_separators))
+            final_chunks.extend(_chunk_text(chunk_text, limit, next_separators))
         else:
-            final_chunks.append(chunk)
+            final_chunks.append(chunk_text)
 
     return final_chunks
 
@@ -365,7 +366,7 @@ async def synthesize_speech(request: SynthesizeRequest):
         try:
             logger.info("Attempting fallback: returning test audio file")
 
-            fallback_path = "fallback.mp3"
+            fallback_path = FALLBACK_PATH
             if os.path.exists(fallback_path):
                 async with aiofiles.open(fallback_path, "rb") as fallback_file:
                     fallback_audio = await fallback_file.read()
