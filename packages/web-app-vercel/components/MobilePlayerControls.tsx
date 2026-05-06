@@ -21,7 +21,7 @@ const repeatModeLabels: Record<RepeatMode, string> = {
 
 export interface MobilePlayerControlsProps {
   playbackRate: number;
-  setIsSpeedModalOpen: (open: boolean) => void;
+  setIsSpeedModalOpen: (_open: boolean) => void;
   playlistState: {
     isPlaylistMode: boolean;
     shuffle: boolean;
@@ -31,16 +31,15 @@ export interface MobilePlayerControlsProps {
   isPlaylistContextReady: boolean;
   canMovePrevious: boolean;
   canMoveNext: boolean;
-  navigateToPlaylistItem: (index: number) => void;
-  wrapIndex: (index: number) => number;
-  currentPlaylistIndex: number;
+  navigateToPlaylistItem: (_index: number) => void;
+  getAdjacentPlaylistIndex: (_direction: -1 | 1) => number;
   isPlaying: boolean;
   play: () => void;
   pause: () => void;
   isPlaybackLoading: boolean;
   toggleRepeatMode: () => void;
   articleId: string | null;
-  setIsPlaylistModalOpen: (open: boolean) => void;
+  setIsPlaylistModalOpen: (_open: boolean) => void;
   url: string;
   startDownload: () => void;
   downloadStatus: string;
@@ -55,8 +54,7 @@ export function MobilePlayerControls({
   canMovePrevious,
   canMoveNext,
   navigateToPlaylistItem,
-  wrapIndex,
-  currentPlaylistIndex,
+  getAdjacentPlaylistIndex,
   isPlaying,
   play,
   pause,
@@ -111,7 +109,7 @@ export function MobilePlayerControls({
             <button
               onClick={() => {
                 if (isPlaylistContextReady && canMovePrevious) {
-                  navigateToPlaylistItem(wrapIndex(currentPlaylistIndex - 1));
+                  navigateToPlaylistItem(getAdjacentPlaylistIndex(-1));
                 }
               }}
               disabled={!isPlaylistContextReady || !canMovePrevious}
@@ -149,7 +147,7 @@ export function MobilePlayerControls({
             <button
               onClick={() => {
                 if (isPlaylistContextReady && canMoveNext) {
-                  navigateToPlaylistItem(wrapIndex(currentPlaylistIndex + 1));
+                  navigateToPlaylistItem(getAdjacentPlaylistIndex(1));
                 }
               }}
               disabled={!isPlaylistContextReady || !canMoveNext}
