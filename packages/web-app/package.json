@@ -2,6 +2,9 @@
   "name": "web-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "jest",
     "dev": "next dev --turbopack",
@@ -15,6 +18,9 @@
     "next-pwa": "^5.6.0",
     "react": "19.1.0",
     "react-dom": "19.1.0"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
