@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { mockArticles } from '../helpers/testData';
-import { clearLocalStorage } from '../helpers/testSetup';
 
 test.describe('Reader layout and controls', () => {
     test('Desktop: bottom-fixed controls and PlaybackSpeedDial modal', async ({ page }) => {
@@ -9,7 +8,9 @@ test.describe('Reader layout and controls', () => {
         // Load an article to show the audio controls
         await page.waitForSelector('[data-testid="url-input"]', { state: 'visible' });
         await page.fill('[data-testid="url-input"]', mockArticles[0].url);
-        await page.click('[data-testid="extract-button"]');
+        const extractButton = page.locator('[data-testid="extract-button"]');
+        await expect(extractButton).toBeEnabled();
+        await extractButton.click();
         // Wait for the desktop controls to appear (sm: fixed bar)
         await page.waitForSelector('[data-testid="audio-player-desktop"]', { state: 'visible', timeout: 30000 });
 
