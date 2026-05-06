@@ -46,6 +46,7 @@ jobs:
         uses: "google-github-actions/run-gemini-cli@v0" # ratchet:exclude
         id: "gemini_invoke"
         env:
+          GEMINI_CLI_TRUST_WORKSPACE: "true"
           GEMINI_API_KEY: "${{ secrets.GEMINI_API_KEY }}"
           ADDITIONAL_CONTEXT: "${{ inputs.additional_context }}"
         with:

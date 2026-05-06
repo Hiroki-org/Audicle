@@ -72,8 +72,8 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
         // Increase timeout to allow the Next.js dev server (and turbopack) to
         // finish compilation and bind to the port in CI environments.
-        // 5 minutes gives the build enough time for cold-starts.
-        timeout: 300000,
+        // 10 minutes gives the build enough time for cold-starts.
+        timeout: 600000,
         // Provide runtime environment variables to the Next.js dev server when Playwright starts it
         env: {
             NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
