@@ -1,6 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { clearLocalStorage } from '../helpers/testSetup';
-
 test.describe('Reader - プレイリスト関連のナビゲーション', () => {
     test.beforeEach(async ({ page }) => {
         // Mock /api/extract to return deterministic content based on URL query
@@ -173,10 +171,6 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
     });
 
     test('シャッフル中の次へボタンがシャッフルキュー順にナビゲートする', async ({ page }) => {
-        await page.addInitScript(() => {
-            Math.random = () => 0;
-        });
-
         await page.goto('/playlists');
         await page.waitForSelector('a[data-testid="playlist-item"]', { state: 'visible' });
         await page.locator('a[data-testid="playlist-item"]').filter({ hasText: 'ソートテスト用プレイリスト' }).first().click();
@@ -195,6 +189,9 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await page.waitForSelector('[data-testid="audio-player-desktop"]', { state: 'visible' });
         await expect(page.getByTestId('article-title')).toContainText('Cherry');
 
+        await page.evaluate(() => {
+            Math.random = () => 0;
+        });
         await page.getByTestId('desktop-shuffle-button').click();
         const currentUrl = page.url();
         await page.getByTestId('desktop-next-button').click();
