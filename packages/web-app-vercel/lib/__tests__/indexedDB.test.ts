@@ -143,6 +143,25 @@ describe('IndexedDB write transactions', () => {
         await expect(promise).rejects.toBe(error);
     });
 
+    it('saveAudioChunk should reject with a fallback Error when the transaction abort has no error', async () => {
+        const mock = createIndexedDBMock();
+        const { saveAudioChunk } = await import('../indexedDB');
+        const promise = saveAudioChunk({
+            audioData: new Blob(['audio'], { type: 'audio/wav' }),
+            timestamp: 123,
+            articleUrl: 'https://example.com/article',
+            chunkIndex: 0,
+            totalChunks: 1,
+            size: 5,
+        });
+
+        await openDatabase(mock);
+        mock.transaction.error = null;
+        mock.transaction.onabort();
+
+        await expect(promise).rejects.toThrow('Save transaction aborted');
+    });
+
     it('clearAll should resolve only after the clear transaction completes', async () => {
         const mock = createIndexedDBMock();
         const { clearAll } = await import('../indexedDB');
@@ -175,5 +194,17 @@ describe('IndexedDB write transactions', () => {
         mock.transaction.onabort();
 
         await expect(promise).rejects.toBe(error);
+    });
+
+    it('clearAll should reject with a fallback Error when the transaction abort has no error', async () => {
+        const mock = createIndexedDBMock();
+        const { clearAll } = await import('../indexedDB');
+        const promise = clearAll();
+
+        await openDatabase(mock);
+        mock.transaction.error = null;
+        mock.transaction.onabort();
+
+        await expect(promise).rejects.toThrow('Clear transaction aborted');
     });
 });

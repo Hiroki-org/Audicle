@@ -119,8 +119,9 @@ export async function saveAudioChunk(entry: Omit<AudioCacheEntry, 'key'>): Promi
         const rejectOnce = (message: string, error: unknown) => {
             if (isSettled) return;
             isSettled = true;
-            logger.error(message, error);
-            reject(error);
+            const finalError = error || new Error(message);
+            logger.error(message, finalError);
+            reject(finalError);
         };
 
         transaction.onerror = () => {
@@ -260,8 +261,9 @@ export async function clearAll(): Promise<void> {
         const rejectOnce = (message: string, error: unknown) => {
             if (isSettled) return;
             isSettled = true;
-            logger.error(message, error);
-            reject(error);
+            const finalError = error || new Error(message);
+            logger.error(message, finalError);
+            reject(finalError);
         };
 
         transaction.onerror = () => {
