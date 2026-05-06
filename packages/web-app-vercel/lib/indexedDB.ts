@@ -73,6 +73,11 @@ function openDB(): Promise<IDBDatabase> {
                 logger.warn('IndexedDB connection closed unexpectedly.');
                 dbPromise = null;
             };
+            db.onversionchange = () => {
+                logger.warn('IndexedDB version changed; closing cached connection.');
+                db.close();
+                dbPromise = null;
+            };
             resolve(db);
         };
 
@@ -109,23 +114,35 @@ export async function saveAudioChunk(entry: Omit<AudioCacheEntry, 'key'>): Promi
 
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_NAME], 'readwrite');
+        let isSettled = false;
+
+        const rejectOnce = (message: string, error: unknown) => {
+            if (isSettled) return;
+            isSettled = true;
+            logger.error(message, error);
+            reject(error);
+        };
 
         transaction.onerror = () => {
-            logger.error('Save transaction error', transaction.error);
-            reject(transaction.error);
+            rejectOnce('Save transaction error', transaction.error);
+        };
+
+        transaction.onabort = () => {
+            rejectOnce('Save transaction aborted', transaction.error);
+        };
+
+        transaction.oncomplete = () => {
+            if (isSettled) return;
+            isSettled = true;
+            logger.info(`Saved chunk ${entry.chunkIndex + 1}/${entry.totalChunks} for ${entry.articleUrl}`);
+            resolve();
         };
 
         const store = transaction.objectStore(STORE_NAME);
         const request = store.put(cacheEntry);
 
-        request.onsuccess = () => {
-            logger.info(`Saved chunk ${entry.chunkIndex + 1}/${entry.totalChunks} for ${entry.articleUrl}`);
-            resolve();
-        };
-
         request.onerror = () => {
-            logger.error('Save error', request.error);
-            reject(request.error);
+            rejectOnce('Save error', request.error);
         };
     });
 }
@@ -238,23 +255,35 @@ export async function clearAll(): Promise<void> {
 
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_NAME], 'readwrite');
+        let isSettled = false;
+
+        const rejectOnce = (message: string, error: unknown) => {
+            if (isSettled) return;
+            isSettled = true;
+            logger.error(message, error);
+            reject(error);
+        };
 
         transaction.onerror = () => {
-            logger.error('Clear transaction error', transaction.error);
-            reject(transaction.error);
+            rejectOnce('Clear transaction error', transaction.error);
+        };
+
+        transaction.onabort = () => {
+            rejectOnce('Clear transaction aborted', transaction.error);
+        };
+
+        transaction.oncomplete = () => {
+            if (isSettled) return;
+            isSettled = true;
+            logger.info('Cleared all cache');
+            resolve();
         };
 
         const store = transaction.objectStore(STORE_NAME);
         const request = store.clear();
 
-        request.onsuccess = () => {
-            logger.info('Cleared all cache');
-            resolve();
-        };
-
         request.onerror = () => {
-            logger.error('Clear error', request.error);
-            reject(request.error);
+            rejectOnce('Clear error', request.error);
         };
     });
 }
