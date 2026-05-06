@@ -10,7 +10,10 @@ import { MobilePlayerControls } from "@/components/MobilePlayerControls";
 import { PlaylistSelectorModal } from "@/components/PlaylistSelectorModal";
 import { PlaylistCompletionScreen } from "@/components/PlaylistCompletionScreen";
 import { usePlaylistPlayback } from "@/contexts/PlaylistPlaybackContext";
-import { useAudioPlayback } from "@/contexts/AudioPlaybackContext";
+import {
+  useAudioPlayback,
+  type AudioPlaybackSource,
+} from "@/contexts/AudioPlaybackContext";
 import { Chunk } from "@/types/api";
 import { Playlist } from "@/types/playlist";
 import { extractContent, parseApiErrorMessage } from "@/lib/api";
@@ -128,6 +131,9 @@ export default function ReaderPageClient() {
   const hasInitiatedAutoplayRef = useRef(false);
   // 直前に再生していた記事URLを追跡（記事切り替え時のみ停止するため）
   const prevArticleUrlRef = useRef<string>("");
+  const stopRef = useRef<() => void>(() => {});
+  const setPlaybackSourceRef =
+    useRef<((_next: AudioPlaybackSource | null) => void) | null>(null);
 
   const chunkCount = chunks.length;
 
@@ -160,6 +166,11 @@ export default function ReaderPageClient() {
     playbackRate,
     setPlaybackRate,
   } = useAudioPlayback();
+
+  useEffect(() => {
+    stopRef.current = stop;
+    setPlaybackSourceRef.current = setPlaybackSource;
+  }, [stop, setPlaybackSource]);
 
   const handleArticleEnd = useCallback(() => {
     logger.info("handleArticleEnd 呼び出し", {
@@ -265,10 +276,10 @@ export default function ReaderPageClient() {
   // コンポーネントのアンマウント時（リーダー画面から離れるとき）に再生を停止する
   useEffect(() => {
     return () => {
-      stop();
-      setPlaybackSource(null);
+      stopRef.current();
+      setPlaybackSourceRef.current?.(null);
     };
-  }, [stop, setPlaybackSource]);
+  }, []);
 
   // ダウンロード機能（モバイルメニュー用）はReaderViewに集約されています
   const { status: downloadStatus, startDownload } = useDownload({

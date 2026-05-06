@@ -89,6 +89,10 @@ const PlaylistPlaybackContext = createContext<
 
 const STORAGE_KEY = STORAGE_KEYS.PLAYLIST_PLAYBACK;
 
+function isPlayablePlaylistItem(item: PlaylistItemWithArticle | undefined): boolean {
+  return Boolean(item?.article?.url);
+}
+
 /**
  * SortOptionをfieldとorderにパース
  */
@@ -230,6 +234,18 @@ export function PlaylistPlaybackProvider({
       startIndex: number = 0,
       sortKey?: string
     ) => {
+      const startItem = items[startIndex];
+      if (!playlistId || startIndex < 0 || startIndex >= items.length || !isPlayablePlaylistItem(startItem)) {
+        logger.warn("プレイリスト再生開始をスキップ: 再生可能な記事URLがありません", {
+          playlistId,
+          startIndex,
+          itemsLength: items.length,
+          articleId: startItem?.article_id,
+          articleUrl: startItem?.article?.url,
+        });
+        return;
+      }
+
       // デバッグ: 再生開始時のキュー順序を出力
       logger.info("プレイリスト再生開始", {
         playlistId,

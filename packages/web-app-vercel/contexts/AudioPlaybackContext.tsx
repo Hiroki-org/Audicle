@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { Chunk } from "@/types/api";
 import { usePlayback } from "@/hooks/usePlayback";
 
@@ -52,11 +52,24 @@ export function AudioPlaybackProvider({
     articleAuthor: source?.author,
     onArticleEnd: source?.onArticleEnd,
   });
+  const stopPlayback = playback.stop;
+
+  const setPlaybackSource = useCallback(
+    (next: AudioPlaybackSource | null) => {
+      if (source?.articleUrl && next?.articleUrl && source.articleUrl !== next.articleUrl) {
+        stopPlayback();
+      } else if (source && next === null) {
+        stopPlayback();
+      }
+      setSource(next);
+    },
+    [source, stopPlayback]
+  );
 
   const value: AudioPlaybackContextType = useMemo(
     () => ({
       source,
-      setSource,
+      setSource: setPlaybackSource,
       isPlaying: playback.isPlaying,
       isLoading: playback.isLoading,
       error: playback.error,
@@ -73,6 +86,7 @@ export function AudioPlaybackProvider({
     }),
     [
       source,
+      setPlaybackSource,
       playback.isPlaying,
       playback.isLoading,
       playback.error,
