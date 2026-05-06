@@ -126,6 +126,8 @@ export default function ReaderPageClient() {
 
   // 自動再生の参照フラグ（useEffectの無限ループを防ぐため）
   const hasInitiatedAutoplayRef = useRef(false);
+  // 直前に再生していた記事URLを追跡（記事切り替え時のみ停止するため）
+  const prevArticleUrlRef = useRef<string>("");
 
   const chunkCount = chunks.length;
 
@@ -221,7 +223,7 @@ export default function ReaderPageClient() {
   ]);
 
   // 記事データが揃ったらグローバルプレーヤーのsourceを更新
-  // 記事が切り替わる場合は先に再生を停止してから新しいソースをセットする
+  // 記事URLが切り替わった場合は先に再生を停止してから新しいソースをセットする
   useEffect(() => {
     if (!isClient) return;
     if (!url || chunks.length === 0) return;
@@ -233,7 +235,12 @@ export default function ReaderPageClient() {
       author = undefined;
     }
 
-    stop();
+    // 再生速度・音声モデル変更など同一記事内の設定変更では停止しない
+    if (prevArticleUrlRef.current && prevArticleUrlRef.current !== url) {
+      stop();
+    }
+    prevArticleUrlRef.current = url;
+
     setPlaybackSource({
       chunks,
       articleUrl: url,
