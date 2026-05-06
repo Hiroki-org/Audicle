@@ -21,7 +21,7 @@ interface UsePlaybackProps {
   articleAuthor?: string;    // 記事著者またはサイト名（Media Session用）
 }
 
-const PREFETCH_AHEAD = 3; // 3つ先まで先読み
+const PREFETCH_AHEAD = 10; // バックグラウンド再生に備えて多めに先読み
 
 // localStorage のキー定数
 const PLAYBACK_RATE_STORAGE_KEY = "audicle-playback-rate";
@@ -270,7 +270,24 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
     [chunks, voiceModel, articleUrl]
   );
 
+  const prefetchFromCurrentPosition = useCallback(() => {
+    if (!isPlaying || currentIndex < 0) return;
+    void prefetchAudio(currentIndex + 1).catch((error) => {
+      logger.warn("Failed to prefetch audio around visibility change", error);
+    });
+  }, [currentIndex, isPlaying, prefetchAudio]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    document.addEventListener("visibilitychange", prefetchFromCurrentPosition);
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        prefetchFromCurrentPosition,
+      );
+    };
+  }, [prefetchFromCurrentPosition]);
 
   // 特定のインデックスから再生
   const playFromIndex = useCallback(
@@ -348,7 +365,9 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
         }
 
         // 先読み
-        prefetchAudio(index + 1);
+        void prefetchAudio(index + 1).catch((error) => {
+          logger.warn("Failed to prefetch upcoming audio chunks", error);
+        });
 
         // Audio要素を再利用し、音声データをセット
         const audio = audioRef.current ?? new Audio();
