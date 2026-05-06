@@ -157,13 +157,14 @@ describe("local-cache", () => {
             expect(result).toBeNull();
         });
 
-        it("should return null and warn if cache structure is invalid", () => {
+        it("should clear cache and return null if cache structure is invalid", () => {
             global.localStorage.setItem(mockKey, JSON.stringify({ invalid: "data" }));
 
             const result = getArticlesCache(mockUserId);
 
             expect(result).toBeNull();
-            expect(console.warn).toHaveBeenCalledWith("Invalid cache structure detected");
+            expect(console.warn).toHaveBeenCalledWith("Invalid cache structure detected; clearing cache");
+            expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
         });
 
         it("should clear cache and return null if version mismatch", () => {
@@ -200,7 +201,7 @@ describe("local-cache", () => {
             expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
         });
 
-        it("should return null and warn if payload is invalid", () => {
+        it("should clear cache and return null if payload is invalid", () => {
             global.localStorage.setItem(
                 mockKey,
                 JSON.stringify({
@@ -213,7 +214,8 @@ describe("local-cache", () => {
             const result = getArticlesCache(mockUserId);
 
             expect(result).toBeNull();
-            expect(console.warn).toHaveBeenCalledWith("Invalid cached payload structure");
+            expect(console.warn).toHaveBeenCalledWith("Invalid cached payload structure; clearing cache");
+            expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
         });
 
         it("should return parsed payload successfully", () => {
@@ -241,6 +243,7 @@ describe("local-cache", () => {
                 "Failed to read articles cache:",
                 expect.any(SyntaxError)
             );
+            expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
         });
     });
 });
