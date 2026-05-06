@@ -63,16 +63,79 @@ describe('articleStorage', () => {
             consoleSpy.mockRestore();
         });
 
-        it('should clear invalid article arrays', () => {
+        it('should filter invalid article entries', () => {
             const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-            localStorageMock.getItem.mockReturnValueOnce(JSON.stringify([{ id: 'missing-fields' }]));
+            const validArticle: Article = {
+                id: '1',
+                url: 'https://example.com',
+                title: 'Test Article',
+                chunks: [],
+                createdAt: '2024-01-01T00:00:00Z',
+            };
+            localStorageMock.getItem.mockReturnValueOnce(JSON.stringify([
+                validArticle,
+                { id: 'missing-fields' },
+            ]));
+
+            expect(articleStorage.getAll()).toEqual([validArticle]);
+
+            expect(consoleSpy).toHaveBeenCalledWith(
+                'Some articles in localStorage were invalid; filtering invalid entries'
+            );
+            expect(localStorageMock.setItem).toHaveBeenCalledWith(
+                'audicle_articles',
+                JSON.stringify([validArticle])
+            );
+            consoleSpy.mockRestore();
+        });
+
+        it('should reject articles with malformed chunks', () => {
+            const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+            localStorageMock.getItem.mockReturnValueOnce(JSON.stringify([
+                {
+                    id: '1',
+                    url: 'https://example.com',
+                    title: 'Test Article',
+                    chunks: [{ id: 'chunk-1', text: 'text' }],
+                    createdAt: '2024-01-01T00:00:00Z',
+                },
+            ]));
 
             expect(articleStorage.getAll()).toEqual([]);
 
             expect(consoleSpy).toHaveBeenCalledWith(
-                'Invalid articles in localStorage; clearing stored articles'
+                'Some articles in localStorage were invalid; filtering invalid entries'
+            );
+            expect(localStorageMock.setItem).toHaveBeenCalledWith('audicle_articles', '[]');
+            consoleSpy.mockRestore();
+        });
+
+        it('should clear storage when article storage is not an array', () => {
+            const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+            localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({ invalid: 'shape' }));
+
+            expect(articleStorage.getAll()).toEqual([]);
+
+            expect(consoleSpy).toHaveBeenCalledWith(
+                'Invalid articles structure in localStorage; clearing stored articles'
             );
             expect(localStorageMock.removeItem).toHaveBeenCalledWith('audicle_articles');
+            consoleSpy.mockRestore();
+        });
+
+        it('should return empty array when localStorage getItem throws', () => {
+            const storageError = new Error('storage unavailable');
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+            localStorageMock.getItem.mockImplementationOnce(() => {
+                throw storageError;
+            });
+
+            expect(articleStorage.getAll()).toEqual([]);
+
+            expect(consoleSpy).toHaveBeenCalledWith(
+                'Failed to parse articles from localStorage',
+                storageError
+            );
             consoleSpy.mockRestore();
         });
     });
