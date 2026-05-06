@@ -218,10 +218,22 @@ export async function deleteArticle(articleUrl: string): Promise<void> {
 
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_NAME], 'readwrite');
+        let isSettled = false;
+
+        const rejectOnce = (message: string, error: unknown) => {
+            if (isSettled) return;
+            isSettled = true;
+            const finalError = error || new Error(message);
+            logger.error(message, finalError);
+            reject(finalError);
+        };
 
         transaction.onerror = () => {
-            logger.error('Delete transaction error', transaction.error);
-            reject(transaction.error);
+            rejectOnce('Delete transaction error', transaction.error);
+        };
+
+        transaction.onabort = () => {
+            rejectOnce('Delete transaction aborted', transaction.error);
         };
 
         const store = transaction.objectStore(STORE_NAME);
@@ -229,6 +241,7 @@ export async function deleteArticle(articleUrl: string): Promise<void> {
         const request = index.openCursor(IDBKeyRange.only(articleUrl));
 
         request.onsuccess = (event) => {
+            if (isSettled) return;
             const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
             if (cursor) {
                 cursor.delete();
@@ -237,11 +250,12 @@ export async function deleteArticle(articleUrl: string): Promise<void> {
         };
 
         request.onerror = () => {
-            logger.error('Delete error', request.error);
-            reject(request.error);
+            rejectOnce('Delete error', request.error);
         };
 
         transaction.oncomplete = () => {
+            if (isSettled) return;
+            isSettled = true;
             logger.info(`Deleted all chunks for ${articleUrl}`);
             resolve();
         };

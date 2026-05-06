@@ -2,20 +2,34 @@ import { generateKey } from '../indexedDB';
 
 type IndexedDBMock = {
     openRequest: Record<string, any>;
+    openRequests: Record<string, any>[];
     db: Record<string, any>;
     transaction: Record<string, any>;
     store: Record<string, jest.Mock>;
+    index: Record<string, jest.Mock>;
+    keyRange: Record<string, jest.Mock>;
     putRequest: Record<string, any>;
     clearRequest: Record<string, any>;
+    openCursorRequest: Record<string, any>;
+    cursor: Record<string, jest.Mock>;
 };
 
 function createIndexedDBMock(): IndexedDBMock {
-    const openRequest: Record<string, any> = {};
+    const openRequests: Record<string, any>[] = [];
     const putRequest: Record<string, any> = {};
     const clearRequest: Record<string, any> = {};
+    const openCursorRequest: Record<string, any> = {};
+    const cursor = {
+        delete: jest.fn(),
+        continue: jest.fn(),
+    };
+    const index = {
+        openCursor: jest.fn(() => openCursorRequest),
+    };
     const store = {
         put: jest.fn(() => putRequest),
         clear: jest.fn(() => clearRequest),
+        index: jest.fn(() => index),
     };
     const transaction: Record<string, any> = {
         objectStore: jest.fn(() => store),
@@ -29,16 +43,43 @@ function createIndexedDBMock(): IndexedDBMock {
     Object.defineProperty(global, 'indexedDB', {
         configurable: true,
         value: {
-            open: jest.fn(() => openRequest),
+            open: jest.fn(() => {
+                const openRequest: Record<string, any> = {};
+                openRequests.push(openRequest);
+                return openRequest;
+            }),
         },
     });
 
-    return { openRequest, db, transaction, store, putRequest, clearRequest };
+    const keyRange = {
+        only: jest.fn((value) => ({ value })),
+    };
+
+    Object.defineProperty(global, 'IDBKeyRange', {
+        configurable: true,
+        value: keyRange,
+    });
+
+    return {
+        get openRequest() {
+            return openRequests[0];
+        },
+        openRequests,
+        db,
+        transaction,
+        store,
+        index,
+        keyRange,
+        putRequest,
+        clearRequest,
+        openCursorRequest,
+        cursor,
+    };
 }
 
-async function openDatabase(mock: IndexedDBMock) {
-    mock.openRequest.result = mock.db;
-    mock.openRequest.onsuccess();
+async function openDatabase(mock: IndexedDBMock, requestIndex = 0, db = mock.db) {
+    mock.openRequests[requestIndex].result = db;
+    mock.openRequests[requestIndex].onsuccess();
     await Promise.resolve();
 }
 
@@ -88,6 +129,8 @@ describe('IndexedDB write transactions', () => {
         jest.resetModules();
         // @ts-ignore
         delete global.indexedDB;
+        // @ts-ignore
+        delete global.IDBKeyRange;
     });
 
     it('saveAudioChunk should resolve only after the write transaction completes', async () => {
@@ -162,6 +205,84 @@ describe('IndexedDB write transactions', () => {
         await expect(promise).rejects.toThrow('Save transaction aborted');
     });
 
+    it('saveAudioChunk should reject with the transaction abort error when present', async () => {
+        const mock = createIndexedDBMock();
+        const { saveAudioChunk } = await import('../indexedDB');
+        const error = new Error('quota exceeded');
+        const promise = saveAudioChunk({
+            audioData: new Blob(['audio'], { type: 'audio/wav' }),
+            timestamp: 123,
+            articleUrl: 'https://example.com/article',
+            chunkIndex: 0,
+            totalChunks: 1,
+            size: 5,
+        });
+
+        await openDatabase(mock);
+        mock.transaction.error = error;
+        mock.transaction.onabort();
+
+        await expect(promise).rejects.toBe(error);
+    });
+
+    it('deleteArticle should resolve only after deleting matching cursors and transaction completes', async () => {
+        const mock = createIndexedDBMock();
+        const { deleteArticle } = await import('../indexedDB');
+        const articleUrl = 'https://example.com/article';
+
+        let resolved = false;
+        const promise = deleteArticle(articleUrl).then(() => {
+            resolved = true;
+        });
+
+        await openDatabase(mock);
+
+        expect(mock.keyRange.only).toHaveBeenCalledWith(articleUrl);
+        expect(mock.index.openCursor).toHaveBeenCalledWith({ value: articleUrl });
+
+        mock.openCursorRequest.result = mock.cursor;
+        mock.openCursorRequest.onsuccess({ target: mock.openCursorRequest });
+
+        expect(mock.cursor.delete).toHaveBeenCalledTimes(1);
+        expect(mock.cursor.continue).toHaveBeenCalledTimes(1);
+        expect(resolved).toBe(false);
+
+        mock.openCursorRequest.result = null;
+        mock.openCursorRequest.onsuccess({ target: mock.openCursorRequest });
+        await Promise.resolve();
+        expect(resolved).toBe(false);
+
+        mock.transaction.oncomplete();
+
+        await expect(promise).resolves.toBeUndefined();
+        expect(resolved).toBe(true);
+    });
+
+    it('deleteArticle should reject when the cursor request fails', async () => {
+        const mock = createIndexedDBMock();
+        const { deleteArticle } = await import('../indexedDB');
+        const error = new Error('cursor failed');
+        const promise = deleteArticle('https://example.com/article');
+
+        await openDatabase(mock);
+        mock.openCursorRequest.error = error;
+        mock.openCursorRequest.onerror();
+
+        await expect(promise).rejects.toBe(error);
+    });
+
+    it('deleteArticle should reject with a fallback Error when the transaction abort has no error', async () => {
+        const mock = createIndexedDBMock();
+        const { deleteArticle } = await import('../indexedDB');
+        const promise = deleteArticle('https://example.com/article');
+
+        await openDatabase(mock);
+        mock.transaction.error = null;
+        mock.transaction.onabort();
+
+        await expect(promise).rejects.toThrow('Delete transaction aborted');
+    });
+
     it('clearAll should resolve only after the clear transaction completes', async () => {
         const mock = createIndexedDBMock();
         const { clearAll } = await import('../indexedDB');
@@ -206,5 +327,45 @@ describe('IndexedDB write transactions', () => {
         mock.transaction.onabort();
 
         await expect(promise).rejects.toThrow('Clear transaction aborted');
+    });
+});
+
+describe('IndexedDB connection lifecycle', () => {
+    afterEach(() => {
+        jest.resetModules();
+        // @ts-ignore
+        delete global.indexedDB;
+        // @ts-ignore
+        delete global.IDBKeyRange;
+    });
+
+    it('should close and discard the cached connection on version changes', async () => {
+        const mock = createIndexedDBMock();
+        const { saveAudioChunk } = await import('../indexedDB');
+        const entry = {
+            audioData: new Blob(['audio'], { type: 'audio/wav' }),
+            timestamp: 123,
+            articleUrl: 'https://example.com/article',
+            chunkIndex: 0,
+            totalChunks: 1,
+            size: 5,
+        };
+
+        const firstSave = saveAudioChunk(entry);
+        await openDatabase(mock);
+        mock.transaction.oncomplete();
+        await expect(firstSave).resolves.toBeUndefined();
+
+        mock.db.onversionchange();
+
+        expect(mock.db.close).toHaveBeenCalledTimes(1);
+
+        const secondSave = saveAudioChunk({ ...entry, chunkIndex: 1 });
+        expect(global.indexedDB.open).toHaveBeenCalledTimes(2);
+
+        await openDatabase(mock, 1);
+        mock.transaction.oncomplete();
+
+        await expect(secondSave).resolves.toBeUndefined();
     });
 });
