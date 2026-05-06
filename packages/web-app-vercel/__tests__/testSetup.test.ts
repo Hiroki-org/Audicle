@@ -99,4 +99,15 @@ describe('testSetup browser cleanup helpers', () => {
         expect(state.deleteDatabase).toHaveBeenCalledWith('audicle-cache');
         expect(state.deleteDatabase).toHaveBeenCalledWith('audicle-audio-cache');
     });
+
+    it('clears known IndexedDB cache names when database enumeration is unavailable', async () => {
+        const state = installBrowserStateMocks();
+        const { page } = mockPage();
+        delete (state.indexedDBMock as { databases?: unknown }).databases;
+
+        await clearLocalStorage(page as never);
+
+        expect(state.deleteDatabase).toHaveBeenCalledWith('audicle-cache');
+        expect(state.deleteDatabase).toHaveBeenCalledWith('audicle-audio-cache');
+    });
 });

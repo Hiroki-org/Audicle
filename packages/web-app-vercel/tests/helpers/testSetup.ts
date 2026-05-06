@@ -28,7 +28,7 @@ async function clearBrowserState(page: Page) {
 
         try {
             if ('indexedDB' in window) {
-                const databaseNames = new Set(['audicle-cache']);
+                const databaseNames = new Set(['audicle-cache', 'audicle-audio-cache']);
 
                 if (typeof indexedDB.databases === 'function') {
                     const databases = await indexedDB.databases();
