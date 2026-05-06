@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test npm run start"
+
 jobs:
   setup:
     name: Setup
@@ -177,11 +180,18 @@ jobs:
           NODE_ENV: production
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXT_PUBLIC_AUTH_ENV: test
 
       - name: Verify Next.js output exists
         run: test -d packages/web-app-vercel/.next
-      - name: Verify Next.js output exists
-        run: test -d packages/web-app-vercel/.next
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: next-build
+          path: packages/web-app-vercel/.next
+          include-hidden-files: true
+          retention-days: 1
 
   e2e-auth:
     name: E2E Auth Setup
@@ -204,6 +214,11 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
       - name: Create auth directory
         run: mkdir -p packages/web-app-vercel/playwright/.auth/
+      - name: Download build
+        uses: actions/download-artifact@v8
+        with:
+          name: next-build
+          path: packages/web-app-vercel/.next
       - name: Run Playwright auth setup
         run: npx playwright test --project=setup
         working-directory: packages/web-app-vercel
@@ -258,6 +273,12 @@ jobs:
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
+
+      - name: Download build
+        uses: actions/download-artifact@v8
+        with:
+          name: next-build
+          path: packages/web-app-vercel/.next
 
       - name: Run e2e shard
         run: npx playwright test --shard=${{ matrix.shard }}/3 --project=${{ matrix.browser }}

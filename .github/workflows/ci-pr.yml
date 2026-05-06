@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test npm run start"
+
 jobs:
   seed-test-db:
     name: テストデータ投入
@@ -247,11 +250,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-          CI_WEB_SERVER_COMMAND: npm run start
 
   e2e-theme-fouc:
     name: E2E Theme FOUC
-    needs: [setup, seed-test-db]
+    needs: [setup, build, seed-test-db]
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -285,6 +287,11 @@ jobs:
         if: steps.playwright-cache-e2e.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps
         working-directory: packages/web-app-vercel
+      - name: Download build
+        uses: actions/download-artifact@v8
+        with:
+          name: next-build
+          path: packages/web-app-vercel/.next
       - name: Run theme FOUC tests
         run: npx playwright test tests/e2e/theme-fouc.spec.ts --project=theme-fouc
         working-directory: packages/web-app-vercel
@@ -353,7 +360,6 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-          CI_WEB_SERVER_COMMAND: npm run start
       - name: Debug - Check auth files
         run: |
           echo "=== Checking auth directory for CI-PR ==="

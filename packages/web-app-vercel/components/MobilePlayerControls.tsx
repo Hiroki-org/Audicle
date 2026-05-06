@@ -21,7 +21,7 @@ const repeatModeLabels: Record<RepeatMode, string> = {
 
 export interface MobilePlayerControlsProps {
   playbackRate: number;
-  setIsSpeedModalOpen: (open: boolean) => void;
+  setIsSpeedModalOpen: (_open: boolean) => void;
   playlistState: {
     isPlaylistMode: boolean;
     shuffle: boolean;
@@ -31,8 +31,8 @@ export interface MobilePlayerControlsProps {
   isPlaylistContextReady: boolean;
   canMovePrevious: boolean;
   canMoveNext: boolean;
-  navigateToPlaylistItem: (index: number) => void;
-  wrapIndex: (index: number) => number;
+  getPlaylistItemHref: (_index: number) => string | undefined;
+  wrapIndex: (_index: number) => number;
   currentPlaylistIndex: number;
   isPlaying: boolean;
   play: () => void;
@@ -40,7 +40,7 @@ export interface MobilePlayerControlsProps {
   isPlaybackLoading: boolean;
   toggleRepeatMode: () => void;
   articleId: string | null;
-  setIsPlaylistModalOpen: (open: boolean) => void;
+  setIsPlaylistModalOpen: (_open: boolean) => void;
   url: string;
   startDownload: () => void;
   downloadStatus: string;
@@ -54,7 +54,7 @@ export function MobilePlayerControls({
   isPlaylistContextReady,
   canMovePrevious,
   canMoveNext,
-  navigateToPlaylistItem,
+  getPlaylistItemHref,
   wrapIndex,
   currentPlaylistIndex,
   isPlaying,
@@ -68,6 +68,14 @@ export function MobilePlayerControls({
   startDownload,
   downloadStatus,
 }: MobilePlayerControlsProps) {
+  const previousIndex = wrapIndex(currentPlaylistIndex - 1);
+  const nextIndex = wrapIndex(currentPlaylistIndex + 1);
+  const previousHref = getPlaylistItemHref(previousIndex);
+  const nextHref = getPlaylistItemHref(nextIndex);
+  const isPreviousDisabled =
+    !isPlaylistContextReady || !canMovePrevious || !previousHref;
+  const isNextDisabled = !isPlaylistContextReady || !canMoveNext || !nextHref;
+
   return (
     <div
       className={`sm:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 p-4 shadow-lg z-[${zIndex.mobileControls}]`}
@@ -108,19 +116,21 @@ export function MobilePlayerControls({
           )}
 
           {playlistState.isPlaylistMode && (
-            <button
-              onClick={() => {
-                if (isPlaylistContextReady && canMovePrevious) {
-                  navigateToPlaylistItem(wrapIndex(currentPlaylistIndex - 1));
-                }
+            <a
+              href={previousHref || "#"}
+              onClick={(event) => {
+                if (isPreviousDisabled) event.preventDefault();
               }}
-              disabled={!isPlaylistContextReady || !canMovePrevious}
-              className="mr-2 p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-disabled={isPreviousDisabled}
+              tabIndex={isPreviousDisabled ? -1 : undefined}
+              className={`mr-2 p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors ${
+                isPreviousDisabled ? "opacity-50 cursor-not-allowed" : ""
+              }`}
               title="前の記事"
               aria-label="前の記事"
             >
               <SkipBack className="size-5" />
-            </button>
+            </a>
           )}
 
           <button
@@ -146,19 +156,21 @@ export function MobilePlayerControls({
           </button>
 
           {playlistState.isPlaylistMode && (
-            <button
-              onClick={() => {
-                if (isPlaylistContextReady && canMoveNext) {
-                  navigateToPlaylistItem(wrapIndex(currentPlaylistIndex + 1));
-                }
+            <a
+              href={nextHref || "#"}
+              onClick={(event) => {
+                if (isNextDisabled) event.preventDefault();
               }}
-              disabled={!isPlaylistContextReady || !canMoveNext}
-              className="ml-2 p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-disabled={isNextDisabled}
+              tabIndex={isNextDisabled ? -1 : undefined}
+              className={`ml-2 p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors ${
+                isNextDisabled ? "opacity-50 cursor-not-allowed" : ""
+              }`}
               title="次の記事"
               aria-label="次の記事"
             >
               <SkipForward className="size-5" />
-            </button>
+            </a>
           )}
 
           {playlistState.isPlaylistMode && (

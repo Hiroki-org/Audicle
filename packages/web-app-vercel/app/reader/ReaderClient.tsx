@@ -10,7 +10,10 @@ import { MobilePlayerControls } from "@/components/MobilePlayerControls";
 import { PlaylistSelectorModal } from "@/components/PlaylistSelectorModal";
 import { PlaylistCompletionScreen } from "@/components/PlaylistCompletionScreen";
 import { usePlaylistPlayback } from "@/contexts/PlaylistPlaybackContext";
-import { useAudioPlayback } from "@/contexts/AudioPlaybackContext";
+import {
+  useAudioPlayback,
+  type AudioPlaybackSource,
+} from "@/contexts/AudioPlaybackContext";
 import { Chunk } from "@/types/api";
 import { Playlist } from "@/types/playlist";
 import { extractContent, parseApiErrorMessage } from "@/lib/api";
@@ -24,17 +27,7 @@ import { type DetectedLanguage } from "@/lib/languageDetector";
 import { selectVoiceModel } from "@/lib/voiceSelector";
 import { UserSettings, DEFAULT_SETTINGS } from "@/types/settings";
 import { createReaderUrl } from "@/lib/urlBuilder";
-import { zIndex } from "@/lib/zIndex";
 import { getPlaylistSortKey } from "@/lib/playlist-utils";
-
-import type { RepeatMode } from "@/contexts/PlaylistPlaybackContext";
-
-// リピートモードのラベルマップ
-const repeatModeLabels: Record<RepeatMode, string> = {
-  off: "リピート: オフ",
-  one: "リピート: 1曲",
-  all: "リピート: 全曲",
-};
 
 function convertParagraphsToChunks(htmlContent: string): {
   chunks: Chunk[];
@@ -110,6 +103,12 @@ export default function ReaderPageClient() {
   const [currentPlaylistIndex, setCurrentPlaylistIndex] = useState<number>(
     indexFromQuery ? parseInt(indexFromQuery, 10) : 0,
   );
+  const playlistIndexFromUrl =
+    indexFromQuery !== null ? parseInt(indexFromQuery, 10) : null;
+  const activePlaylistIndex =
+    playlistIndexFromUrl !== null && !Number.isNaN(playlistIndexFromUrl)
+      ? playlistIndexFromUrl
+      : currentPlaylistIndex;
   const [isPlaylistMode] = useState<boolean>(!!playlistIdFromQuery);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
 
@@ -128,6 +127,9 @@ export default function ReaderPageClient() {
   const hasInitiatedAutoplayRef = useRef(false);
   // 直前に再生していた記事URLを追跡（記事切り替え時のみ停止するため）
   const prevArticleUrlRef = useRef<string>("");
+  const stopRef = useRef<() => void>(() => {});
+  const setPlaybackSourceRef =
+    useRef<((_next: AudioPlaybackSource | null) => void) | null>(null);
 
   const chunkCount = chunks.length;
 
@@ -160,6 +162,11 @@ export default function ReaderPageClient() {
     playbackRate,
     setPlaybackRate,
   } = useAudioPlayback();
+
+  useEffect(() => {
+    stopRef.current = stop;
+    setPlaybackSourceRef.current = setPlaybackSource;
+  }, [stop, setPlaybackSource]);
 
   const handleArticleEnd = useCallback(() => {
     logger.info("handleArticleEnd 呼び出し", {
@@ -265,10 +272,10 @@ export default function ReaderPageClient() {
   // コンポーネントのアンマウント時（リーダー画面から離れるとき）に再生を停止する
   useEffect(() => {
     return () => {
-      stop();
-      setPlaybackSource(null);
+      stopRef.current();
+      setPlaybackSourceRef.current?.(null);
     };
-  }, [stop, setPlaybackSource]);
+  }, []);
 
   // ダウンロード機能（モバイルメニュー用）はReaderViewに集約されています
   const { status: downloadStatus, startDownload } = useDownload({
@@ -848,16 +855,17 @@ export default function ReaderPageClient() {
         playlistIdFromQuery,
         playlistStatePlaylistId: playlistState.playlistId,
         currentPlaylistIndex,
+        activePlaylistIndex,
         playlistStateCurrentIndex: playlistState.currentIndex,
         targetIndex: index,
         itemsLength: playlistState.items.length,
       });
 
       // 同一URLへのpushを避ける（無反応に見えるのを防ぐ）
-      if (index === currentPlaylistIndex) {
+      if (index === activePlaylistIndex) {
         logger.info("Skip navigation: same index", {
           index,
-          currentPlaylistIndex,
+          activePlaylistIndex,
         });
         return;
       }
@@ -883,10 +891,36 @@ export default function ReaderPageClient() {
           playlistIndex: index,
           autoplay: false,
         });
+        setCurrentPlaylistIndex(index);
         router.push(readerUrl);
       }
     },
-    [playlistIdFromQuery, playlistState, router, currentPlaylistIndex],
+    [playlistIdFromQuery, playlistState, router, activePlaylistIndex, currentPlaylistIndex],
+  );
+
+  const getPlaylistItemHref = useCallback(
+    (index: number) => {
+      if (
+        playlistIdFromQuery &&
+        playlistState.playlistId !== playlistIdFromQuery
+      ) {
+        return undefined;
+      }
+
+      const item = playlistState.items[index];
+      const targetPlaylistId = playlistIdFromQuery || playlistState.playlistId;
+      if (!item?.article?.url || !targetPlaylistId) {
+        return undefined;
+      }
+
+      return createReaderUrl({
+        articleUrl: item.article.url,
+        playlistId: targetPlaylistId,
+        playlistIndex: index,
+        autoplay: false,
+      });
+    },
+    [playlistIdFromQuery, playlistState.items, playlistState.playlistId],
   );
 
   // プレイリストのインデックスを循環させるユーティリティ
@@ -897,14 +931,6 @@ export default function ReaderPageClient() {
       return ((index % len) + len) % len;
     },
     [playlistState.items.length],
-  );
-
-  // 再生速度変更ハンドラー（デスクトップ版とモバイル版で共通）
-  const handlePlaybackRateChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setPlaybackRate(parseFloat(e.target.value));
-    },
-    [setPlaybackRate],
   );
 
   return (
@@ -974,7 +1000,7 @@ export default function ReaderPageClient() {
 
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !arePlaylistsLoaded}
                   className="px-4 sm:px-6 py-1.5 sm:py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shrink-0"
                   data-testid="extract-button"
                 >
@@ -1017,9 +1043,9 @@ export default function ReaderPageClient() {
               isPlaylistContextReady={isPlaylistContextReady}
               canMovePrevious={canMovePrevious}
               canMoveNext={canMoveNext}
-              navigateToPlaylistItem={navigateToPlaylistItem}
+              getPlaylistItemHref={getPlaylistItemHref}
               wrapIndex={wrapIndex}
-              currentPlaylistIndex={currentPlaylistIndex}
+              currentPlaylistIndex={activePlaylistIndex}
               isPlaying={isPlaying}
               play={play}
               pause={pause}
@@ -1092,9 +1118,9 @@ export default function ReaderPageClient() {
           isPlaylistContextReady={isPlaylistContextReady}
           canMovePrevious={canMovePrevious}
           canMoveNext={canMoveNext}
-          navigateToPlaylistItem={navigateToPlaylistItem}
+          getPlaylistItemHref={getPlaylistItemHref}
           wrapIndex={wrapIndex}
-          currentPlaylistIndex={currentPlaylistIndex}
+          currentPlaylistIndex={activePlaylistIndex}
           isPlaying={isPlaying}
           play={play}
           pause={pause}

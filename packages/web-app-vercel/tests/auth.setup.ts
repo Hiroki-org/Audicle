@@ -4,10 +4,11 @@ import fs from 'fs'
 const authFile = 'playwright/.auth/user.json'
 
 setup('authenticate', async ({ page }) => {
-    // 既に認証状態ファイルが存在する場合はスキップ
+    // Stale local auth state can redirect every protected E2E page back to
+    // /auth/signin. Always create a fresh state for deterministic runs.
     if (fs.existsSync(authFile)) {
-        console.log('[AUTH SETUP] Using existing auth state from', authFile)
-        return
+        console.log('[AUTH SETUP] Removing existing auth state at', authFile)
+        fs.rmSync(authFile, { force: true })
     }
 
     console.log('[AUTH SETUP] Creating new auth state...')

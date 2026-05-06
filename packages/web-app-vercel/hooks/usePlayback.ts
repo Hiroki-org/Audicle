@@ -63,8 +63,8 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioUrlRef = useRef<string | null>(null);
   const onArticleEndRef = useRef<(() => void) | undefined>(onArticleEnd);
-  // 再生処理が進行中かどうかを追跡するフラグ
-  const isPlayingRequestInProgressRef = useRef<boolean>(false);
+  // 非同期の音声取得・再生開始を世代管理し、古い処理の状態更新を防ぐ
+  const playbackSessionIdRef = useRef<number>(0);
   // `playFromIndex` と `handleAudioEnded` の間の循環参照を解決するためのRef。
   // `handleAudioEnded` は `useCallback` でメモ化されていますが、内部で `playFromIndex` を呼び出す必要があります。
   // `playFromIndex` も `handleAudioEnded` に依存しているため、単純に依存配列に加えると循環参照が発生します。
@@ -114,7 +114,10 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
   }, []);
 
   // onended ハンドラを共通化
-  const handleAudioEnded = useCallback(async (currentIndex: number) => {
+  const handleAudioEnded = useCallback(async (currentIndex: number, sessionId: number) => {
+    if (playbackSessionIdRef.current !== sessionId) {
+      return;
+    }
     if (currentIndex < 0 || currentIndex >= chunks.length) {
       logger.warn("handleAudioEnded called with invalid index", {
         currentIndex,
@@ -132,6 +135,10 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       }
     }
 
+    if (playbackSessionIdRef.current !== sessionId) {
+      return;
+    }
+
     // 次のチャンクがあれば自動的に再生
     if (currentIndex + 1 < chunks.length) {
       // onended からの連続再生は await せず非同期で開始
@@ -144,6 +151,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       // 最後のチャンク終了時も URL を解放
       if (currentAudioUrlRef.current?.startsWith('blob:')) {
         URL.revokeObjectURL(currentAudioUrlRef.current);
+        currentAudioUrlRef.current = null;
       }
       setIsPlaying(false);
       setCurrentIndex(-1);
@@ -169,6 +177,17 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       onArticleEndRef.current?.();
     }
   }, [chunks, setIsPlaying, setCurrentIndex, articleUrl, voiceModel]);
+
+  const isCurrentPlaybackSession = useCallback((sessionId: number) => {
+    return playbackSessionIdRef.current === sessionId;
+  }, []);
+
+  const releaseCurrentAudioUrl = useCallback(() => {
+    if (currentAudioUrlRef.current?.startsWith("blob:")) {
+      URL.revokeObjectURL(currentAudioUrlRef.current);
+    }
+    currentAudioUrlRef.current = null;
+  }, []);
 
   const updateMediaSessionPositionState = useCallback(() => {
     if (!("mediaSession" in navigator)) return;
@@ -262,8 +281,21 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       if (articleUrl && !forceRegenerate) {
         const cachedChunk = await getAudioChunk(articleUrl, index, voiceModel);
         if (cachedChunk) {
+          logger.info("✅ IndexedDB: キャッシュヒット", {
+            articleUrl,
+            chunkIndex: index,
+            voiceModel,
+          });
           return URL.createObjectURL(cachedChunk.audioData);
         }
+        logger.info("💾 IndexedDB: キャッシュミス", {
+          articleUrl,
+          chunkIndex: index,
+          voiceModel,
+        });
+      }
+      if (!articleUrl && !forceRegenerate) {
+        return audioCache.get(chunk.cleanedText, voiceModel);
       }
       return audioCache.get(chunk.cleanedText, voiceModel, articleUrl, forceRegenerate);
     },
@@ -298,15 +330,8 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
         return;
       }
 
-      // 既に再生処理が進行中の場合は新しいリクエストを無視
-      // フラグのチェックと設定を即座に行うことで競合状態を最小化
-      if (isPlayingRequestInProgressRef.current) {
-        logger.warn("再生リクエストが既に進行中のため、新しいリクエストをスキップします", {
-          index,
-        });
-        return;
-      }
-      isPlayingRequestInProgressRef.current = true;
+      // セッションIDを更新
+      const currentSessionId = ++playbackSessionIdRef.current;
 
       setIsLoading(true);
       setError("");
@@ -330,8 +355,17 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
           await sleep(getPauseDuration("heading"));
         }
 
+        if (!isCurrentPlaybackSession(currentSessionId)) return;
+
         logger.info(`💾 音声取得: チャンク ${index + 1}/${chunks.length}`);
         const audioUrl = await fetchAudioUrl(index);
+
+        if (!isCurrentPlaybackSession(currentSessionId)) {
+          if (audioUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(audioUrl);
+          }
+          return;
+        }
 
         // 先読み
         prefetchAudio(index + 1);
@@ -363,11 +397,26 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
 
         // play()を一度だけ呼び出す
         await audio.play();
+        if (!isCurrentPlaybackSession(currentSessionId)) {
+          audio.pause();
+          if (audioUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(audioUrl);
+          }
+          if (currentAudioUrlRef.current === audioUrl) {
+            currentAudioUrlRef.current = null;
+          }
+          return;
+        }
         setIsPlaying(true); // 再生状態を更新
 
         // イベントハンドラを設定
-        audio.onended = () => handleAudioEnded(index);
+        audio.onended = () => {
+          void handleAudioEnded(index, currentSessionId);
+        };
         audio.onerror = async (e) => {
+          if (!isCurrentPlaybackSession(currentSessionId)) {
+            return;
+          }
           const mediaError = audio.error;
 
           if (mediaError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
@@ -401,22 +450,40 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
             // ハンドラを一旦クリアして再取得を試みる
             audio.onended = null;
             audio.onerror = null;
-            if (currentAudioUrlRef.current?.startsWith("blob:")) {
-              URL.revokeObjectURL(currentAudioUrlRef.current);
-            }
+            releaseCurrentAudioUrl();
             audio.src = "";
-            currentAudioUrlRef.current = null;
 
             try {
               logger.info(`🔄 音声を強制再取得中: チャンク ${index + 1}`);
               const newUrl = await fetchAudioUrl(index, true);
+              if (!isCurrentPlaybackSession(currentSessionId)) {
+                if (newUrl.startsWith("blob:")) {
+                  URL.revokeObjectURL(newUrl);
+                }
+                return;
+              }
               audio.src = newUrl;
               currentAudioUrlRef.current = newUrl;
               audio.playbackRate = isNaN(rate) ? DEFAULT_PLAYBACK_RATE : rate;
               await audio.play();
+              if (!isCurrentPlaybackSession(currentSessionId)) {
+                audio.pause();
+                if (newUrl.startsWith("blob:")) {
+                  URL.revokeObjectURL(newUrl);
+                }
+                if (currentAudioUrlRef.current === newUrl) {
+                  currentAudioUrlRef.current = null;
+                }
+                return;
+              }
               // 再取得成功：ハンドラを再登録
-              audio.onended = () => handleAudioEnded(index);
+              audio.onended = () => {
+                void handleAudioEnded(index, currentSessionId);
+              };
               audio.onerror = async (e2) => {
+                if (!isCurrentPlaybackSession(currentSessionId)) {
+                  return;
+                }
                 const err2 = audio.error;
                 const errorMessage2 = `音声の再生に失敗しました (Code: ${err2?.code})`;
                 logger.error("音声再生エラー（再取得後）", { error: err2, event: e2, chunkIndex: index });
@@ -426,11 +493,13 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
               logger.info(`✅ 再取得成功: チャンク ${index + 1}`);
             } catch (refetchErr) {
               logger.warn(`⚠️ 再取得失敗: チャンク ${index + 1}、次のチャンクへスキップします。`, refetchErr);
-              setError("一部の音声が再生できませんでした。次の部分から再開します。");
               // 次のチャンクへ進む
-              void playFromIndexRef.current(index + 1).catch((skipErr) => {
-                logger.error("次チャンクへのスキップ中にエラー", skipErr);
-              });
+              if (isCurrentPlaybackSession(currentSessionId)) {
+                void playFromIndexRef.current(index + 1).catch((skipErr) => {
+                  logger.error("次チャンクへのスキップ中にエラー", skipErr);
+                });
+                setError("一部の音声が再生できませんでした。次の部分から再開します。");
+              }
             }
             return;
           }
@@ -452,6 +521,9 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
         onChunkChange?.(chunk.id);
       } catch (err) {
         const error = err as Error;
+        if (!isCurrentPlaybackSession(currentSessionId)) {
+          return;
+        }
 
         // AbortErrorは通常の操作で発生する可能性があるため、警告レベルで記録
         // (例: ユーザーが素早くクリック、ページ遷移、コンポーネントのアンマウント等)
@@ -480,24 +552,42 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
           if (audio) {
             audio.onended = null;
             audio.onerror = null;
-            if (currentAudioUrlRef.current?.startsWith("blob:")) {
-              URL.revokeObjectURL(currentAudioUrlRef.current);
-            }
+            releaseCurrentAudioUrl();
             audio.src = "";
-            currentAudioUrlRef.current = null;
           }
           try {
             const chunk = chunks[index];
             const newUrl = await fetchAudioUrl(index, true);
+            if (!isCurrentPlaybackSession(currentSessionId)) {
+              if (newUrl.startsWith("blob:")) {
+                URL.revokeObjectURL(newUrl);
+              }
+              return;
+            }
             if (audio) {
               audio.src = newUrl;
               currentAudioUrlRef.current = newUrl;
               const rate2 = parseFloat(localStorage.getItem(PLAYBACK_RATE_STORAGE_KEY) || "");
               audio.playbackRate = isNaN(rate2) ? DEFAULT_PLAYBACK_RATE : rate2;
               await audio.play();
+              if (!isCurrentPlaybackSession(currentSessionId)) {
+                audio.pause();
+                if (newUrl.startsWith("blob:")) {
+                  URL.revokeObjectURL(newUrl);
+                }
+                if (currentAudioUrlRef.current === newUrl) {
+                  currentAudioUrlRef.current = null;
+                }
+                return;
+              }
               setIsPlaying(true);
-              audio.onended = () => handleAudioEnded(index);
+              audio.onended = () => {
+                void handleAudioEnded(index, currentSessionId);
+              };
               audio.onerror = async (e3) => {
+                if (!isCurrentPlaybackSession(currentSessionId)) {
+                  return;
+                }
                 const err3 = audio.error;
                 logger.error("音声再生エラー（NotSupportedError後の再取得後）", { error: err3, event: e3, chunkIndex: index });
                 setError(`音声の再生に失敗しました (Code: ${err3?.code})`);
@@ -512,13 +602,13 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
             }
           } catch (refetchErr2) {
             logger.warn(`⚠️ NotSupportedError後の再取得失敗: チャンク ${index + 1}、次のチャンクへスキップします。`, refetchErr2);
-            setError("一部の音声が再生できませんでした。次の部分から再開します。");
-            setIsPlaying(false);
-            // isPlayingRequestInProgressRef をリセットしてから次チャンクへ
-            isPlayingRequestInProgressRef.current = false;
-            void playFromIndexRef.current(index + 1).catch((skipErr) => {
-              logger.error("次チャンクへのスキップ中にエラー", skipErr);
-            });
+            if (isCurrentPlaybackSession(currentSessionId)) {
+              setIsPlaying(false);
+              void playFromIndexRef.current(index + 1).catch((skipErr) => {
+                logger.error("次チャンクへのスキップ中にエラー", skipErr);
+              });
+              setError("一部の音声が再生できませんでした。次の部分から再開します。");
+            }
           }
         } else {
           setError(
@@ -528,8 +618,9 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
           setIsPlaying(false);
         }
       } finally {
-        setIsLoading(false);
-        isPlayingRequestInProgressRef.current = false;
+        if (isCurrentPlaybackSession(currentSessionId)) {
+          setIsLoading(false);
+        }
       }
     },
     [
@@ -541,6 +632,8 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       fetchAudioUrl,
       handleAudioEnded,
       installPositionStateUpdater,
+      isCurrentPlaybackSession,
+      releaseCurrentAudioUrl,
     ]
   );
 
@@ -556,7 +649,10 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
 
   // 一時停止
   const pause = useCallback(() => {
+    playbackSessionIdRef.current++;
     if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
       audioRef.current.pause();
       setIsPlaying(false);
     }
@@ -564,16 +660,26 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
 
   // 停止
   const stop = useCallback(() => {
+    playbackSessionIdRef.current++;
     if (audioRef.current) {
-      if (currentAudioUrlRef.current?.startsWith('blob:')) {
-        URL.revokeObjectURL(currentAudioUrlRef.current);
-      }
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      releaseCurrentAudioUrl();
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      if (typeof audioRef.current.removeAttribute === "function") {
+        audioRef.current.removeAttribute("src");
+      } else {
+        audioRef.current.src = "";
+      }
+      if (typeof audioRef.current.load === "function") {
+        audioRef.current.load();
+      }
     }
     setIsPlaying(false);
     setCurrentIndex(-1);
-  }, []);
+    setIsLoading(false);
+  }, [releaseCurrentAudioUrl]);
 
   // 次のチャンクへ移動
   const next = useCallback(async () => {
@@ -639,15 +745,16 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
   // クリーンアップ
   useEffect(() => {
     return () => {
+      playbackSessionIdRef.current++;
       positionStateCleanupRef.current?.();
       if (audioRef.current) {
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
         audioRef.current.pause();
       }
-      if (currentAudioUrlRef.current?.startsWith('blob:')) {
-        URL.revokeObjectURL(currentAudioUrlRef.current);
-      }
+      releaseCurrentAudioUrl();
     };
-  }, []);
+  }, [releaseCurrentAudioUrl]);
 
   return {
     isPlaying,

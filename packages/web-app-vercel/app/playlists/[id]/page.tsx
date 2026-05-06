@@ -88,6 +88,11 @@ export default function PlaylistDetailPage() {
     });
   }, [playlist?.items, sortOption]);
 
+  const firstPlayableIndex = useMemo(
+    () => sortedItems.findIndex((item) => Boolean(item.article?.url)),
+    [sortedItems]
+  );
+
   // playlistが読み込まれたら編集フィールドを初期化
   useEffect(() => {
     if (playlist && !isEditing) {
@@ -181,19 +186,27 @@ export default function PlaylistDetailPage() {
 
   const handleArticleClick = useCallback(
     (playlistItem: PlaylistItemWithArticle) => {
-      if (playlist?.id) {
-        // Find the index in sortedItems
-        const index = sortedItems.findIndex(
-          (item) => item.id === playlistItem.id
-        );
-        startPlaylistPlayback(
-          playlist.id,
-          playlist.name,
-          sortedItems,
-          index >= 0 ? index : 0,
-          sortOption
-        );
+      if (!playlist?.id) return;
+
+      const index = sortedItems.findIndex((item) => item.id === playlistItem.id);
+      const item = index >= 0 ? sortedItems[index] : playlistItem;
+      if (index < 0 || !item.article?.url) {
+        logger.warn("プレイリスト記事クリックをスキップ: 再生可能なURLがありません", {
+          playlistId: playlist.id,
+          itemId: playlistItem.id,
+          articleId: playlistItem.article_id,
+          articleUrl: item.article?.url,
+        });
+        return;
       }
+
+      startPlaylistPlayback(
+        playlist.id,
+        playlist.name,
+        sortedItems,
+        index,
+        sortOption
+      );
     },
     [startPlaylistPlayback, playlist?.id, playlist?.name, sortedItems, sortOption]
   );
@@ -338,16 +351,17 @@ export default function PlaylistDetailPage() {
               </div>
               <button
                 onClick={() => {
-                  if (playlist && sortedItems.length > 0) {
+                  if (playlist && firstPlayableIndex >= 0) {
                     startPlaylistPlayback(
                       playlist.id,
                       playlist.name,
                       sortedItems,
-                      0,
+                      firstPlayableIndex,
                       sortOption
                     );
                   }
                 }}
+                disabled={firstPlayableIndex < 0}
                 className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 whitespace-nowrap"
               >
                 <Play className="size-4" />
