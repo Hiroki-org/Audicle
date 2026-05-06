@@ -182,11 +182,11 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
 
     # Recursively process any chunks that are still too big
     final_chunks = []
-    for chunk, chunk_len in chunks:
+    for chunk_text, chunk_len in chunks:
         if chunk_len > limit:
-            final_chunks.extend(_chunk_text(chunk, limit, next_separators))
+            final_chunks.extend(_chunk_text(chunk_text, limit, next_separators))
         else:
-            final_chunks.append(chunk)
+            final_chunks.append(chunk_text)
 
     return final_chunks
 
