@@ -245,5 +245,158 @@ describe("local-cache", () => {
             );
             expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
         });
+
+        describe("safeRemoveCache swallows removeItem errors", () => {
+            beforeEach(() => {
+                (global.localStorage.removeItem as jest.Mock).mockImplementation(() => {
+                    throw new Error("Storage removeItem failed");
+                });
+            });
+
+            it("should not throw when removeItem fails on invalid cache structure", () => {
+                global.localStorage.setItem(mockKey, JSON.stringify({ invalid: "data" }));
+
+                expect(() => getArticlesCache(mockUserId)).not.toThrow();
+                const result = getArticlesCache(mockUserId);
+                expect(result).toBeNull();
+            });
+
+            it("should not throw when removeItem fails on version mismatch", () => {
+                global.localStorage.setItem(
+                    mockKey,
+                    JSON.stringify({ version: 999, timestamp: Date.now(), payload: mockData })
+                );
+
+                expect(() => getArticlesCache(mockUserId)).not.toThrow();
+                const result = getArticlesCache(mockUserId);
+                expect(result).toBeNull();
+            });
+
+            it("should not throw when removeItem fails on expired cache", () => {
+                global.localStorage.setItem(
+                    mockKey,
+                    JSON.stringify({
+                        version: 1,
+                        timestamp: Date.now() - (1000 * 60 * 60 * 25),
+                        payload: mockData,
+                    })
+                );
+
+                expect(() => getArticlesCache(mockUserId)).not.toThrow();
+                const result = getArticlesCache(mockUserId);
+                expect(result).toBeNull();
+            });
+
+            it("should not throw when removeItem fails on invalid payload structure", () => {
+                global.localStorage.setItem(
+                    mockKey,
+                    JSON.stringify({ version: 1, timestamp: Date.now(), payload: { invalid: "payload" } })
+                );
+
+                expect(() => getArticlesCache(mockUserId)).not.toThrow();
+                const result = getArticlesCache(mockUserId);
+                expect(result).toBeNull();
+            });
+
+            it("should not throw when removeItem fails on JSON parse error", () => {
+                global.localStorage.setItem(mockKey, "not-valid-json");
+
+                expect(() => getArticlesCache(mockUserId)).not.toThrow();
+                const result = getArticlesCache(mockUserId);
+                expect(result).toBeNull();
+            });
+        });
+
+        describe("safeRemoveCache called exactly once per error path", () => {
+            it("should call removeItem exactly once on invalid cache structure", () => {
+                global.localStorage.setItem(mockKey, JSON.stringify({ invalid: "data" }));
+
+                getArticlesCache(mockUserId);
+
+                expect(global.localStorage.removeItem).toHaveBeenCalledTimes(1);
+                expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
+            });
+
+            it("should call removeItem exactly once on version mismatch", () => {
+                global.localStorage.setItem(
+                    mockKey,
+                    JSON.stringify({ version: 999, timestamp: Date.now(), payload: mockData })
+                );
+
+                getArticlesCache(mockUserId);
+
+                expect(global.localStorage.removeItem).toHaveBeenCalledTimes(1);
+                expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
+            });
+
+            it("should call removeItem exactly once on expired cache", () => {
+                global.localStorage.setItem(
+                    mockKey,
+                    JSON.stringify({
+                        version: 1,
+                        timestamp: Date.now() - (1000 * 60 * 60 * 25),
+                        payload: mockData,
+                    })
+                );
+
+                getArticlesCache(mockUserId);
+
+                expect(global.localStorage.removeItem).toHaveBeenCalledTimes(1);
+                expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
+            });
+
+            it("should call removeItem exactly once on invalid payload structure", () => {
+                global.localStorage.setItem(
+                    mockKey,
+                    JSON.stringify({ version: 1, timestamp: Date.now(), payload: { invalid: "payload" } })
+                );
+
+                getArticlesCache(mockUserId);
+
+                expect(global.localStorage.removeItem).toHaveBeenCalledTimes(1);
+                expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
+            });
+
+            it("should call removeItem exactly once on JSON parse error", () => {
+                global.localStorage.setItem(mockKey, "not-valid-json");
+
+                getArticlesCache(mockUserId);
+
+                expect(global.localStorage.removeItem).toHaveBeenCalledTimes(1);
+                expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
+            });
+
+            it("should not call removeItem on a cache miss (null stored value)", () => {
+                // Nothing in cache — no cleanup should occur
+                getArticlesCache(mockUserId);
+
+                expect(global.localStorage.removeItem).not.toHaveBeenCalled();
+            });
+        });
+
+        it("should call removeItem with correct key when localStorage.getItem itself throws", () => {
+            // Key is computed before the try block, so even when getItem throws,
+            // safeRemoveCache receives the correct key in the catch handler.
+            (global.localStorage.getItem as jest.Mock).mockImplementation(() => {
+                throw new Error("getItem failed");
+            });
+
+            const result = getArticlesCache(mockUserId);
+
+            expect(result).toBeNull();
+            expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
+        });
+
+        it("should not throw when both getItem and removeItem throw", () => {
+            (global.localStorage.getItem as jest.Mock).mockImplementation(() => {
+                throw new Error("getItem failed");
+            });
+            (global.localStorage.removeItem as jest.Mock).mockImplementation(() => {
+                throw new Error("removeItem failed");
+            });
+
+            expect(() => getArticlesCache(mockUserId)).not.toThrow();
+            expect(getArticlesCache(mockUserId)).toBeNull();
+        });
     });
 });
