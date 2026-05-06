@@ -12,13 +12,59 @@ export interface Article {
 
 const STORAGE_KEY = "audicle_articles";
 
+const _clearCorruptStorage = (): void => {
+    if (typeof window === "undefined") return;
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch {
+        // Ignore cleanup failures; callers can continue with an empty list.
+    }
+};
+
+const _isStoredChunk = (value: unknown): value is Chunk => {
+    if (typeof value !== "object" || value === null) return false;
+    const chunk = value as Partial<Chunk>;
+    return (
+        typeof chunk.id === "string" &&
+        typeof chunk.text === "string" &&
+        typeof chunk.cleanedText === "string" &&
+        typeof chunk.type === "string"
+    );
+};
+
+const _isStoredArticle = (value: unknown): value is Article => {
+    if (typeof value !== "object" || value === null) return false;
+    const article = value as Partial<Article>;
+    return (
+        typeof article.id === "string" &&
+        typeof article.url === "string" &&
+        typeof article.title === "string" &&
+        typeof article.createdAt === "string" &&
+        Array.isArray(article.chunks) &&
+        article.chunks.every(_isStoredChunk)
+    );
+};
+
 const _readArticles = (): Article[] => {
     if (typeof window === "undefined") return [];
-    const data = localStorage.getItem(STORAGE_KEY);
     try {
-        return data ? JSON.parse(data) : [];
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (!data) return [];
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+            const validArticles = parsed.filter(_isStoredArticle);
+            if (validArticles.length !== parsed.length) {
+                console.warn("Some articles in localStorage were invalid; filtering invalid entries");
+                _writeArticles(validArticles);
+            }
+            return validArticles;
+        }
+        console.warn("Invalid articles structure in localStorage; clearing stored articles");
+        _clearCorruptStorage();
+        return [];
     } catch (e) {
         console.error("Failed to parse articles from localStorage", e);
+        _clearCorruptStorage();
         return [];
     }
 };
