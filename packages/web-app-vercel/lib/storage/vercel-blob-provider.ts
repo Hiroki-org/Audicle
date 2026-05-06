@@ -28,7 +28,7 @@ export class VercelBlobProvider implements StorageProvider {
 
     private getBlobUrl(key: string): string {
         const baseUrl = this.requirePublicBaseUrl();
-        const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+        const encodedKey = key.split("/").filter(Boolean).map(encodeURIComponent).join("/");
         return `${baseUrl}/${encodedKey}`;
     }
 

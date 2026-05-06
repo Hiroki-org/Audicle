@@ -110,6 +110,13 @@ describe("VercelBlobProvider", () => {
             await provider.deleteObject("test-key.mp3");
             expect(del).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/test-key.mp3");
         });
+
+        it("should throw if token is missing", async () => {
+            delete process.env.BLOB_READ_WRITE_TOKEN;
+            const newProvider = new VercelBlobProvider();
+            await expect(newProvider.deleteObject("test-key.mp3")).rejects.toThrow("BLOB_READ_WRITE_TOKEN is required to construct Vercel Blob URLs");
+            expect(del).not.toHaveBeenCalled();
+        });
     });
 
     describe("headObject", () => {
