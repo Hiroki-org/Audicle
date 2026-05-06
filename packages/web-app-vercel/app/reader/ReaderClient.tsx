@@ -876,9 +876,25 @@ export default function ReaderPageClient() {
     (index: number) => {
       const len = playlistState.items.length;
       if (len === 0) return 0;
+      if (playlistState.shuffle && playlistState.shuffledIndices.length > 0) {
+        const currentShufflePos =
+          playlistState.shuffledIndices.indexOf(currentPlaylistIndex);
+        if (currentShufflePos !== -1 && index !== currentPlaylistIndex) {
+          const direction = index > currentPlaylistIndex ? 1 : -1;
+          const nextShufflePos =
+            (currentShufflePos + direction + playlistState.shuffledIndices.length) %
+            playlistState.shuffledIndices.length;
+          return playlistState.shuffledIndices[nextShufflePos];
+        }
+      }
       return ((index % len) + len) % len;
     },
-    [playlistState.items.length],
+    [
+      currentPlaylistIndex,
+      playlistState.items.length,
+      playlistState.shuffle,
+      playlistState.shuffledIndices,
+    ],
   );
 
   // 再生速度変更ハンドラー（デスクトップ版とモバイル版で共通）

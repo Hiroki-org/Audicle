@@ -159,5 +159,16 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         await expect(articles.nth(0)).toContainText('Cherry');
         await expect(articles.nth(1)).toContainText('Banana');
         await expect(articles.nth(2)).toContainText('Apple');
+
+        await articles.nth(0).click();
+        await page.waitForURL(/\/reader\?/);
+        await page.waitForSelector('[data-testid="audio-player-desktop"]', { state: 'visible' });
+        await expect(page.getByTestId('article-title')).toContainText('Cherry');
+
+        const next = page.getByTestId('desktop-next-button');
+        const currentUrl = page.url();
+        await next.click();
+        await page.waitForURL((url) => url.toString() !== currentUrl);
+        await expect(page.getByTestId('article-title')).toContainText('Banana');
     });
 });
