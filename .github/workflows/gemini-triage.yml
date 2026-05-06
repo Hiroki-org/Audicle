@@ -117,18 +117,11 @@ jobs:
       - name: "Run Gemini issue analysis"
         id: "gemini_analysis"
         if: |-
-          ${{
-            steps.get_labels.outputs.available_labels != '' &&
-            (inputs.issues_to_triage == '' || inputs.issues_to_triage == null) &&
-            contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.issue.author_association || '')
-          }}
+          ${{ steps.get_labels.outputs.available_labels != '' && (inputs.issues_to_triage == '' || inputs.issues_to_triage == null) }}
         uses: "google-github-actions/run-gemini-cli@v0" # ratchet:exclude
         env:
           GITHUB_TOKEN: "" # Do NOT pass any auth tokens here since this runs on untrusted inputs
           GEMINI_API_KEY: "${{ secrets.GEMINI_API_KEY }}"
-          # The CLI requires an explicit trust signal in headless Actions runs.
-          # This step is gated to repository-trusted actors above.
-          GEMINI_CLI_TRUST_WORKSPACE: "true"
           ISSUE_TITLE: "${{ github.event.issue.title }}"
           ISSUE_BODY: "${{ github.event.issue.body }}"
           AVAILABLE_LABELS: "${{ steps.get_labels.outputs.available_labels }}"

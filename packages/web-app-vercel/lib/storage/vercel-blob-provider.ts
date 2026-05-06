@@ -26,9 +26,11 @@ export class VercelBlobProvider implements StorageProvider {
         return this.publicBaseUrl;
     }
 
-    private getBlobUrl(key: string): string {
+    private getFullUrl(key: string): string {
         const baseUrl = this.requirePublicBaseUrl();
-        const encodedKey = key.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+        // key may contain multiple segments (e.g. "folder/file name.mp3").
+        // Encode each segment individually.
+        const encodedKey = key.split('/').map(encodeURIComponent).join('/');
         return `${baseUrl}/${encodedKey}`;
     }
 
@@ -42,7 +44,7 @@ export class VercelBlobProvider implements StorageProvider {
     }
 
     async generatePresignedGetUrl(key: string, _expiresIn: number): Promise<string> {
-        return this.getBlobUrl(key);
+        return this.getFullUrl(key);
     }
 
     async uploadObject(key: string, data: ArrayBuffer | Buffer, contentType: string, _expiresIn?: number): Promise<string> {
@@ -58,12 +60,14 @@ export class VercelBlobProvider implements StorageProvider {
     }
 
     async deleteObject(key: string): Promise<void> {
-        await del(this.getBlobUrl(key));
+        const fullUrl = this.getFullUrl(key);
+        await del(fullUrl);
     }
 
     async headObject(key: string): Promise<{ exists: boolean; size?: number }> {
         try {
-            const response = await head(this.getBlobUrl(key));
+            const fullUrl = this.getFullUrl(key);
+            const response = await head(fullUrl);
             return { exists: true, size: response.size };
         } catch {
             return { exists: false };

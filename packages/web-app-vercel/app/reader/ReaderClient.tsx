@@ -871,32 +871,14 @@ export default function ReaderPageClient() {
     [playlistIdFromQuery, playlistState, router, currentPlaylistIndex],
   );
 
-  const getAdjacentPlaylistIndex = useCallback(
-    (direction: -1 | 1) => {
+  // プレイリストのインデックスを循環させるユーティリティ
+  const wrapIndex = useCallback(
+    (index: number) => {
       const len = playlistState.items.length;
       if (len === 0) return 0;
-      if (playlistState.shuffle && playlistState.shuffledIndices.length > 0) {
-        const currentShufflePos =
-          playlistState.shuffledIndices.indexOf(currentPlaylistIndex);
-        if (currentShufflePos !== -1) {
-          const nextShufflePos =
-            (currentShufflePos + direction + playlistState.shuffledIndices.length) %
-            playlistState.shuffledIndices.length;
-          return playlistState.shuffledIndices[nextShufflePos];
-        }
-        logger.warn("Shuffle queue does not contain current playlist index", {
-          currentPlaylistIndex,
-          shuffledIndices: playlistState.shuffledIndices,
-        });
-      }
-      return ((currentPlaylistIndex + direction) % len + len) % len;
+      return ((index % len) + len) % len;
     },
-    [
-      currentPlaylistIndex,
-      playlistState.items.length,
-      playlistState.shuffle,
-      playlistState.shuffledIndices,
-    ],
+    [playlistState.items.length],
   );
 
   // 再生速度変更ハンドラー（デスクトップ版とモバイル版で共通）
@@ -1018,7 +1000,8 @@ export default function ReaderPageClient() {
               canMovePrevious={canMovePrevious}
               canMoveNext={canMoveNext}
               navigateToPlaylistItem={navigateToPlaylistItem}
-              getAdjacentPlaylistIndex={getAdjacentPlaylistIndex}
+              wrapIndex={wrapIndex}
+              currentPlaylistIndex={currentPlaylistIndex}
               isPlaying={isPlaying}
               play={play}
               pause={pause}
@@ -1092,7 +1075,8 @@ export default function ReaderPageClient() {
           canMovePrevious={canMovePrevious}
           canMoveNext={canMoveNext}
           navigateToPlaylistItem={navigateToPlaylistItem}
-          getAdjacentPlaylistIndex={getAdjacentPlaylistIndex}
+          wrapIndex={wrapIndex}
+          currentPlaylistIndex={currentPlaylistIndex}
           isPlaying={isPlaying}
           play={play}
           pause={pause}

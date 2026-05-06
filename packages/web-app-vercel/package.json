@@ -89,7 +89,7 @@
     "tsx": "^4.21.0",
     "typescript": "^6"
   },
-  "overrides": {
-    "fast-xml-parser": "^5.7.3"
+  "resolutions": {
+    "eslint": "^8.57.0"
   }
 }

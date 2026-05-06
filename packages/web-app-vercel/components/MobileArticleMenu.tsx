@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { logger } from "@/lib/logger";
 import {
   MoreVertical,
   ExternalLink,
@@ -81,7 +80,7 @@ export function MobileArticleMenu({
         setShowCopiedNotification(false);
       }, 2000);
     } catch (error) {
-      logger.error("URLのコピーに失敗しました:", error);
+      console.error("URLのコピーに失敗しました:", error);
     }
   };
 

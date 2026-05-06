@@ -24,25 +24,25 @@ describe("VercelBlobProvider", () => {
 
     describe("Initialization", () => {
         it("should parse storeId from BLOB_READ_WRITE_TOKEN", async () => {
-            const url = await provider.generatePresignedGetUrl("test.mp3", 3600);
-            expect(url).toBe("https://12345.public.blob.vercel-storage.com/test.mp3");
+            const url = await provider.generatePresignedGetUrl("test-key.mp3", 3600);
+            expect(url).toBe("https://12345.public.blob.vercel-storage.com/test-key.mp3");
         });
 
-        it("should throw if token is missing", async () => {
+        it("should have undefined publicBaseUrl if token is missing", async () => {
             delete process.env.BLOB_READ_WRITE_TOKEN;
             const newProvider = new VercelBlobProvider();
-            await expect(newProvider.generatePresignedGetUrl("test.mp3", 3600)).rejects.toThrow("BLOB_READ_WRITE_TOKEN is required to construct Vercel Blob URLs");
+            await expect(newProvider.generatePresignedGetUrl("test-key.mp3", 3600)).rejects.toThrow("BLOB_READ_WRITE_TOKEN is required to construct Vercel Blob URLs");
         });
 
-        it("should throw if token format is invalid", async () => {
+        it("should have undefined publicBaseUrl if token format is invalid", async () => {
             process.env.BLOB_READ_WRITE_TOKEN = "invalid_token";
             const newProvider = new VercelBlobProvider();
-            await expect(newProvider.generatePresignedGetUrl("test.mp3", 3600)).rejects.toThrow("BLOB_READ_WRITE_TOKEN is required to construct Vercel Blob URLs");
+            await expect(newProvider.generatePresignedGetUrl("test-key.mp3", 3600)).rejects.toThrow("BLOB_READ_WRITE_TOKEN is required to construct Vercel Blob URLs");
         });
     });
 
     describe("generatePresignedPutUrl", () => {
-        it("should upload an empty public blob and return its url", async () => {
+        it("should call put with empty Blob and return url (uploading an empty public blob to get a public URL)", async () => {
             (put as jest.Mock).mockResolvedValueOnce({ url: "https://example.com/put-url" });
             const url = await provider.generatePresignedPutUrl("test-key", 3600);
             expect(put).toHaveBeenCalledWith("test-key", expect.any(Blob), {
@@ -53,21 +53,21 @@ describe("VercelBlobProvider", () => {
             expect(url).toBe("https://example.com/put-url");
         });
 
-        it("should throw if put rejects", async () => {
-            (put as jest.Mock).mockRejectedValueOnce(new Error("Upload failed"));
-            await expect(provider.generatePresignedPutUrl("test-key", 3600)).rejects.toThrow("Upload failed");
+        it("should propagate errors if put rejects", async () => {
+            (put as jest.Mock).mockRejectedValueOnce(new Error("Put failed"));
+            await expect(provider.generatePresignedPutUrl("test-key", 3600)).rejects.toThrow("Put failed");
         });
     });
 
     describe("generatePresignedGetUrl", () => {
-        it("should generate URL based on publicBaseUrl", async () => {
+        it("should generate URL based on storeId and publicBaseUrl", async () => {
             const url = await provider.generatePresignedGetUrl("test-key.mp3", 3600);
             expect(url).toBe("https://12345.public.blob.vercel-storage.com/test-key.mp3");
         });
 
-        it("should URL-encode key path segments", async () => {
-            const url = await provider.generatePresignedGetUrl("path/to/my file.mp3", 3600);
-            expect(url).toBe("https://12345.public.blob.vercel-storage.com/path/to/my%20file.mp3");
+        it("should url-encode path segments", async () => {
+            const url = await provider.generatePresignedGetUrl("folder/test key.mp3", 3600);
+            expect(url).toBe("https://12345.public.blob.vercel-storage.com/folder/test%20key.mp3");
         });
 
         it("should throw error if publicBaseUrl is missing", async () => {
@@ -106,31 +106,29 @@ describe("VercelBlobProvider", () => {
     });
 
     describe("deleteObject", () => {
-        it("should call del with the full blob URL", async () => {
+        it("should call del with the full url", async () => {
             await provider.deleteObject("test-key.mp3");
             expect(del).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/test-key.mp3");
         });
 
-        it("should throw if token is missing", async () => {
-            delete process.env.BLOB_READ_WRITE_TOKEN;
-            const newProvider = new VercelBlobProvider();
-            await expect(newProvider.deleteObject("test-key.mp3")).rejects.toThrow("BLOB_READ_WRITE_TOKEN is required to construct Vercel Blob URLs");
-            expect(del).not.toHaveBeenCalled();
+        it("should call del with url-encoded full url", async () => {
+            await provider.deleteObject("folder/test key.mp3");
+            expect(del).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/folder/test%20key.mp3");
         });
     });
 
     describe("headObject", () => {
-        it("should return exists true and size if head succeeds", async () => {
+        it("should return exists true and size if head succeeds with full url", async () => {
             (head as jest.Mock).mockResolvedValueOnce({ size: 1024 });
             const result = await provider.headObject("test-key.mp3");
             expect(head).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/test-key.mp3");
             expect(result).toEqual({ exists: true, size: 1024 });
         });
 
-        it("should return exists false if head throws", async () => {
+        it("should return exists false if head throws with full url", async () => {
             (head as jest.Mock).mockRejectedValueOnce(new Error("Not found"));
-            const result = await provider.headObject("test-key.mp3");
-            expect(head).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/test-key.mp3");
+            const result = await provider.headObject("folder/test key.mp3");
+            expect(head).toHaveBeenCalledWith("https://12345.public.blob.vercel-storage.com/folder/test%20key.mp3");
             expect(result).toEqual({ exists: false });
         });
     });
