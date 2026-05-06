@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import type { UpdateSettingsRequest, UserSettings } from "@/types/settings";
+import type { UserSettings } from "@/types/settings";
 
 /**
  * ユーザー設定を取得
@@ -32,7 +32,7 @@ export function useUpdateUserSettingsMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (settings: UpdateSettingsRequest) => {
+        mutationFn: async (settings: UserSettings) => {
             const response = await fetch("/api/settings/update", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },

@@ -182,19 +182,21 @@ export default function PlaylistDetailPage() {
   const handleArticleClick = useCallback(
     (playlistItem: PlaylistItemWithArticle) => {
       if (playlistItem.article?.url && playlist?.id) {
+        // Find the index in sortedItems
         const index = sortedItems.findIndex(
           (item) => item.id === playlistItem.id
         );
-        startPlaylistPlayback(
-          playlist.id,
-          playlist.name,
-          sortedItems,
-          index >= 0 ? index : 0,
-          sortOption
+        router.push(
+          createReaderUrl({
+            articleUrl: playlistItem.article.url,
+            playlistId: playlist.id,
+            playlistIndex: index >= 0 ? index : 0,
+            autoplay: true,
+          })
         );
       }
     },
-    [playlist, sortedItems, sortOption, startPlaylistPlayback]
+    [router, playlist?.id, sortedItems]
   );
 
   if (isLoading) {
@@ -337,12 +339,18 @@ export default function PlaylistDetailPage() {
               </div>
               <button
                 onClick={() => {
-                  startPlaylistPlayback(
-                    playlist.id,
-                    playlist.name,
-                    sortedItems,
-                    0,
-                    sortOption
+                  const firstArticleUrl =
+                    sortedItems && sortedItems.length > 0
+                      ? sortedItems[0].article?.url
+                      : undefined;
+
+                  router.push(
+                    createReaderUrl({
+                      articleUrl: firstArticleUrl,
+                      playlistId: playlist.id,
+                      playlistIndex: 0,
+                      autoplay: true,
+                    })
                   );
                 }}
                 className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 whitespace-nowrap"

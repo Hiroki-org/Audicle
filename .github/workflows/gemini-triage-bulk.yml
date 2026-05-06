@@ -75,7 +75,6 @@ jobs:
                   REPOSITORY: "${{ github.repository }}"
                   AVAILABLE_LABELS: "${{ steps.get_labels.outputs.available_labels }}"
                   GEMINI_API_KEY: "${{ secrets.GEMINI_API_KEY }}"
-                  GEMINI_CLI_TRUST_WORKSPACE: "true"
               with:
                   # No GCP fields - using API key only
                   gemini_api_key: "${{ secrets.GEMINI_API_KEY }}"
