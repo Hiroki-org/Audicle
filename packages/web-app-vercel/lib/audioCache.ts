@@ -16,6 +16,7 @@ const MAX_CACHE_SIZE = 50; // キャッシュする最大アイテム数
 
 export class AudioCache {
   private cache = new Map<string, CacheEntry>();
+  private inFlightRequests = new Map<string, Promise<string>>();
 
   // キャッシュキーを生成（音声モデルと再生速度を含む）
   private getCacheKey(
@@ -49,6 +50,12 @@ export class AudioCache {
 
     // forceRegenerate フラグがある場合はキャッシュをスキップ
     if (!forceRegenerate) {
+      const inFlight = this.inFlightRequests.get(key);
+      if (inFlight) {
+        logger.cache("WAIT", `${text.substring(0, 30)}...`);
+        return inFlight;
+      }
+
       // キャッシュチェック
       const cached = this.cache.get(key);
       if (cached) {
@@ -80,6 +87,31 @@ export class AudioCache {
     }
 
     // キャッシュミス - 新規合成
+    const request = this.synthesizeAndStore(
+      key,
+      text,
+      voiceModel,
+      articleUrl,
+    );
+    if (!forceRegenerate) {
+      this.inFlightRequests.set(key, request);
+    }
+
+    try {
+      return await request;
+    } finally {
+      if (this.inFlightRequests.get(key) === request) {
+        this.inFlightRequests.delete(key);
+      }
+    }
+  }
+
+  private async synthesizeAndStore(
+    key: string,
+    text: string,
+    voiceModel: string,
+    articleUrl?: string,
+  ): Promise<string> {
     logger.cache("MISS", `${text.substring(0, 30)}...`);
     const blob = await synthesizeSpeech(
       text,
@@ -164,6 +196,7 @@ export class AudioCache {
       URL.revokeObjectURL(entry.url);
     });
     this.cache.clear();
+    this.inFlightRequests.clear();
     logger.cache("CLEAR", "all");
   }
 }
