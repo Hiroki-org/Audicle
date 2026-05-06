@@ -59,6 +59,20 @@ describe('articleStorage', () => {
             localStorageMock.getItem.mockReturnValueOnce('invalid json');
             expect(articleStorage.getAll()).toEqual([]);
             expect(consoleSpy).toHaveBeenCalled();
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('audicle_articles');
+            consoleSpy.mockRestore();
+        });
+
+        it('should clear invalid article arrays', () => {
+            const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+            localStorageMock.getItem.mockReturnValueOnce(JSON.stringify([{ id: 'missing-fields' }]));
+
+            expect(articleStorage.getAll()).toEqual([]);
+
+            expect(consoleSpy).toHaveBeenCalledWith(
+                'Invalid articles in localStorage; clearing stored articles'
+            );
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('audicle_articles');
             consoleSpy.mockRestore();
         });
     });

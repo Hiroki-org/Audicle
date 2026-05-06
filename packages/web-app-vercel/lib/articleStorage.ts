@@ -12,13 +12,41 @@ export interface Article {
 
 const STORAGE_KEY = "audicle_articles";
 
+const _clearCorruptStorage = (): void => {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch {
+        // Ignore cleanup failures; callers can continue with an empty list.
+    }
+};
+
+const _isStoredArticle = (value: unknown): value is Article => {
+    if (typeof value !== "object" || value === null) return false;
+    const article = value as Partial<Article>;
+    return (
+        typeof article.id === "string" &&
+        typeof article.url === "string" &&
+        typeof article.title === "string" &&
+        typeof article.createdAt === "string" &&
+        Array.isArray(article.chunks)
+    );
+};
+
 const _readArticles = (): Article[] => {
     if (typeof window === "undefined") return [];
     const data = localStorage.getItem(STORAGE_KEY);
     try {
-        return data ? JSON.parse(data) : [];
+        if (!data) return [];
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.every(_isStoredArticle)) {
+            return parsed;
+        }
+        console.warn("Invalid articles in localStorage; clearing stored articles");
+        _clearCorruptStorage();
+        return [];
     } catch (e) {
         console.error("Failed to parse articles from localStorage", e);
+        _clearCorruptStorage();
         return [];
     }
 };
