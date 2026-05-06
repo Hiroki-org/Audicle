@@ -122,6 +122,7 @@ jobs:
         env:
           GITHUB_TOKEN: "" # Do NOT pass any auth tokens here since this runs on untrusted inputs
           GEMINI_API_KEY: "${{ secrets.GEMINI_API_KEY }}"
+          GEMINI_CLI_TRUST_WORKSPACE: "true"
           ISSUE_TITLE: "${{ github.event.issue.title }}"
           ISSUE_BODY: "${{ github.event.issue.body }}"
           AVAILABLE_LABELS: "${{ steps.get_labels.outputs.available_labels }}"
