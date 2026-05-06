@@ -17,29 +17,38 @@ const CACHE_VERSION = 1;
 // Default TTL: 24 hours
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 
+function removeCacheItem(key: string): void {
+    try {
+        localStorage.removeItem(key);
+    } catch {
+        // Ignore cleanup failures; callers already fall back to fresh data.
+    }
+}
+
 export function getArticlesCache(userId: string): CachedPlaylistData | null {
     if (typeof window === "undefined" || !userId) return null;
+    const key = `${STORAGE_KEYS.ARTICLES_CACHE}-${userId}`;
     try {
-        const key = `${STORAGE_KEYS.ARTICLES_CACHE}-${userId}`;
         const cached = localStorage.getItem(key);
         if (!cached) return null;
 
         const parsed = JSON.parse(cached);
 
         if (!isValidEnvelope(parsed)) {
-            console.warn("Invalid cache structure detected");
+            console.warn("Invalid cache structure detected; clearing cache");
+            removeCacheItem(key);
             return null;
         }
 
         if (parsed.version !== CACHE_VERSION) {
             console.warn("Cache version mismatch; clearing cache");
-            try { localStorage.removeItem(key); } catch { }
+            removeCacheItem(key);
             return null;
         }
 
         if (Date.now() - parsed.timestamp > CACHE_TTL_MS) {
             console.info("Articles cache expired; removing");
-            try { localStorage.removeItem(key); } catch { }
+            removeCacheItem(key);
             return null;
         }
 
@@ -47,10 +56,12 @@ export function getArticlesCache(userId: string): CachedPlaylistData | null {
             return parsed.payload;
         }
 
-        console.warn("Invalid cached payload structure");
+        console.warn("Invalid cached payload structure; clearing cache");
+        removeCacheItem(key);
         return null;
     } catch (error) {
         console.error("Failed to read articles cache:", error);
+        removeCacheItem(key);
         return null;
     }
 }
