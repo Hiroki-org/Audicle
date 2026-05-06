@@ -164,6 +164,7 @@ describe("local-cache", () => {
 
             expect(result).toBeNull();
             expect(console.warn).toHaveBeenCalledWith("Invalid cache structure detected");
+            expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
         });
 
         it("should clear cache and return null if version mismatch", () => {
@@ -214,6 +215,7 @@ describe("local-cache", () => {
 
             expect(result).toBeNull();
             expect(console.warn).toHaveBeenCalledWith("Invalid cached payload structure");
+            expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
         });
 
         it("should return parsed payload successfully", () => {
@@ -241,6 +243,7 @@ describe("local-cache", () => {
                 "Failed to read articles cache:",
                 expect.any(SyntaxError)
             );
+            expect(global.localStorage.removeItem).toHaveBeenCalledWith(mockKey);
         });
     });
 });

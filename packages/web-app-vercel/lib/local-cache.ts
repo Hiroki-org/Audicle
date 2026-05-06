@@ -19,8 +19,9 @@ const CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 
 export function getArticlesCache(userId: string): CachedPlaylistData | null {
     if (typeof window === "undefined" || !userId) return null;
+    const key = getArticlesCacheKey(userId);
+
     try {
-        const key = `${STORAGE_KEYS.ARTICLES_CACHE}-${userId}`;
         const cached = localStorage.getItem(key);
         if (!cached) return null;
 
@@ -28,18 +29,19 @@ export function getArticlesCache(userId: string): CachedPlaylistData | null {
 
         if (!isValidEnvelope(parsed)) {
             console.warn("Invalid cache structure detected");
+            safeRemoveCache(key);
             return null;
         }
 
         if (parsed.version !== CACHE_VERSION) {
             console.warn("Cache version mismatch; clearing cache");
-            try { localStorage.removeItem(key); } catch { }
+            safeRemoveCache(key);
             return null;
         }
 
         if (Date.now() - parsed.timestamp > CACHE_TTL_MS) {
             console.info("Articles cache expired; removing");
-            try { localStorage.removeItem(key); } catch { }
+            safeRemoveCache(key);
             return null;
         }
 
@@ -48,10 +50,24 @@ export function getArticlesCache(userId: string): CachedPlaylistData | null {
         }
 
         console.warn("Invalid cached payload structure");
+        safeRemoveCache(key);
         return null;
     } catch (error) {
         console.error("Failed to read articles cache:", error);
+        safeRemoveCache(key);
         return null;
+    }
+}
+
+function getArticlesCacheKey(userId: string): string {
+    return `${STORAGE_KEYS.ARTICLES_CACHE}-${userId}`;
+}
+
+function safeRemoveCache(key: string): void {
+    try {
+        localStorage.removeItem(key);
+    } catch {
+        // Ignore cleanup failures; callers already fall back to a cache miss.
     }
 }
 
@@ -79,7 +95,7 @@ function isValidCachedData(data: any): data is CachedPlaylistData {
 export function setArticlesCache(userId: string, data: CachedPlaylistData): void {
     if (typeof window === "undefined" || !userId) return;
     try {
-        const key = `${STORAGE_KEYS.ARTICLES_CACHE}-${userId}`;
+        const key = getArticlesCacheKey(userId);
         const envelope: CacheEnvelope = { version: CACHE_VERSION, timestamp: Date.now(), payload: data };
         localStorage.setItem(key, JSON.stringify(envelope));
     } catch (error) {
