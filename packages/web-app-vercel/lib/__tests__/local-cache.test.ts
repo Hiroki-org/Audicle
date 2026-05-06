@@ -398,5 +398,13 @@ describe("local-cache", () => {
             expect(() => getArticlesCache(mockUserId)).not.toThrow();
             expect(getArticlesCache(mockUserId)).toBeNull();
         });
+
+        it("should return null without throwing when localStorage is unavailable after window exists", () => {
+            // @ts-ignore
+            delete global.localStorage;
+
+            expect(() => getArticlesCache(mockUserId)).not.toThrow();
+            expect(getArticlesCache(mockUserId)).toBeNull();
+        });
     });
 });

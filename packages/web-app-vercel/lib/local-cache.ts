@@ -64,6 +64,8 @@ function getArticlesCacheKey(userId: string): string {
 }
 
 function safeRemoveCache(key: string): void {
+    if (typeof localStorage === "undefined" || localStorage === null) return;
+
     try {
         localStorage.removeItem(key);
     } catch {
