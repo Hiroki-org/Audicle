@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("Supabase RPC error:", error);
       return NextResponse.json(
-        { error: "Failed to record stats", details: error.message },
+        { error: "Failed to record stats" },
         { status: 500 },
       );
     }
