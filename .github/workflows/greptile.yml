@@ -1,0 +1,49 @@
+name: "🤖 Greptile PR サマリー"
+
+on:
+  pull_request_review:
+    types:
+      - "submitted"
+
+concurrency:
+  group: "${{ github.workflow }}-greptile-${{ github.event.pull_request.number }}"
+  cancel-in-progress: true
+
+jobs:
+  update-description:
+    runs-on: "ubuntu-latest"
+    permissions:
+      pull-requests: "write"
+
+    if: |-
+      ${{ github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.review.user.login == 'greptile-apps[bot]' }}
+
+    steps:
+      - name: "PR説明にGreptileサマリーを追加"
+        env:
+          GH_TOKEN: "${{ github.token }}"
+        run: |
+          REVIEW_BODY=$(jq -r '.review.body // empty' "$GITHUB_EVENT_PATH")
+          if [ -z "$REVIEW_BODY" ]; then
+            echo "Greptile レビュー本文が空のためスキップします。"
+            exit 0
+          fi
+
+          CURRENT_BODY=$(gh pr view "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --json body -q .body) || {
+            echo "PR情報の取得に失敗しました。スキップします。"
+            exit 0
+          }
+
+          # Greptileサマリーが既に含まれている場合はスキップ
+          if echo "$CURRENT_BODY" | grep -q "Greptile Summary"; then
+            echo "Greptile サマリーは既にPR説明に含まれています。スキップします。"
+            exit 0
+          fi
+
+          {
+            printf '%s\n' "$CURRENT_BODY"
+            echo ""
+            printf '%s' "$REVIEW_BODY"
+          } > new_body.txt
+          gh pr edit "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body-file new_body.txt
