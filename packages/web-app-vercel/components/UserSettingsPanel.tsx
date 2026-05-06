@@ -17,6 +17,7 @@ import {
   ColorTheme,
 } from "@/types/settings";
 import { applyTheme } from "@/lib/theme";
+import { logger } from "@/lib/logger";
 
 export default function UserSettingsPanel() {
   const { data: session } = useSession();
@@ -61,7 +62,7 @@ export default function UserSettingsPanel() {
           const parsed = JSON.parse(storedSettings);
           setSettings({ ...DEFAULT_SETTINGS, ...parsed });
         } catch (e) {
-          console.error("Failed to parse local settings:", e);
+          logger.error("Failed to parse local settings:", e);
         }
       }
     }

@@ -48,6 +48,24 @@ describe('parseApiErrorMessage', () => {
         const errorText = JSON.stringify({ error: 'エラーメッセージ' });
         expect(parseApiErrorMessage(errorText, 'デフォルトメッセージ')).toBe('エラーメッセージ');
     });
+
+    it('returns original text when errorText is "null" (valid JSON but not an object)', () => {
+        expect(parseApiErrorMessage('null')).toBe('null');
+    });
+
+    it('returns original text when errorText is an array "[]"', () => {
+        expect(parseApiErrorMessage('[]')).toBe('[]');
+    });
+
+    it('returns original text when errorText is an empty string', () => {
+        expect(parseApiErrorMessage('')).toBe('');
+    });
+
+    it('returns original text when errorText is an HTML error page', () => {
+        const htmlError = '<html><body>502 Bad Gateway</body></html>';
+        expect(parseApiErrorMessage(htmlError)).toBe(htmlError);
+    });
+
 });
 
 describe('extractContent', () => {
