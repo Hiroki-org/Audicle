@@ -941,6 +941,62 @@ describe("usePlayback", () => {
       );
     });
 
+    it('NotSupportedError 後の再取得中に stop() された場合、古い失敗でエラー状態を上書きしないこと', async () => {
+      const { audioCache } = require("@/lib/audioCache");
+      const { getAudioChunk } = require("@/lib/indexedDB");
+      getAudioChunk.mockResolvedValue(null);
+
+      let rejectRefetch: (_error: Error) => void = () => {};
+      audioCache.get
+        .mockResolvedValueOnce("blob:stale-audio-url")
+        .mockImplementationOnce(
+          () =>
+            new Promise((_resolve, reject) => {
+              rejectRefetch = reject;
+            })
+        );
+      mockAudioInstance.play = jest
+        .fn()
+        .mockRejectedValueOnce({
+          name: "NotSupportedError",
+          message: "unsupported source",
+        })
+        .mockResolvedValue(undefined);
+
+      const mockChunks = [
+        { id: "chunk-1", text: "テスト1", cleanedText: "テスト1", type: "paragraph" },
+        { id: "chunk-2", text: "テスト2", cleanedText: "テスト2", type: "paragraph" },
+      ];
+
+      const { result } = renderHook(() =>
+        usePlayback({
+          chunks: mockChunks,
+          articleUrl: "https://example.com/test",
+          voiceModel: "ja-JP-Standard-B",
+        })
+      );
+
+      const playPromise = result.current.play();
+
+      await waitFor(() => {
+        expect(audioCache.get).toHaveBeenCalledTimes(2);
+      });
+
+      act(() => {
+        result.current.stop();
+      });
+
+      await act(async () => {
+        rejectRefetch(new Error("Re-fetch failed"));
+        await playPromise;
+      });
+
+      expect(result.current.error).toBe("");
+      expect(result.current.isPlaying).toBe(false);
+      expect(result.current.currentIndex).toBe(-1);
+      expect(audioCache.get).toHaveBeenCalledTimes(2);
+    });
+
     it('onerror イベントで MEDIA_ERR_SRC_NOT_SUPPORTED が発生し再取得も失敗した場合、エラーが設定されて次のチャンクへスキップすること', async () => {
       const { audioCache } = require("@/lib/audioCache");
       const { getAudioChunk } = require("@/lib/indexedDB");

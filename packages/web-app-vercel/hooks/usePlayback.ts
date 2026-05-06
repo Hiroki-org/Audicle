@@ -498,8 +498,8 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
                 void playFromIndexRef.current(index + 1).catch((skipErr) => {
                   logger.error("次チャンクへのスキップ中にエラー", skipErr);
                 });
+                setError("一部の音声が再生できませんでした。次の部分から再開します。");
               }
-              setError("一部の音声が再生できませんでした。次の部分から再開します。");
             }
             return;
           }
@@ -521,6 +521,9 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
         onChunkChange?.(chunk.id);
       } catch (err) {
         const error = err as Error;
+        if (!isCurrentPlaybackSession(currentSessionId)) {
+          return;
+        }
 
         // AbortErrorは通常の操作で発生する可能性があるため、警告レベルで記録
         // (例: ユーザーが素早くクリック、ページ遷移、コンポーネントのアンマウント等)
@@ -545,9 +548,6 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
             chunkIndex: index,
             errorMessage: error.message,
           });
-          if (!isCurrentPlaybackSession(currentSessionId)) {
-            return;
-          }
           const audio = audioRef.current;
           if (audio) {
             audio.onended = null;
@@ -602,13 +602,13 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
             }
           } catch (refetchErr2) {
             logger.warn(`⚠️ NotSupportedError後の再取得失敗: チャンク ${index + 1}、次のチャンクへスキップします。`, refetchErr2);
-            setIsPlaying(false);
             if (isCurrentPlaybackSession(currentSessionId)) {
+              setIsPlaying(false);
               void playFromIndexRef.current(index + 1).catch((skipErr) => {
                 logger.error("次チャンクへのスキップ中にエラー", skipErr);
               });
+              setError("一部の音声が再生できませんでした。次の部分から再開します。");
             }
-            setError("一部の音声が再生できませんでした。次の部分から再開します。");
           }
         } else {
           setError(

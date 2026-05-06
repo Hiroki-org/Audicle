@@ -200,4 +200,55 @@ describe('AudioPlaybackContext', () => {
     contextValue.setPlaybackRate(1.5);
     expect(mockSetPlaybackRate).toHaveBeenCalledWith(1.5);
   });
+
+  it('should stop playback when switching from an empty article URL source to a different source', () => {
+    const mockStop = jest.fn();
+    mockUsePlayback.mockReturnValue({
+      isPlaying: true,
+      isLoading: false,
+      error: '',
+      currentIndex: 0,
+      currentChunkId: 'chunk-1',
+      playbackRate: 1,
+      play: jest.fn(),
+      pause: jest.fn(),
+      stop: mockStop,
+      next: jest.fn(),
+      previous: jest.fn(),
+      seekToChunk: jest.fn(),
+      setPlaybackRate: jest.fn(),
+    });
+
+    let contextValue: any;
+
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'Old', cleanedText: 'Old', type: 'paragraph' as const }],
+        articleUrl: '',
+      });
+    });
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-2', text: 'New', cleanedText: 'New', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/new',
+      });
+    });
+
+    expect(mockStop).toHaveBeenCalledTimes(1);
+  });
 });
