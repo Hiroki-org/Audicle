@@ -119,7 +119,7 @@ jobs:
                       ]
 
                       ## Strict Output Rules
-                      Output the JSON array directly in your response. Ensure the output is strictly valid JSON format, without markdown formatting if possible. Warning: Do not use example data. Output the actual analysis results for the issues provided above.
+                      Output the JSON array directly as the entire response body. The response MUST be strictly valid JSON only: no markdown fences, no prose, no preamble, and no trailing text. Warning: Do not use example data. Output the actual analysis results for the issues provided above.
 
             - name: "Collect outputs"
               id: "collect_outputs"
