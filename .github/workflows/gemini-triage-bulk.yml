@@ -107,8 +107,6 @@ jobs:
                       ## Primary Directive
                       Analyze the issues above and generate a JSON array containing your triage decisions.
 
-                      Target File Path: /tmp/triaged_issues.json
-
                       Output Format (JSON Array):
                       [
                         {
@@ -125,7 +123,7 @@ jobs:
               id: "collect_outputs"
               uses: "actions/github-script@v9"
               env:
-                  GEMINI_RESPONSE: "${{ steps.gemini_issue_analysis.outputs.gemini_response }}"
+                  GEMINI_RESPONSE: "${{ steps.gemini_issue_analysis.outputs.summary }}"
               with:
                   script: |-
                       let triagedIssues = '[]';
@@ -140,11 +138,19 @@ jobs:
                           const anyMatch = response.match(/```\n([\s\S]*?)\n```/);
                           if (anyMatch) {
                             jsonStr = anyMatch[1];
+                          } else {
+                            const arrayMatch = response.match(/(\[[\s\S]*\])/);
+                            if (arrayMatch) {
+                              jsonStr = arrayMatch[1];
+                            }
                           }
                         }
 
                         console.log('Extracted content preview:', jsonStr.substring(0, 100));
-                        JSON.parse(jsonStr);
+                        const parsed = JSON.parse(jsonStr);
+                        if (!Array.isArray(parsed)) {
+                          throw new Error('Gemini response must be a JSON array');
+                        }
                         triagedIssues = jsonStr;
                       } catch (error) {
                         core.warning(`Error parsing triaged issues from Gemini response: ${error.message}`);
