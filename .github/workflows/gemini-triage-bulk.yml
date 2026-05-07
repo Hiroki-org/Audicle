@@ -87,11 +87,6 @@ jobs:
                         },
                         "telemetry": {
                           "enabled": false
-                        },
-                        "tools": {
-                          "core": [
-                            "run_shell_command"
-                          ]
                         }
                       }
                   prompt: |-
@@ -112,8 +107,6 @@ jobs:
                       ## Primary Directive
                       Analyze the issues above and generate a JSON array containing your triage decisions.
 
-                      Target File Path: /tmp/triaged_issues.json
-
                       Output Format (JSON Array):
                       [
                         {
@@ -124,36 +117,47 @@ jobs:
                       ]
 
                       ## Strict Output Rules
-                      1. You MUST NOT output the JSON content in your text response.
-                      2. You MUST use the Python script below to write the file to avoid quoting issues.
-
-                      Execute exactly this format:
-                      run_shell_command(python3 -c "import json; f=open('/tmp/triaged_issues.json', 'w'); json.dump(YOUR_ANALYSIS_RESULT_LIST, f, ensure_ascii=False); f.close()")
-
-                      Warning: Do not use example data. Output the actual analysis results for the issues provided above.
-                      Execute the Python script now.
+                      Output the JSON array directly as the entire response body. The response MUST be strictly valid JSON only: no markdown fences, no prose, no preamble, and no trailing text. Warning: Do not use example data. Output the actual analysis results for the issues provided above.
 
             - name: "Collect outputs"
               id: "collect_outputs"
               uses: "actions/github-script@v9"
+              env:
+                  GEMINI_RESPONSE: "${{ steps.gemini_issue_analysis.outputs.summary }}"
               with:
                   script: |-
-                      const fs = require('fs');
-                      const path = '/tmp/triaged_issues.json';
                       let triagedIssues = '[]';
+                      const response = process.env.GEMINI_RESPONSE || '';
                       
                       try {
-                        if (fs.existsSync(path)) {
-                          const content = fs.readFileSync(path, 'utf8');
-                          console.log('File content preview:', content.substring(0, 100)); // プレビューも出す
-                          // Validate JSON
-                          JSON.parse(content);
-                          triagedIssues = content;
+                        let jsonStr = response.trim();
+                        const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+                        if (jsonMatch) {
+                          jsonStr = jsonMatch[1];
                         } else {
-                          core.warning('⚠️ Output file /tmp/triaged_issues.json was NOT found. Gemini likely failed to execute the write command.');
+                          const anyMatch = response.match(/```\s*([\s\S]*?)\s*```/);
+                          if (anyMatch) {
+                            jsonStr = anyMatch[1];
+                          } else {
+                            // Extract JSON array literal with a fallback regex
+                            const arrayMatch = response.match(/\[[\s\S]*\]/);
+                            if (arrayMatch) {
+                              jsonStr = arrayMatch[0];
+                            }
+                          }
                         }
+
+                        const parsed = JSON.parse(jsonStr);
+                        if (!Array.isArray(parsed)) {
+                          throw new Error("Parsed JSON is not an array");
+                        }
+                        triagedIssues = JSON.stringify(parsed);
+                        core.info(`Parsed ${parsed.length} triage decisions from Gemini response`);
                       } catch (error) {
-                        core.warning(`Error reading or parsing triaged issues file: ${error.message}`);
+                        core.warning(`Error parsing triaged issues from Gemini response: ${error.message}`);
+                        const len = response.length;
+                        const trimmedLen = response.trim().length;
+                        core.info(`Response Length: ${len}, Trimmed Length: ${trimmedLen}`);
                       }
                       
                       core.setOutput('triaged_issues', triagedIssues);
