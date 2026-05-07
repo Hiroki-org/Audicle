@@ -133,11 +133,11 @@ jobs:
                       
                       try {
                         let jsonStr = response.trim();
-                        const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
+                        const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
                         if (jsonMatch) {
                           jsonStr = jsonMatch[1];
                         } else {
-                          const anyMatch = response.match(/```\n([\s\S]*?)\n```/);
+                          const anyMatch = response.match(/```\s*([\s\S]*?)\s*```/);
                           if (anyMatch) {
                             jsonStr = anyMatch[1];
                           } else {
@@ -152,12 +152,17 @@ jobs:
                         console.log('Extracted content preview:', jsonStr.substring(0, 100));
                         const parsed = JSON.parse(jsonStr);
                         if (!Array.isArray(parsed)) {
-                              throw new Error("Parsed JSON is not an array");
+                          throw new Error("Parsed JSON is not an array");
                         }
                         triagedIssues = jsonStr;
                       } catch (error) {
                         core.warning(`Error parsing triaged issues from Gemini response: ${error.message}`);
-                        core.info(`Raw response: ${response}`);
+                        const trimmedResponse = response.trim();
+                        const previewLength = 500;
+                        const responsePreview = trimmedResponse.slice(0, previewLength);
+                        const isTruncated = trimmedResponse.length > previewLength;
+                        core.info(`Gemini response parse failure metadata: length=${response.length}, trimmedLength=${trimmedResponse.length}, previewLength=${responsePreview.length}, truncated=${isTruncated}`);
+                        core.info(`Gemini response preview (first ${previewLength} chars): ${responsePreview}`);
                       }
                       
                       core.setOutput('triaged_issues', triagedIssues);
