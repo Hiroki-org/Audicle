@@ -87,11 +87,6 @@ jobs:
                         },
                         "telemetry": {
                           "enabled": false
-                        },
-                        "tools": {
-                          "core": [
-                            "run_shell_command"
-                          ]
                         }
                       }
                   prompt: |-
@@ -124,36 +119,36 @@ jobs:
                       ]
 
                       ## Strict Output Rules
-                      1. You MUST NOT output the JSON content in your text response.
-                      2. You MUST use the Python script below to write the file to avoid quoting issues.
-
-                      Execute exactly this format:
-                      run_shell_command(python3 -c "import json; f=open('/tmp/triaged_issues.json', 'w'); json.dump(YOUR_ANALYSIS_RESULT_LIST, f, ensure_ascii=False); f.close()")
-
-                      Warning: Do not use example data. Output the actual analysis results for the issues provided above.
-                      Execute the Python script now.
+                      Output the JSON array directly in your response. Ensure the output is strictly valid JSON format, without markdown formatting if possible. Warning: Do not use example data. Output the actual analysis results for the issues provided above.
 
             - name: "Collect outputs"
               id: "collect_outputs"
               uses: "actions/github-script@v9"
+              env:
+                  GEMINI_RESPONSE: "${{ steps.gemini_issue_analysis.outputs.gemini_response }}"
               with:
                   script: |-
-                      const fs = require('fs');
-                      const path = '/tmp/triaged_issues.json';
                       let triagedIssues = '[]';
+                      const response = process.env.GEMINI_RESPONSE || '';
                       
                       try {
-                        if (fs.existsSync(path)) {
-                          const content = fs.readFileSync(path, 'utf8');
-                          console.log('File content preview:', content.substring(0, 100)); // プレビューも出す
-                          // Validate JSON
-                          JSON.parse(content);
-                          triagedIssues = content;
+                        let jsonStr = response.trim();
+                        const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
+                        if (jsonMatch) {
+                          jsonStr = jsonMatch[1];
                         } else {
-                          core.warning('⚠️ Output file /tmp/triaged_issues.json was NOT found. Gemini likely failed to execute the write command.');
+                          const anyMatch = response.match(/```\n([\s\S]*?)\n```/);
+                          if (anyMatch) {
+                            jsonStr = anyMatch[1];
+                          }
                         }
+
+                        console.log('Extracted content preview:', jsonStr.substring(0, 100));
+                        JSON.parse(jsonStr);
+                        triagedIssues = jsonStr;
                       } catch (error) {
-                        core.warning(`Error reading or parsing triaged issues file: ${error.message}`);
+                        core.warning(`Error parsing triaged issues from Gemini response: ${error.message}`);
+                        core.info(`Raw response: ${response}`);
                       }
                       
                       core.setOutput('triaged_issues', triagedIssues);
