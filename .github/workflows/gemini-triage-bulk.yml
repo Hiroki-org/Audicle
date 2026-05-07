@@ -152,17 +152,17 @@ jobs:
                         console.log('Extracted content preview:', jsonStr.substring(0, 100));
                         const parsed = JSON.parse(jsonStr);
                         if (!Array.isArray(parsed)) {
-                          throw new Error("Parsed JSON is not an array");
+                              throw new Error("Parsed JSON is not an array");
                         }
                         triagedIssues = jsonStr;
                       } catch (error) {
                         core.warning(`Error parsing triaged issues from Gemini response: ${error.message}`);
-                        const trimmedResponse = response.trim();
-                        const previewLength = 500;
-                        const responsePreview = trimmedResponse.slice(0, previewLength);
-                        const isTruncated = trimmedResponse.length > previewLength;
-                        core.info(`Gemini response parse failure metadata: length=${response.length}, trimmedLength=${trimmedResponse.length}, previewLength=${responsePreview.length}, truncated=${isTruncated}`);
-                        core.info(`Gemini response preview (first ${previewLength} chars): ${responsePreview}`);
+                        const len = response.length;
+                        const trimmedLen = response.trim().length;
+                        const previewStr = response.substring(0, 500);
+                        const isTruncated = len > 500;
+                        core.info(`Response Length: ${len}, Trimmed Length: ${trimmedLen}, Truncated: ${isTruncated}`);
+                        core.info(`Raw response preview: ${previewStr}`);
                       }
                       
                       core.setOutput('triaged_issues', triagedIssues);
