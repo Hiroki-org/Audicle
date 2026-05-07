@@ -107,8 +107,6 @@ jobs:
                       ## Primary Directive
                       Analyze the issues above and generate a JSON array containing your triage decisions.
 
-                      Target File Path: /tmp/triaged_issues.json
-
                       Output Format (JSON Array):
                       [
                         {
@@ -149,20 +147,17 @@ jobs:
                           }
                         }
 
-                        console.log('Extracted content preview:', jsonStr.substring(0, 100));
                         const parsed = JSON.parse(jsonStr);
                         if (!Array.isArray(parsed)) {
-                              throw new Error("Parsed JSON is not an array");
+                          throw new Error("Parsed JSON is not an array");
                         }
-                        triagedIssues = jsonStr;
+                        triagedIssues = JSON.stringify(parsed);
+                        core.info(`Parsed ${parsed.length} triage decisions from Gemini response`);
                       } catch (error) {
                         core.warning(`Error parsing triaged issues from Gemini response: ${error.message}`);
                         const len = response.length;
                         const trimmedLen = response.trim().length;
-                        const previewStr = response.substring(0, 500);
-                        const isTruncated = len > 500;
-                        core.info(`Response Length: ${len}, Trimmed Length: ${trimmedLen}, Truncated: ${isTruncated}`);
-                        core.info(`Raw response preview: ${previewStr}`);
+                        core.info(`Response Length: ${len}, Trimmed Length: ${trimmedLen}`);
                       }
                       
                       core.setOutput('triaged_issues', triagedIssues);
