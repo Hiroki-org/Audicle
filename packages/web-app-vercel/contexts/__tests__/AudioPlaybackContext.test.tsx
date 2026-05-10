@@ -251,4 +251,147 @@ describe('AudioPlaybackContext', () => {
 
     expect(mockStop).toHaveBeenCalledTimes(1);
   });
+
+  it('should stop playback when the next source is null', () => {
+    const mockStop = jest.fn();
+    mockUsePlayback.mockReturnValue({
+      isPlaying: true,
+      isLoading: false,
+      error: '',
+      currentIndex: 0,
+      currentChunkId: 'chunk-1',
+      playbackRate: 1,
+      play: jest.fn(),
+      pause: jest.fn(),
+      stop: mockStop,
+      next: jest.fn(),
+      previous: jest.fn(),
+      seekToChunk: jest.fn(),
+      setPlaybackRate: jest.fn(),
+    });
+
+    let contextValue: any;
+
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'Old', cleanedText: 'Old', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/old',
+      });
+    });
+
+    act(() => {
+      contextValue.setSource(null);
+    });
+
+    expect(mockStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not stop playback when the next source has the same articleUrl', () => {
+    const mockStop = jest.fn();
+    mockUsePlayback.mockReturnValue({
+      isPlaying: true,
+      isLoading: false,
+      error: '',
+      currentIndex: 0,
+      currentChunkId: 'chunk-1',
+      playbackRate: 1,
+      play: jest.fn(),
+      pause: jest.fn(),
+      stop: mockStop,
+      next: jest.fn(),
+      previous: jest.fn(),
+      seekToChunk: jest.fn(),
+      setPlaybackRate: jest.fn(),
+    });
+
+    let contextValue: any;
+
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'Old', cleanedText: 'Old', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/same',
+      });
+    });
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'Old updated', cleanedText: 'Old updated', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/same',
+      });
+    });
+
+    expect(mockStop).not.toHaveBeenCalled();
+  });
+
+  it('should not stop playback when the initial source is null', () => {
+    const mockStop = jest.fn();
+    mockUsePlayback.mockReturnValue({
+      isPlaying: false,
+      isLoading: false,
+      error: '',
+      currentIndex: -1,
+      currentChunkId: undefined,
+      playbackRate: 1,
+      play: jest.fn(),
+      pause: jest.fn(),
+      stop: mockStop,
+      next: jest.fn(),
+      previous: jest.fn(),
+      seekToChunk: jest.fn(),
+      setPlaybackRate: jest.fn(),
+    });
+
+    let contextValue: any;
+
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'New', cleanedText: 'New', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/new',
+      });
+    });
+
+    expect(mockStop).not.toHaveBeenCalled();
+  });
 });
