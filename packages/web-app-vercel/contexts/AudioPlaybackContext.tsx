@@ -56,7 +56,12 @@ export function AudioPlaybackProvider({
 
   const setPlaybackSource = useCallback(
     (next: AudioPlaybackSource | null) => {
-      if (source && (!next || source.articleUrl !== next.articleUrl)) {
+      if (
+        source &&
+        (!next ||
+          source.articleUrl !== next.articleUrl ||
+          source.voiceModel !== next.voiceModel)
+      ) {
         stopPlayback();
       }
       setSource(next);

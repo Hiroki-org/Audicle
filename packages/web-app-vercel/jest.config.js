@@ -27,7 +27,7 @@ const customJestConfig = {
     "lib/**/*.{js,jsx,ts,tsx}",
     "components/DomainBadge.tsx",
     "contexts/**/*.{ts,tsx}",
-    "!lib/**/__tests__/**",
+    "!**/__tests__/**",
     "!**/*.d.ts",
     "!**/node_modules/**",
     "!**/.next/**",
