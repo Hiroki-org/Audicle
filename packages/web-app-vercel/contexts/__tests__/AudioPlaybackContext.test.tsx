@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, act } from '@testing-library/react';
+import { render, act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { AudioPlaybackProvider, useAudioPlayback } from '../AudioPlaybackContext';
 import { usePlayback } from '../../hooks/usePlayback';
 
@@ -250,5 +250,228 @@ describe('AudioPlaybackContext', () => {
     });
 
     expect(mockStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('should stop playback when the next source is null', () => {
+    const mockStop = jest.fn();
+    mockUsePlayback.mockReturnValue({
+      isPlaying: true,
+      isLoading: false,
+      error: '',
+      currentIndex: 0,
+      currentChunkId: 'chunk-1',
+      playbackRate: 1,
+      play: jest.fn(),
+      pause: jest.fn(),
+      stop: mockStop,
+      next: jest.fn(),
+      previous: jest.fn(),
+      seekToChunk: jest.fn(),
+      setPlaybackRate: jest.fn(),
+    });
+
+    let contextValue: any;
+
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'Old', cleanedText: 'Old', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/old',
+      });
+    });
+
+    act(() => {
+      contextValue.setSource(null);
+    });
+
+    expect(mockStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not stop playback when the next source has the same articleUrl', () => {
+    const mockStop = jest.fn();
+    mockUsePlayback.mockReturnValue({
+      isPlaying: true,
+      isLoading: false,
+      error: '',
+      currentIndex: 0,
+      currentChunkId: 'chunk-1',
+      playbackRate: 1,
+      play: jest.fn(),
+      pause: jest.fn(),
+      stop: mockStop,
+      next: jest.fn(),
+      previous: jest.fn(),
+      seekToChunk: jest.fn(),
+      setPlaybackRate: jest.fn(),
+    });
+
+    let contextValue: any;
+
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'Old', cleanedText: 'Old', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/same',
+      });
+    });
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'Old updated', cleanedText: 'Old updated', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/same',
+      });
+    });
+
+    expect(mockStop).not.toHaveBeenCalled();
+  });
+
+  it('should stop playback when the voice model changes for the same articleUrl', async () => {
+    const mockStop = jest.fn();
+    mockUsePlayback.mockReturnValue({
+      isPlaying: true,
+      isLoading: false,
+      error: '',
+      currentIndex: 0,
+      currentChunkId: 'chunk-1',
+      playbackRate: 1,
+      play: jest.fn(),
+      pause: jest.fn(),
+      stop: mockStop,
+      next: jest.fn(),
+      previous: jest.fn(),
+      seekToChunk: jest.fn(),
+      setPlaybackRate: jest.fn(),
+    });
+
+    function TestComponent() {
+      const { source, setSource } = useAudioPlayback();
+      return (
+        <div>
+          <span data-testid="voice-model">{source?.voiceModel ?? 'none'}</span>
+          <button
+            type="button"
+            onClick={() =>
+              setSource({
+                chunks: [
+                  {
+                    id: 'chunk-1',
+                    text: 'Old',
+                    cleanedText: 'Old',
+                    type: 'paragraph' as const,
+                  },
+                ],
+                articleUrl: 'https://example.com/same',
+                voiceModel: 'voice-a',
+              })
+            }
+          >
+            Set voice A
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setSource({
+                chunks: [
+                  {
+                    id: 'chunk-1',
+                    text: 'Old',
+                    cleanedText: 'Old',
+                    type: 'paragraph' as const,
+                  },
+                ],
+                articleUrl: 'https://example.com/same',
+                voiceModel: 'voice-b',
+              })
+            }
+          >
+            Set voice B
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set voice A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set voice B' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('voice-model')).toHaveTextContent('voice-b');
+      expect(mockStop).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('should not stop playback when the initial source is null', () => {
+    const mockStop = jest.fn();
+    mockUsePlayback.mockReturnValue({
+      isPlaying: false,
+      isLoading: false,
+      error: '',
+      currentIndex: -1,
+      currentChunkId: undefined,
+      playbackRate: 1,
+      play: jest.fn(),
+      pause: jest.fn(),
+      stop: mockStop,
+      next: jest.fn(),
+      previous: jest.fn(),
+      seekToChunk: jest.fn(),
+      setPlaybackRate: jest.fn(),
+    });
+
+    let contextValue: any;
+
+    function TestComponent() {
+      const val = useAudioPlayback();
+      React.useEffect(() => {
+        contextValue = val;
+      }, [val]);
+      return <div>Test</div>;
+    }
+
+    render(
+      <AudioPlaybackProvider>
+        <TestComponent />
+      </AudioPlaybackProvider>
+    );
+
+    act(() => {
+      contextValue.setSource({
+        chunks: [{ id: 'chunk-1', text: 'New', cleanedText: 'New', type: 'paragraph' as const }],
+        articleUrl: 'https://example.com/new',
+      });
+    });
+
+    expect(mockStop).not.toHaveBeenCalled();
   });
 });
