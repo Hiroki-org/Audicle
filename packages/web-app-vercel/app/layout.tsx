@@ -3,7 +3,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ClientLayout from "./client-layout";
-import { DEFAULT_SETTINGS } from "@/types/settings";
+import { DEFAULT_SETTINGS, COLOR_THEMES } from "@/types/settings";
 import { STORAGE_KEYS } from "@/lib/constants";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
@@ -29,11 +29,22 @@ export default function RootLayout({
         <script
           data-storage-key={STORAGE_KEYS.COLOR_THEME}
           data-default-theme={DEFAULT_SETTINGS.color_theme}
+          data-valid-themes={COLOR_THEMES.map((t) => t.value).join(",")}
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  const theme = localStorage.getItem(document.currentScript.getAttribute('data-storage-key')) || document.currentScript.getAttribute('data-default-theme');
+                  const script = document.currentScript;
+                  const storageKey = script.getAttribute('data-storage-key');
+                  const defaultTheme = script.getAttribute('data-default-theme');
+                  const validThemes = script.getAttribute('data-valid-themes').split(',');
+
+                  let theme = localStorage.getItem(storageKey) || defaultTheme;
+
+                  if (!validThemes.includes(theme)) {
+                    theme = defaultTheme;
+                  }
+
                   document.documentElement.setAttribute('data-theme', theme);
                   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     document.documentElement.classList.add('dark');
