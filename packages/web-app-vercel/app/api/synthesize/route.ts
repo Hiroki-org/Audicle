@@ -479,7 +479,7 @@ export async function POST(request: NextRequest) {
             skippedHead: boolean;
         };
 
-        const chunkPromises: Promise<ChunkResult>[] = textChunks.map(async (chunkText, i): Promise<ChunkResult> => {
+        const chunkPromises: Promise<ChunkResult>[] = textChunks.map(async (chunkText: string, i: number): Promise<ChunkResult> => {
             const cleanedChunkText = removeSeparatorCharacters(chunkText);
             const textHash = calculateTextHash(cleanedChunkText, i);
             const cacheKey = `${textHash}:${voiceToUse}.mp3`;
