@@ -26,6 +26,7 @@ const customJestConfig = {
   collectCoverageFrom: [
     "lib/**/*.{js,jsx,ts,tsx}",
     "components/DomainBadge.tsx",
+    "app/share-target/AutoCloseComponent.tsx",
     "contexts/**/*.{ts,tsx}",
     "!**/__tests__/**",
     "!**/*.d.ts",
