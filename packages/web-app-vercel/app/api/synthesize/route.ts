@@ -472,26 +472,32 @@ export async function POST(request: NextRequest) {
         // Simple Operations 削減カウンター
         let headOperationsSkipped = 0;
 
-        for (let i = 0; i < textChunks.length; i++) {
-            const chunkText = textChunks[i];
+        type ChunkResult = {
+            url: string;
+            buffer: Buffer;
+            hit: boolean;
+            skippedHead: boolean;
+        };
+
+        const chunkPromises: Promise<ChunkResult>[] = textChunks.map(async (chunkText, i): Promise<ChunkResult> => {
             const cleanedChunkText = removeSeparatorCharacters(chunkText);
             const textHash = calculateTextHash(cleanedChunkText, i);
             const cacheKey = `${textHash}:${voiceToUse}.mp3`;
             const isCachedByIndex = cacheIndex ? isCachedInIndex(cacheIndex, textHash) : false;
 
-            const recordCachedHit = async (): Promise<boolean> => {
+            let chunkSkippedHead = false;
+            let chunkHit = false;
+
+            const recordCachedHit = async (): Promise<{ success: boolean; url: string; buffer: Buffer }> => {
                 try {
                     const url = await storage.generatePresignedGetUrl(cacheKey, signedUrlTtlSeconds);
-                    cacheHits++;
-                    audioUrls.push(url);
-                    audioBuffers.push(Buffer.alloc(0));
-                    return true;
+                    return { success: true, url, buffer: Buffer.alloc(0) };
                 } catch (urlError) {
                     log('warn', '署名付きGET URLの発行に失敗しました', {
                         cacheKey,
                         error: urlError instanceof Error ? urlError.message : urlError,
                     });
-                    return false;
+                    return { success: false, url: '', buffer: Buffer.alloc(0) };
                 }
             };
 
@@ -513,12 +519,13 @@ export async function POST(request: NextRequest) {
 
             // 人気記事の場合：全チャンクがキャッシュ済みと仮定してhead()をスキップ
             if (isPopularArticle) {
-                log('info', `人気記事のためhead()をスキップ: チャンク ${audioUrls.length + 1}`);
-                headOperationsSkipped++;
+                log('info', `人気記事のためhead()をスキップ: チャンク ${i + 1}`);
+                chunkSkippedHead = true;
 
-                const hitRecorded = await recordCachedHit();
-                if (hitRecorded) {
-                    continue;
+                const hitResult = await recordCachedHit();
+                if (hitResult.success) {
+                    chunkHit = true;
+                    return { url: hitResult.url, buffer: hitResult.buffer, hit: chunkHit, skippedHead: chunkSkippedHead };
                 }
 
                 log('warn', '人気記事の署名付きURLの取得に失敗しました。通常のフローにフォールバックします。');
@@ -528,19 +535,21 @@ export async function POST(request: NextRequest) {
                 if (isCachedByIndex) {
                     // Supabaseインデックスにキャッシュ済み → head()スキップ！
                     log('info', `✅ R2キャッシュヒット (Supabase Index): ${cacheKey}のためhead()をスキップ`);
-                    headOperationsSkipped++;
+                    chunkSkippedHead = true;
 
-                    const hitRecorded = await recordCachedHit();
-                    if (hitRecorded) {
-                        continue;
+                    const hitResult = await recordCachedHit();
+                    if (hitResult.success) {
+                        chunkHit = true;
+                        return { url: hitResult.url, buffer: hitResult.buffer, hit: chunkHit, skippedHead: chunkSkippedHead };
                     }
 
                     log('warn', '署名付きURLの取得に失敗しました。head()チェックにフォールバックします。');
                     await checkWithHead();
                     if (objectExists) {
                         const fallbackHit = await recordCachedHit();
-                        if (fallbackHit) {
-                            continue;
+                        if (fallbackHit.success) {
+                            chunkHit = true;
+                            return { url: fallbackHit.url, buffer: fallbackHit.buffer, hit: chunkHit, skippedHead: chunkSkippedHead };
                         }
                     }
                 } else {
@@ -558,8 +567,9 @@ export async function POST(request: NextRequest) {
             if (objectExists) {
                 log('info', `✅ R2キャッシュヒット (headObject): ${cacheKey}`);
 
-                const hitRecorded = await recordCachedHit();
-                if (hitRecorded) {
+                const hitResult = await recordCachedHit();
+                if (hitResult.success) {
+                    chunkHit = true;
                     // インデックスにはないが Blob に存在する場合：遅延インデックス作成
                     if (articleUrl && cacheIndex && !isCachedByIndex) {
                         addCachedChunk(articleUrl, voiceToUse, textHash)
@@ -571,22 +581,17 @@ export async function POST(request: NextRequest) {
                             });
                     }
 
-                    continue;
+                    return { url: hitResult.url, buffer: hitResult.buffer, hit: chunkHit, skippedHead: chunkSkippedHead };
                 }
             }
 
             // 2. キャッシュミス：TTS生成
             log('info', `❌ R2キャッシュミス: ${cacheKey}。Google TTS APIを呼び出します。`);
-            cacheMisses++;
             const audioBuffer = await synthesizeToBuffer(cleanedChunkText, voiceToUse, speakingRate);
-
-            // 音声バッファを保存
-            audioBuffers.push(audioBuffer);
 
             // 3. ストレージに保存（失敗時はbase64にフォールバック）
             try {
                 const storedUrl = await storage.uploadObject(cacheKey, audioBuffer, 'audio/mpeg', signedUrlTtlSeconds);
-                audioUrls.push(storedUrl);
                 log('info', `音声を作成しR2キャッシュに保存しました: ${cacheKey}`);
 
                 // 4. Supabaseインデックスに追加（articleUrlがある場合）
@@ -598,12 +603,30 @@ export async function POST(request: NextRequest) {
                         // addCachedChunk関数内で既にエラーログが出力されているため、ここではログ出力しない
                     }
                 }
+
+                return { url: storedUrl, buffer: audioBuffer, hit: false, skippedHead: chunkSkippedHead };
             } catch (putError) {
                 log('error', `音声のキャッシュへの保存に失敗しました。base64にフォールバックします: ${cacheKey}`, { error: putError });
                 const base64Audio = audioBuffer.toString('base64');
-                audioUrls.push(`data:audio/mpeg;base64,${base64Audio}`);
+                return { url: `data:audio/mpeg;base64,${base64Audio}`, buffer: audioBuffer, hit: false, skippedHead: chunkSkippedHead };
             }
-        }        // キャッシュヒット率を計算
+        });
+
+        const chunkResults = await Promise.all(chunkPromises);
+
+        for (const result of chunkResults) {
+            audioUrls.push(result.url);
+            audioBuffers.push(result.buffer);
+            if (result.hit) {
+                cacheHits++;
+            } else {
+                cacheMisses++;
+            }
+            if (result.skippedHead) {
+                headOperationsSkipped++;
+            }
+        }
+        // キャッシュヒット率を計算
         const totalChunks = textChunks.length;
         const hitRate = totalChunks > 0 ? cacheHits / totalChunks : 0;
 
