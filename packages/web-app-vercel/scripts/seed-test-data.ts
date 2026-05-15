@@ -411,11 +411,11 @@ async function seedTestData() {
     // 5. デフォルトプレイリストの作成
     console.log("5. デフォルトプレイリストを作成中...");
 
+    // delete all playlists for this user to start fresh
     await supabase
         .from("playlists")
         .delete()
-        .eq("owner_email", TEST_USER_EMAIL)
-        .eq("is_default", true);
+        .eq("owner_email", TEST_USER_EMAIL);
 
     const { data: defaultPlaylist, error: playlistError } = await supabase
         .from("playlists")
