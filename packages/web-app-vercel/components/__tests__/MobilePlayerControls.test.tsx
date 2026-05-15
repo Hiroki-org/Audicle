@@ -64,10 +64,10 @@ describe("MobilePlayerControls", () => {
     const prevLink = screen.getByTitle("前の記事");
     const nextLink = screen.getByTitle("次の記事");
     expect(prevLink).toBeInTheDocument();
-    expect(prevLink).not.toHaveAttribute("aria-disabled", "true");
+    expect(prevLink).toHaveAttribute("aria-disabled", "false");
     expect(prevLink).not.toHaveAttribute("tabIndex", "-1");
     expect(nextLink).toBeInTheDocument();
-    expect(nextLink).not.toHaveAttribute("aria-disabled", "true");
+    expect(nextLink).toHaveAttribute("aria-disabled", "false");
     expect(nextLink).not.toHaveAttribute("tabIndex", "-1");
   });
 
