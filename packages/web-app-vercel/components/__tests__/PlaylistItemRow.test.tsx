@@ -89,7 +89,7 @@ describe('PlaylistItemRow', () => {
       />
     );
 
-    const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
-    expect(checkbox.checked).toBe(true);
+    const checkbox = screen.getByRole('checkbox');
+    expect(checkbox).toBeChecked();
   });
 });
