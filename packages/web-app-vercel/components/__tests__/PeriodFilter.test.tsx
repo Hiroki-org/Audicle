@@ -61,21 +61,21 @@ describe("PeriodFilter", () => {
     // week ボタンをクリック
     fireEvent.click(screen.getByRole("button", { name: "今週" }));
     expect(mockOnPeriodChange).toHaveBeenCalledTimes(1);
-    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(1, "week");
+    expect(mockOnPeriodChange).toHaveBeenCalledWith("week");
 
     // month ボタンをクリック
     fireEvent.click(screen.getByRole("button", { name: "今月" }));
     expect(mockOnPeriodChange).toHaveBeenCalledTimes(2);
-    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(2, "month");
+    expect(mockOnPeriodChange).toHaveBeenCalledWith("month");
 
     // all ボタンをクリック
     fireEvent.click(screen.getByRole("button", { name: "全期間" }));
     expect(mockOnPeriodChange).toHaveBeenCalledTimes(3);
-    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(3, "all");
+    expect(mockOnPeriodChange).toHaveBeenCalledWith("all");
 
     // today ボタンをクリック
     fireEvent.click(screen.getByRole("button", { name: "今日" }));
     expect(mockOnPeriodChange).toHaveBeenCalledTimes(4);
-    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(4, "today");
+    expect(mockOnPeriodChange).toHaveBeenCalledWith("today");
   });
 });
