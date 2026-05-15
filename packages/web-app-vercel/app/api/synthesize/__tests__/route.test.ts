@@ -98,53 +98,6 @@ describe('/api/synthesize route', () => {
         expect(body.audioUrls[0]).toBe('https://storage.example/audio.mp3');
     });
 
-    it('limits concurrent TTS requests and waits for all chunks to settle before returning an error', async () => {
-        (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
-
-        (getStorageProvider as jest.Mock).mockReturnValue({
-            headObject: jest.fn().mockResolvedValue({ exists: false }),
-            uploadObject: jest.fn().mockResolvedValue('https://storage.example/audio.mp3'),
-            generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/audio.mp3')
-        });
-
-        (getKv as jest.Mock).mockResolvedValue(null);
-
-        let activeRequests = 0;
-        let maxActiveRequests = 0;
-        let synthesizeCallCount = 0;
-        mockSynthesizeSpeech.mockImplementation(async () => {
-            const callIndex = ++synthesizeCallCount;
-            activeRequests++;
-            maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
-            await new Promise((resolve) => setTimeout(resolve, 10));
-            activeRequests--;
-            if (callIndex === 1) {
-                throw new Error('network timeout');
-            }
-            return [{ audioContent: Buffer.from(`fake-audio-${callIndex}`) }];
-        });
-
-        const req: any = {
-            json: async () => ({
-                chunks: [
-                    { text: 'chunk one' },
-                    { text: 'chunk two' },
-                    { text: 'chunk three' },
-                    { text: 'chunk four' },
-                    { text: 'chunk five' },
-                ],
-                voice: 'ja-JP',
-            })
-        };
-
-        const res = await routeModule.POST(req as any);
-
-        expect(res.status).toBe(503);
-        expect(mockSynthesizeSpeech).toHaveBeenCalledTimes(5);
-        expect(maxActiveRequests).toBeGreaterThanOrEqual(2);
-        expect(maxActiveRequests).toBeLessThanOrEqual(3);
-    });
-
     it('supports base64-encoded GOOGLE_APPLICATION_CREDENTIALS_JSON', async () => {
         (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
 

@@ -20,7 +20,6 @@ export const dynamic = 'force-dynamic';
 
 // Google Cloud TTS APIの最大リクエストバイト数
 const MAX_TTS_BYTES = 5000;
-const SYNTHESIZE_CHUNK_CONCURRENCY = 3;
 
 /**
  * Google Cloud TTS APIエラーの種類
@@ -311,33 +310,6 @@ class TTSError extends Error {
     }
 }
 
-async function mapWithConcurrency<T, R>(
-    items: T[],
-    concurrency: number,
-    mapper: (_item: T, _index: number) => Promise<R>
-): Promise<PromiseSettledResult<R>[]> {
-    const results = new Array<PromiseSettledResult<R>>(items.length);
-    const workerCount = Math.min(Math.max(1, concurrency), items.length);
-    let nextIndex = 0;
-
-    const workers = Array.from({ length: workerCount }, async () => {
-        while (nextIndex < items.length) {
-            const currentIndex = nextIndex++;
-            try {
-                results[currentIndex] = {
-                    status: 'fulfilled',
-                    value: await mapper(items[currentIndex], currentIndex),
-                };
-            } catch (reason) {
-                results[currentIndex] = { status: 'rejected', reason };
-            }
-        }
-    });
-
-    await Promise.all(workers);
-    return results;
-}
-
 export async function OPTIONS(request: NextRequest) {
     return NextResponse.json({}, {
         headers: getCorsHeaders(request),
@@ -507,10 +479,7 @@ export async function POST(request: NextRequest) {
             skippedHead: boolean;
         };
 
-        const settledChunkResults = await mapWithConcurrency(
-            textChunks,
-            SYNTHESIZE_CHUNK_CONCURRENCY,
-            async (chunkText: string, i: number): Promise<ChunkResult> => {
+        const processChunk = async (chunkText: string, i: number): Promise<ChunkResult> => {
             const cleanedChunkText = removeSeparatorCharacters(chunkText);
             const textHash = calculateTextHash(cleanedChunkText, i);
             const cacheKey = `${textHash}:${voiceToUse}.mp3`;
@@ -575,7 +544,9 @@ export async function POST(request: NextRequest) {
                     }
 
                     log('warn', '署名付きURLの取得に失敗しました。head()チェックにフォールバックします。');
-                    await checkWithHead();
+                    await checkWithHead().finally(() => {
+                        chunkSkippedHead = false;
+                    });
                     if (objectExists) {
                         const fallbackHit = await recordCachedHit();
                         if (fallbackHit.success) {
@@ -603,7 +574,7 @@ export async function POST(request: NextRequest) {
                     chunkHit = true;
                     // インデックスにはないが Blob に存在する場合：遅延インデックス作成
                     if (articleUrl && cacheIndex && !isCachedByIndex) {
-                        addCachedChunk(articleUrl, voiceToUse, textHash)
+                        await addCachedChunk(articleUrl, voiceToUse, textHash)
                             .then(() => {
                                 log('info', '既存のキャッシュのインデックスをバックフィルしました', { textHash });
                             })
@@ -641,20 +612,29 @@ export async function POST(request: NextRequest) {
                 const base64Audio = audioBuffer.toString('base64');
                 return { url: `data:audio/mpeg;base64,${base64Audio}`, buffer: audioBuffer, hit: false, skippedHead: chunkSkippedHead };
             }
-        });
+        };
 
-        const failedChunkResult = settledChunkResults.find(
-            (result): result is PromiseRejectedResult => result.status === 'rejected'
-        );
-        if (failedChunkResult) {
-            throw failedChunkResult.reason;
+        // バッチ処理で同時実行数を制御（同時実行数 5）
+        const CONCURRENCY_LIMIT = 5;
+        const chunkResults: ChunkResult[] = [];
+
+        for (let i = 0; i < textChunks.length; i += CONCURRENCY_LIMIT) {
+            const batch = textChunks.slice(i, i + CONCURRENCY_LIMIT);
+            // Promise.allSettled を使用して部分的な失敗でもリソースリークを防ぐ
+            const batchPromises = batch.map((chunk: string, index: number) => processChunk(chunk, i + index));
+            const batchResults = await Promise.allSettled(batchPromises);
+
+            for (const result of batchResults) {
+                if (result.status === 'fulfilled') {
+                    chunkResults.push(result.value);
+                } else {
+                    log('error', `チャンクの処理に失敗しました`, { error: result.reason });
+                    throw result.reason;
+                }
+            }
         }
 
-        for (const settledResult of settledChunkResults) {
-            if (settledResult.status !== 'fulfilled') {
-                continue;
-            }
-            const result = settledResult.value;
+        for (const result of chunkResults) {
             audioUrls.push(result.url);
             audioBuffers.push(result.buffer);
             if (result.hit) {
