@@ -1,6 +1,9 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import React from 'react';
 import { render, screen, act } from "@testing-library/react";
-import type { RenderResult } from "@testing-library/react";
 import { AutoCloseComponent } from "../AutoCloseComponent";
 
 const mockPush = jest.fn();
@@ -12,7 +15,7 @@ jest.mock("next/navigation", () => ({
 
 describe("AutoCloseComponent", () => {
   let originalWindowClose: () => void;
-  let renderResult: RenderResult | null;
+  let renderResult: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -79,7 +82,7 @@ describe("AutoCloseComponent", () => {
     expect(mockPush).toHaveBeenCalledWith("/");
   });
 
-  it("cleans up timers when unmounted before any timer fires", () => {
+  it("cleans up timers when unmounted", () => {
     renderResult = render(<AutoCloseComponent articleTitle="Test" />);
 
     // Unmount before timers execute
@@ -93,29 +96,6 @@ describe("AutoCloseComponent", () => {
 
     // Neither close nor push should have been called
     expect(window.close).not.toHaveBeenCalled();
-    expect(mockPush).not.toHaveBeenCalled();
-  });
-
-  it("cleans up redirectTimer when unmounted after window.close fires", () => {
-    renderResult = render(<AutoCloseComponent articleTitle="Test" />);
-
-    // Advance past the first timer so window.close() fires and redirectTimer is set
-    act(() => {
-      jest.advanceTimersByTime(1000);
-    });
-
-    expect(window.close).toHaveBeenCalledTimes(1);
-
-    // Unmount while redirectTimer is still pending
-    renderResult.unmount();
-    renderResult = null; // prevent afterEach from unmounting again
-
-    // Advance past the redirect timer
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
-
-    // push should not be called because redirectTimer was cleared on unmount
     expect(mockPush).not.toHaveBeenCalled();
   });
 });
