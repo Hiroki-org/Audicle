@@ -111,8 +111,9 @@ describe('/api/synthesize route', () => {
 
         let activeRequests = 0;
         let maxActiveRequests = 0;
+        let synthesizeCallCount = 0;
         mockSynthesizeSpeech.mockImplementation(async () => {
-            const callIndex = mockSynthesizeSpeech.mock.calls.length;
+            const callIndex = ++synthesizeCallCount;
             activeRequests++;
             maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
             await new Promise((resolve) => setTimeout(resolve, 10));
@@ -140,6 +141,7 @@ describe('/api/synthesize route', () => {
 
         expect(res.status).toBe(503);
         expect(mockSynthesizeSpeech).toHaveBeenCalledTimes(5);
+        expect(maxActiveRequests).toBeGreaterThanOrEqual(2);
         expect(maxActiveRequests).toBeLessThanOrEqual(3);
     });
 
