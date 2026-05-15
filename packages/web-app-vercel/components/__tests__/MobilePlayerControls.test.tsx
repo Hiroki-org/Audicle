@@ -124,7 +124,9 @@ describe("MobilePlayerControls", () => {
     const nextLink = screen.getByTitle("次の記事");
 
     expect(prevLink).toHaveAttribute("aria-disabled", "true");
+    expect(prevLink).toHaveAttribute("tabIndex", "-1");
     expect(nextLink).toHaveAttribute("aria-disabled", "true");
+    expect(nextLink).toHaveAttribute("tabIndex", "-1");
   });
 
   it("does not render add to playlist button if articleId is null", () => {
