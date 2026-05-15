@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 import { config } from "dotenv";
 import { resolve } from "path";
+import { readFileSync } from "fs";
 
 // .env.test.local を読み込む
 config({ path: resolve(__dirname, "../.env.test.local") });
@@ -129,7 +130,7 @@ async function runMigrations() {
             if (constraints !== null) {
                 console.log("✓ articles テーブルにアクセス可能");
             }
-        } catch {
+        } catch (e) {
             console.log("⚠️ マイグレーションの手動実行が必要かもしれません");
         }
     } else {
@@ -410,29 +411,7 @@ async function seedTestData() {
     // 5. デフォルトプレイリストの作成
     console.log("5. デフォルトプレイリストを作成中...");
 
-    // delete all playlists and their items for this user to start fresh
-    const { data: existingPlaylists, error: existingPlaylistsError } = await supabase
-        .from("playlists")
-        .select("id")
-        .eq("owner_email", TEST_USER_EMAIL);
-
-    if (existingPlaylistsError) {
-        console.error("既存プレイリストの取得に失敗:", existingPlaylistsError);
-        process.exit(1);
-    }
-
-    const existingPlaylistIds = existingPlaylists?.map((playlist) => playlist.id) ?? [];
-    if (existingPlaylistIds.length > 0) {
-        const { error: itemsDeleteError } = await supabase
-            .from("playlist_items")
-            .delete()
-            .in("playlist_id", existingPlaylistIds);
-        if (itemsDeleteError) {
-            console.error("プレイリストアイテムの削除に失敗:", itemsDeleteError);
-            process.exit(1);
-        }
-    }
-
+    // delete all playlists for this user to start fresh
     await supabase
         .from("playlists")
         .delete()
@@ -476,6 +455,12 @@ async function seedTestData() {
 
     // 7. ソートテスト用プレイリストの作成
     console.log("7. ソートテスト用プレイリストを作成中...");
+
+    await supabase
+        .from("playlists")
+        .delete()
+        .eq("owner_email", TEST_USER_EMAIL)
+        .eq("name", "ソートテスト用プレイリスト");
 
     const { data: sortTestPlaylist, error: sortPlaylistError } = await supabase
         .from("playlists")
