@@ -411,7 +411,20 @@ async function seedTestData() {
     // 5. デフォルトプレイリストの作成
     console.log("5. デフォルトプレイリストを作成中...");
 
-    // delete all playlists for this user to start fresh
+    // delete all playlists and their items for this user to start fresh
+    const { data: existingPlaylists } = await supabase
+        .from("playlists")
+        .select("id")
+        .eq("owner_email", TEST_USER_EMAIL);
+
+    const existingPlaylistIds = existingPlaylists?.map((playlist) => playlist.id) ?? [];
+    if (existingPlaylistIds.length > 0) {
+        await supabase
+            .from("playlist_items")
+            .delete()
+            .in("playlist_id", existingPlaylistIds);
+    }
+
     await supabase
         .from("playlists")
         .delete()
