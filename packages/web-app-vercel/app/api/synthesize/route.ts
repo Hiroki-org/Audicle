@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
 
 // Google Cloud TTS APIの最大リクエストバイト数
 const MAX_TTS_BYTES = 5000;
-const SYNTHESIZE_CHUNK_CONCURRENCY = 3;
+export const SYNTHESIZE_CHUNK_CONCURRENCY = 3;
 
 /**
  * Google Cloud TTS APIエラーの種類

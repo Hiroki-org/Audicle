@@ -207,15 +207,17 @@ describe('/api/synthesize route', () => {
             });
         });
 
+        const chunks = [
+            { text: 'chunk one' },
+            { text: 'chunk two' },
+            { text: 'chunk three' },
+            { text: 'chunk four' },
+            { text: 'chunk five' },
+        ];
+
         const req: any = {
             json: async () => ({
-                chunks: [
-                    { text: 'chunk one' },
-                    { text: 'chunk two' },
-                    { text: 'chunk three' },
-                    { text: 'chunk four' },
-                    { text: 'chunk five' },
-                ],
+                chunks,
                 voice: 'ja-JP',
             })
         };
@@ -225,8 +227,7 @@ describe('/api/synthesize route', () => {
         expect(res.status).toBe(500);
         expect(synthesizeCallCount).toBe(5);
         expect(completedRequests).toBe(5);
-        expect(maxActiveRequests).toBeGreaterThanOrEqual(2);
-        expect(maxActiveRequests).toBeLessThanOrEqual(3);
+        expect(maxActiveRequests).toBe(Math.min(routeModule.SYNTHESIZE_CHUNK_CONCURRENCY, chunks.length));
     });
 
     describe('Error handling', () => {
