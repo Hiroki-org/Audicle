@@ -696,8 +696,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // When not in production, include the original error message for easier
+        // debugging. Do not include sensitive details in production.
         interface SynthesizeErrorResponse {
             error: string;
+            detail?: string;
             errorType?: string;
         }
 
@@ -705,6 +708,9 @@ export async function POST(request: NextRequest) {
             error: 'Failed to synthesize speech',
             errorType: 'UNKNOWN'
         };
+        if (process.env.NODE_ENV !== 'production' && error instanceof Error) {
+            responseBody.detail = error.message;
+        }
 
         return NextResponse.json(responseBody, { status: 500, headers: corsHeaders });
     }

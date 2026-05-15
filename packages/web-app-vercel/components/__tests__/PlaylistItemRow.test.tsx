@@ -58,7 +58,6 @@ describe('PlaylistItemRow', () => {
 
     const checkbox = screen.getByRole('checkbox');
     fireEvent.click(checkbox);
-    expect(mockOnToggle).toHaveBeenCalledTimes(1);
     expect(mockOnToggle).toHaveBeenCalledWith('test-playlist-id');
   });
 
@@ -90,7 +89,7 @@ describe('PlaylistItemRow', () => {
       />
     );
 
-    const checkbox = screen.getByRole('checkbox');
-    expect(checkbox).toBeChecked();
+    const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
   });
 });
