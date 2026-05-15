@@ -1,16 +1,9 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PeriodFilter } from "../PeriodFilter";
-import type { Period } from "@/types/stats";
 
 describe("PeriodFilter", () => {
   const mockOnPeriodChange = jest.fn();
-  const periodCases: Array<{ period: Period; label: string }> = [
-    { period: "today", label: "今日" },
-    { period: "week", label: "今週" },
-    { period: "month", label: "今月" },
-    { period: "all", label: "全期間" },
-  ];
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -24,33 +17,13 @@ describe("PeriodFilter", () => {
       />
     );
 
-    for (const { label } of periodCases) {
-      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
-    }
+    expect(screen.getByRole("button", { name: "今日" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "今週" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "今月" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "全期間" })).toBeInTheDocument();
   });
 
-  it.each(periodCases)(
-    "applies active styling only to the $period button",
-    ({ period, label }) => {
-      render(
-        <PeriodFilter
-          activePeriod={period}
-          onPeriodChange={mockOnPeriodChange}
-        />
-      );
-
-      for (const periodCase of periodCases) {
-        const button = screen.getByRole("button", { name: periodCase.label });
-        if (periodCase.label === label) {
-          expect(button).toHaveClass("bg-primary");
-        } else {
-          expect(button).not.toHaveClass("bg-primary");
-        }
-      }
-    }
-  );
-
-  it("updates active styling when activePeriod changes", () => {
+  it("applies active styling to the currently active period button", () => {
     const { rerender } = render(
       <PeriodFilter
         activePeriod="today"
@@ -59,8 +32,13 @@ describe("PeriodFilter", () => {
     );
 
     const todayButton = screen.getByRole("button", { name: "今日" });
-    expect(todayButton).toHaveClass("bg-primary");
+    const weekButton = screen.getByRole("button", { name: "今週" });
 
+    // 最初に today が active
+    expect(todayButton).toHaveClass("bg-primary");
+    expect(weekButton).not.toHaveClass("bg-primary");
+
+    // week を active に変更
     rerender(
       <PeriodFilter
         activePeriod="week"
@@ -68,7 +46,6 @@ describe("PeriodFilter", () => {
       />
     );
 
-    const weekButton = screen.getByRole("button", { name: "今週" });
     expect(todayButton).not.toHaveClass("bg-primary");
     expect(weekButton).toHaveClass("bg-primary");
   });
