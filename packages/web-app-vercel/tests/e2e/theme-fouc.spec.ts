@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
+import { DEFAULT_SETTINGS } from '../../types/settings'
 
 const THEME_STORAGE_KEY = 'audicle-color-theme'
+const DEFAULT_THEME = DEFAULT_SETTINGS.color_theme
 const THEMES = ['ocean', 'purple', 'forest', 'rose', 'orange'] as const
 const COLOR_MAP: Record<string, string> = {
     ocean: 'hsl(199 89% 48%)',
@@ -79,7 +81,7 @@ test.describe('Theme FOUC prevention', () => {
         await p.goto('/', { waitUntil: 'domcontentloaded' })
 
         const domTheme = await p.evaluate(() => document.documentElement.getAttribute('data-theme'))
-        expect(domTheme).toBe('ocean')
+        expect(domTheme).toBe(DEFAULT_THEME)
         await ctx.close()
     })
 
@@ -93,7 +95,7 @@ test.describe('Theme FOUC prevention', () => {
         await p.goto('/', { waitUntil: 'domcontentloaded' })
 
         const domTheme = await p.evaluate(() => document.documentElement.getAttribute('data-theme'))
-        expect(domTheme).toBe('ocean')
+        expect(domTheme).toBe(DEFAULT_THEME)
         await ctx.close()
     })
 })
