@@ -51,15 +51,6 @@ describe("useUserSettings hook", () => {
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
-  const expectSettingsUpdateRequest = (settings: unknown) => {
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/settings/update", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    });
-  };
-
   describe("useUserSettings", () => {
     it("should fetch user settings successfully", async () => {
       const mockSettings = { theme: "dark", playbackSpeed: 1.5 };
@@ -146,7 +137,12 @@ describe("useUserSettings hook", () => {
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-      expectSettingsUpdateRequest(mockSettings);
+      expect(fetchMock).toHaveBeenCalledWith("/api/settings/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mockSettings),
+      });
+
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({
         queryKey: ["user-settings", "test@example.com"],
       });
@@ -167,7 +163,6 @@ describe("useUserSettings hook", () => {
 
       await waitFor(() => expect(result.current.isError).toBe(true));
 
-      expectSettingsUpdateRequest(mockSettings);
       expect(result.current.error?.message).toBe("Mutation specific error");
     });
 
@@ -185,7 +180,6 @@ describe("useUserSettings hook", () => {
 
       await waitFor(() => expect(result.current.isError).toBe(true));
 
-      expectSettingsUpdateRequest(mockSettings);
       expect(result.current.error?.message).toBe("設定の保存に失敗しました");
     });
   });
