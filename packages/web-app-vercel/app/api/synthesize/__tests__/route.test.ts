@@ -199,19 +199,12 @@ describe('/api/synthesize route', () => {
                 }
             };
 
-            const originalEnv = process.env.NODE_ENV;
-            process.env.NODE_ENV = 'development';
-
-            try {
-                const res = await routeModule.POST(req as any);
-                expect(res.status).toBe(500);
-                const body = await res.json();
-                expect(body).toHaveProperty('error', 'Failed to synthesize speech');
-                expect(body).toHaveProperty('errorType', 'UNKNOWN');
-                expect(body).toHaveProperty('detail', 'Unexpected generic error');
-            } finally {
-                process.env.NODE_ENV = originalEnv;
-            }
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(500);
+            const body = await res.json();
+            expect(body).toHaveProperty('error', 'Failed to synthesize speech');
+            expect(body).toHaveProperty('errorType', 'UNKNOWN');
+            expect(body).not.toHaveProperty('detail');
         });
 
         it('returns appropriate status and message for TTSError via Google Cloud mock', async () => {
