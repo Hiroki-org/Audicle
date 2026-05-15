@@ -1,16 +1,13 @@
-/**
- * @jest-environment jsdom
- */
-
 import React from 'react';
 import { render, screen, act } from "@testing-library/react";
 import { AutoCloseComponent } from "../AutoCloseComponent";
 
 const mockPush = jest.fn();
+const mockRouter = { push: mockPush };
 
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => mockRouter,
 }));
 
 describe("AutoCloseComponent", () => {
@@ -33,8 +30,8 @@ describe("AutoCloseComponent", () => {
       renderResult.unmount();
     }
     // Restore window.close and real timers
+    jest.clearAllTimers();
     window.close = originalWindowClose;
-    jest.runOnlyPendingTimers();
     jest.useRealTimers();
   });
 
