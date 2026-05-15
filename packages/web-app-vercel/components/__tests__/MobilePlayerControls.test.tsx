@@ -71,12 +71,14 @@ describe("MobilePlayerControls", () => {
     const playButton = screen.getByTestId("play-button");
     fireEvent.click(playButton);
     expect(defaultProps.play).toHaveBeenCalledTimes(1);
+    expect(defaultProps.pause).not.toHaveBeenCalled();
 
     rerender(<MobilePlayerControls {...defaultProps} isPlaying={true} />);
 
     const pauseButton = screen.getByTestId("pause-button");
     fireEvent.click(pauseButton);
     expect(defaultProps.pause).toHaveBeenCalledTimes(1);
+    expect(defaultProps.play).toHaveBeenCalledTimes(1);
   });
 
   it("shows playback loading state", () => {
