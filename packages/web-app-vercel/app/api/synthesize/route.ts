@@ -20,6 +20,7 @@ export const dynamic = 'force-dynamic';
 
 // Google Cloud TTS APIの最大リクエストバイト数
 const MAX_TTS_BYTES = 5000;
+const SYNTHESIZE_CHUNK_CONCURRENCY = 3;
 
 /**
  * Google Cloud TTS APIエラーの種類
@@ -310,6 +311,33 @@ class TTSError extends Error {
     }
 }
 
+async function mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    mapper: (_item: T, _index: number) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+    const results = new Array<PromiseSettledResult<R>>(items.length);
+    const workerCount = Math.min(Math.max(1, concurrency), items.length);
+    let nextIndex = 0;
+
+    const workers = Array.from({ length: workerCount }, async () => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex++;
+            try {
+                results[currentIndex] = {
+                    status: 'fulfilled',
+                    value: await mapper(items[currentIndex], currentIndex),
+                };
+            } catch (reason) {
+                results[currentIndex] = { status: 'rejected', reason };
+            }
+        }
+    });
+
+    await Promise.all(workers);
+    return results;
+}
+
 export async function OPTIONS(request: NextRequest) {
     return NextResponse.json({}, {
         headers: getCorsHeaders(request),
@@ -479,7 +507,10 @@ export async function POST(request: NextRequest) {
             skippedHead: boolean;
         };
 
-        const chunkPromises: Promise<ChunkResult>[] = textChunks.map(async (chunkText: string, i: number): Promise<ChunkResult> => {
+        const settledChunkResults = await mapWithConcurrency(
+            textChunks,
+            SYNTHESIZE_CHUNK_CONCURRENCY,
+            async (chunkText: string, i: number): Promise<ChunkResult> => {
             const cleanedChunkText = removeSeparatorCharacters(chunkText);
             const textHash = calculateTextHash(cleanedChunkText, i);
             const cacheKey = `${textHash}:${voiceToUse}.mp3`;
@@ -612,9 +643,18 @@ export async function POST(request: NextRequest) {
             }
         });
 
-        const chunkResults = await Promise.all(chunkPromises);
+        const failedChunkResult = settledChunkResults.find(
+            (result): result is PromiseRejectedResult => result.status === 'rejected'
+        );
+        if (failedChunkResult) {
+            throw failedChunkResult.reason;
+        }
 
-        for (const result of chunkResults) {
+        for (const settledResult of settledChunkResults) {
+            if (settledResult.status !== 'fulfilled') {
+                continue;
+            }
+            const result = settledResult.value;
             audioUrls.push(result.url);
             audioBuffers.push(result.buffer);
             if (result.hit) {
