@@ -20,7 +20,6 @@ export const dynamic = 'force-dynamic';
 
 // Google Cloud TTS APIの最大リクエストバイト数
 const MAX_TTS_BYTES = 5000;
-export const SYNTHESIZE_CHUNK_CONCURRENCY = 3;
 
 /**
  * Google Cloud TTS APIエラーの種類
@@ -103,42 +102,6 @@ function getLanguageCode(voiceModel: string): string {
 function calculateArticleHash(chunks: string[]): string {
     const content = chunks.join('\n');
     return calculateTextHash(content, 0).substring(0, 16);
-}
-
-async function mapWithConcurrency<T, R>(
-    items: T[],
-    limit: number,
-    mapper: (_item: T, _index: number) => Promise<R>,
-): Promise<PromiseSettledResult<R>[]> {
-    if (items.length === 0) {
-        return [];
-    }
-
-    const results = new Array<PromiseSettledResult<R>>(items.length);
-    let nextIndex = 0;
-    const workerCount = Math.max(1, Math.min(limit, items.length));
-
-    const worker = async () => {
-        while (nextIndex < items.length) {
-            const currentIndex = nextIndex;
-            nextIndex++;
-
-            try {
-                results[currentIndex] = {
-                    status: 'fulfilled',
-                    value: await mapper(items[currentIndex], currentIndex),
-                };
-            } catch (reason) {
-                results[currentIndex] = {
-                    status: 'rejected',
-                    reason,
-                };
-            }
-        }
-    };
-
-    await Promise.all(Array.from({ length: workerCount }, () => worker()));
-    return results;
 }
 
 // Google Cloud TTS クライアント
@@ -509,32 +472,26 @@ export async function POST(request: NextRequest) {
         // Simple Operations 削減カウンター
         let headOperationsSkipped = 0;
 
-        type ChunkResult = {
-            url: string;
-            buffer: Buffer;
-            hit: boolean;
-            skippedHead: boolean;
-        };
-
-        const processChunk = async (chunkText: string, i: number): Promise<ChunkResult> => {
+        for (let i = 0; i < textChunks.length; i++) {
+            const chunkText = textChunks[i];
             const cleanedChunkText = removeSeparatorCharacters(chunkText);
             const textHash = calculateTextHash(cleanedChunkText, i);
             const cacheKey = `${textHash}:${voiceToUse}.mp3`;
             const isCachedByIndex = cacheIndex ? isCachedInIndex(cacheIndex, textHash) : false;
 
-            let chunkSkippedHead = false;
-            let chunkHit = false;
-
-            const recordCachedHit = async (): Promise<{ success: boolean; url: string; buffer: Buffer }> => {
+            const recordCachedHit = async (): Promise<boolean> => {
                 try {
                     const url = await storage.generatePresignedGetUrl(cacheKey, signedUrlTtlSeconds);
-                    return { success: true, url, buffer: Buffer.alloc(0) };
+                    cacheHits++;
+                    audioUrls.push(url);
+                    audioBuffers.push(Buffer.alloc(0));
+                    return true;
                 } catch (urlError) {
                     log('warn', '署名付きGET URLの発行に失敗しました', {
                         cacheKey,
                         error: urlError instanceof Error ? urlError.message : urlError,
                     });
-                    return { success: false, url: '', buffer: Buffer.alloc(0) };
+                    return false;
                 }
             };
 
@@ -556,40 +513,34 @@ export async function POST(request: NextRequest) {
 
             // 人気記事の場合：全チャンクがキャッシュ済みと仮定してhead()をスキップ
             if (isPopularArticle) {
-                log('info', `人気記事のためhead()をスキップ: チャンク ${i + 1}`);
-                chunkSkippedHead = true;
+                log('info', `人気記事のためhead()をスキップ: チャンク ${audioUrls.length + 1}`);
+                headOperationsSkipped++;
 
-                const hitResult = await recordCachedHit();
-                if (hitResult.success) {
-                    chunkHit = true;
-                    return { url: hitResult.url, buffer: hitResult.buffer, hit: chunkHit, skippedHead: chunkSkippedHead };
+                const hitRecorded = await recordCachedHit();
+                if (hitRecorded) {
+                    continue;
                 }
 
                 log('warn', '人気記事の署名付きURLの取得に失敗しました。通常のフローにフォールバックします。');
-                chunkSkippedHead = false;
             }
 
             if (cacheIndex) {
                 if (isCachedByIndex) {
                     // Supabaseインデックスにキャッシュ済み → head()スキップ！
                     log('info', `✅ R2キャッシュヒット (Supabase Index): ${cacheKey}のためhead()をスキップ`);
-                    chunkSkippedHead = true;
+                    headOperationsSkipped++;
 
-                    const hitResult = await recordCachedHit();
-                    if (hitResult.success) {
-                        chunkHit = true;
-                        return { url: hitResult.url, buffer: hitResult.buffer, hit: chunkHit, skippedHead: chunkSkippedHead };
+                    const hitRecorded = await recordCachedHit();
+                    if (hitRecorded) {
+                        continue;
                     }
 
                     log('warn', '署名付きURLの取得に失敗しました。head()チェックにフォールバックします。');
-                    await checkWithHead().finally(() => {
-                        chunkSkippedHead = false;
-                    });
+                    await checkWithHead();
                     if (objectExists) {
                         const fallbackHit = await recordCachedHit();
-                        if (fallbackHit.success) {
-                            chunkHit = true;
-                            return { url: fallbackHit.url, buffer: fallbackHit.buffer, hit: chunkHit, skippedHead: chunkSkippedHead };
+                        if (fallbackHit) {
+                            continue;
                         }
                     }
                 } else {
@@ -607,12 +558,11 @@ export async function POST(request: NextRequest) {
             if (objectExists) {
                 log('info', `✅ R2キャッシュヒット (headObject): ${cacheKey}`);
 
-                const hitResult = await recordCachedHit();
-                if (hitResult.success) {
-                    chunkHit = true;
+                const hitRecorded = await recordCachedHit();
+                if (hitRecorded) {
                     // インデックスにはないが Blob に存在する場合：遅延インデックス作成
                     if (articleUrl && cacheIndex && !isCachedByIndex) {
-                        await addCachedChunk(articleUrl, voiceToUse, textHash)
+                        addCachedChunk(articleUrl, voiceToUse, textHash)
                             .then(() => {
                                 log('info', '既存のキャッシュのインデックスをバックフィルしました', { textHash });
                             })
@@ -621,17 +571,22 @@ export async function POST(request: NextRequest) {
                             });
                     }
 
-                    return { url: hitResult.url, buffer: hitResult.buffer, hit: chunkHit, skippedHead: chunkSkippedHead };
+                    continue;
                 }
             }
 
             // 2. キャッシュミス：TTS生成
             log('info', `❌ R2キャッシュミス: ${cacheKey}。Google TTS APIを呼び出します。`);
+            cacheMisses++;
             const audioBuffer = await synthesizeToBuffer(cleanedChunkText, voiceToUse, speakingRate);
+
+            // 音声バッファを保存
+            audioBuffers.push(audioBuffer);
 
             // 3. ストレージに保存（失敗時はbase64にフォールバック）
             try {
                 const storedUrl = await storage.uploadObject(cacheKey, audioBuffer, 'audio/mpeg', signedUrlTtlSeconds);
+                audioUrls.push(storedUrl);
                 log('info', `音声を作成しR2キャッシュに保存しました: ${cacheKey}`);
 
                 // 4. Supabaseインデックスに追加（articleUrlがある場合）
@@ -643,42 +598,12 @@ export async function POST(request: NextRequest) {
                         // addCachedChunk関数内で既にエラーログが出力されているため、ここではログ出力しない
                     }
                 }
-
-                return { url: storedUrl, buffer: audioBuffer, hit: false, skippedHead: chunkSkippedHead };
             } catch (putError) {
                 log('error', `音声のキャッシュへの保存に失敗しました。base64にフォールバックします: ${cacheKey}`, { error: putError });
                 const base64Audio = audioBuffer.toString('base64');
-                return { url: `data:audio/mpeg;base64,${base64Audio}`, buffer: audioBuffer, hit: false, skippedHead: chunkSkippedHead };
+                audioUrls.push(`data:audio/mpeg;base64,${base64Audio}`);
             }
-        };
-
-        const settledChunkResults = await mapWithConcurrency(
-            textChunks,
-            SYNTHESIZE_CHUNK_CONCURRENCY,
-            processChunk,
-        );
-        const failedChunkResult = settledChunkResults.find(
-            (result): result is PromiseRejectedResult => result.status === 'rejected',
-        );
-        if (failedChunkResult) {
-            log('error', 'チャンクの処理に失敗しました', { error: failedChunkResult.reason });
-            throw failedChunkResult.reason;
-        }
-
-        for (const settledResult of settledChunkResults) {
-            const result = (settledResult as PromiseFulfilledResult<ChunkResult>).value;
-            audioUrls.push(result.url);
-            audioBuffers.push(result.buffer);
-            if (result.hit) {
-                cacheHits++;
-            } else {
-                cacheMisses++;
-            }
-            if (result.skippedHead) {
-                headOperationsSkipped++;
-            }
-        }
-        // キャッシュヒット率を計算
+        }        // キャッシュヒット率を計算
         const totalChunks = textChunks.length;
         const hitRate = totalChunks > 0 ? cacheHits / totalChunks : 0;
 
@@ -771,12 +696,22 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        return NextResponse.json(
-            {
-                error: 'Failed to synthesize speech',
-                errorType: 'UNKNOWN',
-            },
-            { status: 500, headers: corsHeaders }
-        );
+        // When not in production, include the original error message for easier
+        // debugging. Do not include sensitive details in production.
+        interface SynthesizeErrorResponse {
+            error: string;
+            detail?: string;
+            errorType?: string;
+        }
+
+        const responseBody: SynthesizeErrorResponse = {
+            error: 'Failed to synthesize speech',
+            errorType: 'UNKNOWN'
+        };
+        if (process.env.NODE_ENV !== 'production' && error instanceof Error) {
+            responseBody.detail = error.message;
+        }
+
+        return NextResponse.json(responseBody, { status: 500, headers: corsHeaders });
     }
 }
