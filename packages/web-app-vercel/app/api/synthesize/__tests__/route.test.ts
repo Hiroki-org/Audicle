@@ -172,6 +172,64 @@ describe('/api/synthesize route', () => {
         expect(res.status).toBe(200);
     });
 
+    it('limits concurrent TTS requests and waits for all chunks to settle before returning an error', async () => {
+        (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+
+        (getStorageProvider as jest.Mock).mockReturnValue({
+            headObject: jest.fn().mockResolvedValue({ exists: false }),
+            uploadObject: jest.fn().mockResolvedValue('https://storage.example/audio.mp3'),
+            generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/audio.mp3')
+        });
+        (getKv as jest.Mock).mockResolvedValue(null);
+
+        let activeRequests = 0;
+        let maxActiveRequests = 0;
+        let completedRequests = 0;
+        let synthesizeCallCount = 0;
+
+        mockSynthesizeSpeech.mockImplementation(() => {
+            const callIndex = ++synthesizeCallCount;
+            activeRequests++;
+            maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    activeRequests--;
+                    completedRequests++;
+
+                    if (callIndex === 2) {
+                        reject(new Error('Synthetic chunk failure'));
+                        return;
+                    }
+
+                    resolve([{ audioContent: Buffer.from(`audio-${callIndex}`) }]);
+                }, 10);
+            });
+        });
+
+        const chunks = [
+            { text: 'chunk one' },
+            { text: 'chunk two' },
+            { text: 'chunk three' },
+            { text: 'chunk four' },
+            { text: 'chunk five' },
+        ];
+
+        const req: any = {
+            json: async () => ({
+                chunks,
+                voice: 'ja-JP',
+            })
+        };
+
+        const res = await routeModule.POST(req as any);
+
+        expect(res.status).toBe(500);
+        expect(synthesizeCallCount).toBe(5);
+        expect(completedRequests).toBe(5);
+        expect(maxActiveRequests).toBe(Math.min(routeModule.SYNTHESIZE_CHUNK_CONCURRENCY, chunks.length));
+    });
+
     describe('Error handling', () => {
         it('returns 400 for SyntaxError', async () => {
             (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
@@ -199,19 +257,12 @@ describe('/api/synthesize route', () => {
                 }
             };
 
-            const originalEnv = process.env.NODE_ENV;
-            process.env.NODE_ENV = 'development';
-
-            try {
-                const res = await routeModule.POST(req as any);
-                expect(res.status).toBe(500);
-                const body = await res.json();
-                expect(body).toHaveProperty('error', 'Failed to synthesize speech');
-                expect(body).toHaveProperty('errorType', 'UNKNOWN');
-                expect(body).toHaveProperty('detail', 'Unexpected generic error');
-            } finally {
-                process.env.NODE_ENV = originalEnv;
-            }
+            const res = await routeModule.POST(req as any);
+            expect(res.status).toBe(500);
+            const body = await res.json();
+            expect(body).toHaveProperty('error', 'Failed to synthesize speech');
+            expect(body).toHaveProperty('errorType', 'UNKNOWN');
+            expect(body).not.toHaveProperty('detail');
         });
 
         it('returns appropriate status and message for TTSError via Google Cloud mock', async () => {

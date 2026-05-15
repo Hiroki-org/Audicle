@@ -1,16 +1,13 @@
-/**
- * @jest-environment jsdom
- */
-
-import React from 'react';
+import React from "react";
 import { render, screen, act } from "@testing-library/react";
 import { AutoCloseComponent } from "../AutoCloseComponent";
 
 const mockPush = jest.fn();
+const mockRouter = { push: mockPush };
 
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => mockRouter,
 }));
 
 describe("AutoCloseComponent", () => {
@@ -33,8 +30,8 @@ describe("AutoCloseComponent", () => {
       renderResult.unmount();
     }
     // Restore window.close and real timers
+    jest.clearAllTimers();
     window.close = originalWindowClose;
-    jest.runOnlyPendingTimers();
     jest.useRealTimers();
   });
 
@@ -62,7 +59,7 @@ describe("AutoCloseComponent", () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it("redirects to home if window.close fails (after additional 500ms)", () => {
+  it("redirects to home 500ms after window.close attempt (always fires regardless of close success)", () => {
     renderResult = render(<AutoCloseComponent articleTitle="Test" />);
 
     // Advance past the first timer (1000ms)
