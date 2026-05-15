@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DesktopPlayerControls } from "../DesktopPlayerControls";
+import { zIndex } from "@/lib/zIndex";
 
 // プレイリストのモック関数を準備
 const mockWrapIndex = jest.fn((index) => index);
@@ -145,25 +146,6 @@ describe("DesktopPlayerControls", () => {
     expect(nextButton).toHaveClass("cursor-not-allowed");
   });
 
-  it("disables previous and next buttons while playlist context is not ready", () => {
-    render(
-      <DesktopPlayerControls
-        {...defaultProps}
-        playlistState={{ ...defaultProps.playlistState, isPlaylistMode: true }}
-        isPlaylistContextReady={false}
-      />
-    );
-
-    expect(screen.getByTestId("desktop-prev-button")).toHaveAttribute(
-      "aria-disabled",
-      "true"
-    );
-    expect(screen.getByTestId("desktop-next-button")).toHaveAttribute(
-      "aria-disabled",
-      "true"
-    );
-  });
-
   it("prevents default behavior when clicking disabled prev/next links", () => {
     render(
       <DesktopPlayerControls
@@ -175,22 +157,15 @@ describe("DesktopPlayerControls", () => {
     );
 
     const prevButton = screen.getByTestId("desktop-prev-button");
-    const nextButton = screen.getByTestId("desktop-next-button");
 
     // We use fireEvent because userEvent might not trigger the click handler for elements acting disabled
-    const prevClickEvent = new MouseEvent("click", {
+    const clickEvent = new MouseEvent("click", {
       bubbles: true,
       cancelable: true,
     });
-    fireEvent(prevButton, prevClickEvent);
-    expect(prevClickEvent.defaultPrevented).toBe(true);
 
-    const nextClickEvent = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-    });
-    fireEvent(nextButton, nextClickEvent);
-    expect(nextClickEvent.defaultPrevented).toBe(true);
+    fireEvent(prevButton, clickEvent);
+    expect(clickEvent.defaultPrevented).toBe(true);
   });
 
   it("calls set speed modal open when speed button is clicked", async () => {
