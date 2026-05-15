@@ -1,15 +1,26 @@
 
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MobilePlayerControls } from "../MobilePlayerControls";
+import {
+  MobilePlayerControls,
+  type MobilePlayerControlsProps,
+} from "../MobilePlayerControls";
+
+const mockMobileArticleMenu = jest.fn((props) => (
+  <div
+    data-testid="mobile-article-menu"
+    data-is-downloading={String(props.isDownloading)}
+  />
+));
 
 // Mock child components to isolate the test
 jest.mock("@/components/MobileArticleMenu", () => ({
-  MobileArticleMenu: () => <div data-testid="mobile-article-menu" />
+  MobileArticleMenu: (props: { isDownloading: boolean }) =>
+    mockMobileArticleMenu(props),
 }));
 
 describe("MobilePlayerControls", () => {
-  const defaultProps = {
+  const createDefaultProps = (): MobilePlayerControlsProps => ({
     playbackRate: 1.0,
     setIsSpeedModalOpen: jest.fn(),
     playlistState: {
@@ -34,14 +45,15 @@ describe("MobilePlayerControls", () => {
     url: "https://example.com/test",
     startDownload: jest.fn(),
     downloadStatus: "idle",
-  };
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it("renders basic controls correctly when not in playlist mode", () => {
-    render(<MobilePlayerControls {...defaultProps} />);
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} />);
 
     expect(screen.getByTestId("audio-player")).toBeInTheDocument();
     expect(screen.getByTestId("speed-button-mobile")).toHaveTextContent("1.0x");
@@ -57,7 +69,8 @@ describe("MobilePlayerControls", () => {
   });
 
   it("renders playlist controls when in playlist mode", () => {
-    render(<MobilePlayerControls {...defaultProps} playlistState={{...defaultProps.playlistState, isPlaylistMode: true}} />);
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} playlistState={{...props.playlistState, isPlaylistMode: true}} />);
 
     expect(screen.getByTestId("mobile-shuffle-button")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-repeat-button")).toBeInTheDocument();
@@ -66,21 +79,23 @@ describe("MobilePlayerControls", () => {
   });
 
   it("calls play and pause functions correctly", () => {
-    const { rerender } = render(<MobilePlayerControls {...defaultProps} isPlaying={false} />);
+    const props = createDefaultProps();
+    const { rerender } = render(<MobilePlayerControls {...props} isPlaying={false} />);
 
     const playButton = screen.getByTestId("play-button");
     fireEvent.click(playButton);
-    expect(defaultProps.play).toHaveBeenCalledTimes(1);
+    expect(props.play).toHaveBeenCalledTimes(1);
 
-    rerender(<MobilePlayerControls {...defaultProps} isPlaying={true} />);
+    rerender(<MobilePlayerControls {...props} isPlaying={true} />);
 
     const pauseButton = screen.getByTestId("pause-button");
     fireEvent.click(pauseButton);
-    expect(defaultProps.pause).toHaveBeenCalledTimes(1);
+    expect(props.pause).toHaveBeenCalledTimes(1);
   });
 
   it("shows playback loading state", () => {
-    render(<MobilePlayerControls {...defaultProps} isPlaybackLoading={true} />);
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} isPlaybackLoading={true} />);
 
     const loadingButton = screen.getByTestId("playback-loading");
     expect(loadingButton).toBeInTheDocument();
@@ -88,35 +103,54 @@ describe("MobilePlayerControls", () => {
   });
 
   it("calls speed modal open function", () => {
-    render(<MobilePlayerControls {...defaultProps} />);
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} />);
 
     fireEvent.click(screen.getByTestId("speed-button-mobile"));
-    expect(defaultProps.setIsSpeedModalOpen).toHaveBeenCalledWith(true);
+    expect(props.setIsSpeedModalOpen).toHaveBeenCalledWith(true);
   });
 
   it("calls playlist modal open function", () => {
-    render(<MobilePlayerControls {...defaultProps} />);
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} />);
 
     fireEvent.click(screen.getByTestId("playlist-add-button"));
-    expect(defaultProps.setIsPlaylistModalOpen).toHaveBeenCalledWith(true);
+    expect(props.setIsPlaylistModalOpen).toHaveBeenCalledWith(true);
   });
 
   it("handles shuffle and repeat toggles in playlist mode", () => {
-    render(<MobilePlayerControls {...defaultProps} playlistState={{...defaultProps.playlistState, isPlaylistMode: true}} />);
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} playlistState={{...props.playlistState, isPlaylistMode: true}} />);
 
     fireEvent.click(screen.getByTestId("mobile-shuffle-button"));
-    expect(defaultProps.toggleShuffle).toHaveBeenCalledTimes(1);
+    expect(props.toggleShuffle).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByTestId("mobile-repeat-button"));
-    expect(defaultProps.toggleRepeatMode).toHaveBeenCalledTimes(1);
+    expect(props.toggleRepeatMode).toHaveBeenCalledTimes(1);
   });
 
-  it("disables prev/next buttons when context is not ready or cannot move", () => {
-    render(<MobilePlayerControls
-      {...defaultProps}
-      playlistState={{...defaultProps.playlistState, isPlaylistMode: true}}
-      isPlaylistContextReady={false}
-    />);
+  it.each([
+    {
+      name: "playlist context is not ready",
+      overrides: { isPlaylistContextReady: false },
+    },
+    {
+      name: "movement is unavailable",
+      overrides: { canMovePrevious: false, canMoveNext: false },
+    },
+    {
+      name: "playlist hrefs are unavailable",
+      overrides: { getPlaylistItemHref: jest.fn().mockReturnValue(undefined) },
+    },
+  ])("disables prev/next buttons when $name", ({ overrides }) => {
+    const props = createDefaultProps();
+    render(
+      <MobilePlayerControls
+        {...props}
+        {...overrides}
+        playlistState={{...props.playlistState, isPlaylistMode: true}}
+      />
+    );
 
     const prevLink = screen.getByTitle("前の記事");
     const nextLink = screen.getByTitle("次の記事");
@@ -126,12 +160,27 @@ describe("MobilePlayerControls", () => {
   });
 
   it("does not render add to playlist button if articleId is null", () => {
-    render(<MobilePlayerControls {...defaultProps} articleId={null} />);
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} articleId={null} />);
     expect(screen.queryByTestId("playlist-add-button")).not.toBeInTheDocument();
   });
 
   it("does not render mobile menu if url is empty", () => {
-    render(<MobilePlayerControls {...defaultProps} url="" />);
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} url="" />);
     expect(screen.queryByTestId("mobile-article-menu")).not.toBeInTheDocument();
+  });
+
+  it("passes downloading state to the mobile article menu", () => {
+    const props = createDefaultProps();
+    render(<MobilePlayerControls {...props} downloadStatus="downloading" />);
+
+    expect(screen.getByTestId("mobile-article-menu")).toHaveAttribute(
+      "data-is-downloading",
+      "true"
+    );
+    expect(mockMobileArticleMenu).toHaveBeenCalledWith(
+      expect.objectContaining({ isDownloading: true })
+    );
   });
 });
