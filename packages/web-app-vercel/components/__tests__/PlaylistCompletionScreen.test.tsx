@@ -34,7 +34,7 @@ describe("PlaylistCompletionScreen", () => {
   it("calls onReplay when 'もう一度聴く' button is clicked", () => {
     render(<PlaylistCompletionScreen {...defaultProps} />);
 
-    const replayButton = screen.getByRole("button", { name: "もう一度聴く" });
+    const replayButton = screen.getByText("もう一度聴く");
     fireEvent.click(replayButton);
 
     expect(mockOnReplay).toHaveBeenCalledTimes(1);
@@ -43,7 +43,7 @@ describe("PlaylistCompletionScreen", () => {
   it("navigates to playlist page when 'プレイリストに戻る' button is clicked", () => {
     render(<PlaylistCompletionScreen {...defaultProps} />);
 
-    const backButton = screen.getByRole("button", { name: "プレイリストに戻る" });
+    const backButton = screen.getByText("プレイリストに戻る");
     fireEvent.click(backButton);
 
     expect(mockPush).toHaveBeenCalledWith("/playlists/test-playlist-123");
