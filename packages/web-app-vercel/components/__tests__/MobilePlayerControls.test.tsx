@@ -74,8 +74,13 @@ describe("MobilePlayerControls", () => {
 
     expect(screen.getByTestId("mobile-shuffle-button")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-repeat-button")).toBeInTheDocument();
-    expect(screen.getByTitle("前の記事")).toBeInTheDocument();
-    expect(screen.getByTitle("次の記事")).toBeInTheDocument();
+    const prevLink = screen.getByTitle("前の記事");
+    const nextLink = screen.getByTitle("次の記事");
+
+    expect(prevLink).toHaveAttribute("aria-disabled", "false");
+    expect(prevLink).toHaveAttribute("href", "/item/0");
+    expect(nextLink).toHaveAttribute("aria-disabled", "false");
+    expect(nextLink).toHaveAttribute("href", "/item/2");
   });
 
   it("calls play and pause functions correctly", () => {
