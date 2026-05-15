@@ -1,0 +1,43 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { createExtensionToken, validateExtensionRedirectUri } from '@/lib/extension-auth';
+
+function appendAuthInfoToRedirectUri(
+    redirectUri: string,
+    data: { accessToken: string; expiresAt: number; email: string }
+): string {
+    const hashParams = new URLSearchParams({
+        access_token: data.accessToken,
+        expires_at: String(data.expiresAt),
+        email: data.email,
+    });
+    return `${redirectUri}#${hashParams.toString()}`;
+}
+
+export async function GET(request: NextRequest) {
+    const redirectUri = request.nextUrl.searchParams.get('redirect_uri');
+
+    if (!redirectUri || !validateExtensionRedirectUri(redirectUri)) {
+        return NextResponse.json({ error: 'Invalid redirect_uri' }, { status: 400 });
+    }
+
+    const session = await auth();
+    if (!session?.user?.email || !session.user.id) {
+        const callbackUrl = `/extension/login?redirect_uri=${encodeURIComponent(redirectUri)}`;
+        const signInUrl = `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+        return NextResponse.redirect(new URL(signInUrl, request.url));
+    }
+
+    const { token, expiresAt, email } = createExtensionToken({
+        id: session.user.id,
+        email: session.user.email,
+    });
+
+    return NextResponse.redirect(
+        appendAuthInfoToRedirectUri(redirectUri, {
+            accessToken: token,
+            expiresAt,
+            email,
+        })
+    );
+}

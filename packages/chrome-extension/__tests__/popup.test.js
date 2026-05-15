@@ -1,4 +1,4 @@
-const { getHostnameFromUrl } = require('../popup.js');
+const { getHostnameFromUrl, parseAuthResult } = require('../popup.js');
 
 describe('getHostnameFromUrl', () => {
   beforeEach(() => {
@@ -27,5 +27,22 @@ describe('getHostnameFromUrl', () => {
     expect(getHostnameFromUrl('chrome://extensions/')).toBe('extensions');
     expect(getHostnameFromUrl('chrome-extension://abcdefghijklmnopqrstuvwxyz/')).toBe('abcdefghijklmnopqrstuvwxyz');
     expect(getHostnameFromUrl('file:///C:/path/to/file')).toBe(''); // file protocol doesn't typically have a hostname
+  });
+});
+
+describe('parseAuthResult', () => {
+  it('should parse token from hash parameters', () => {
+    const result = parseAuthResult('https://abc.chromiumapp.org/audicle-auth#access_token=token123&expires_at=2000&email=test%40example.com');
+    expect(result).toEqual({
+      accessToken: 'token123',
+      expiresAt: 2000,
+      email: 'test@example.com',
+    });
+  });
+
+  it('should parse token from query parameters', () => {
+    const result = parseAuthResult('https://abc.chromiumapp.org/audicle-auth?access_token=token456&expires_at=3000');
+    expect(result.accessToken).toBe('token456');
+    expect(result.expiresAt).toBe(3000);
   });
 });

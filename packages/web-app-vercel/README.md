@@ -107,6 +107,11 @@ AUTH_SECRET=your-random-secret
 # アクセス制御
 ALLOWED_USERS=user1@example.com,user2@example.com
 ALLOWED_EMAILS=user1@example.com,user2@example.com
+
+# Chrome拡張機能連携
+ALLOWED_ORIGINS=https://your-domain.vercel.app,chrome-extension://<extension-id>
+ALLOWED_EXTENSION_REDIRECT_ORIGINS=https://<extension-id>.chromiumapp.org
+EXTENSION_AUTH_SECRET=your-extension-token-secret
 ```
 
 ### 環境変数の取得方法
