@@ -1,5 +1,6 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { PeriodFilter } from "../PeriodFilter";
 
 describe("PeriodFilter", () => {
@@ -50,7 +51,8 @@ describe("PeriodFilter", () => {
     expect(weekButton).toHaveClass("bg-primary");
   });
 
-  it("calls onPeriodChange with the correct period when a button is clicked", () => {
+  it("calls onPeriodChange with the correct period when a button is clicked", async () => {
+    const user = userEvent.setup();
     render(
       <PeriodFilter
         activePeriod="today"
@@ -58,24 +60,24 @@ describe("PeriodFilter", () => {
       />
     );
 
-    // week ボタンをクリック
-    fireEvent.click(screen.getByRole("button", { name: "今週" }));
+    // today ボタンをクリック（アクティブ中でもハンドラが呼ばれることを確認）
+    await user.click(screen.getByRole("button", { name: "今日" }));
     expect(mockOnPeriodChange).toHaveBeenCalledTimes(1);
-    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(1, "week");
+    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(1, "today");
+
+    // week ボタンをクリック
+    await user.click(screen.getByRole("button", { name: "今週" }));
+    expect(mockOnPeriodChange).toHaveBeenCalledTimes(2);
+    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(2, "week");
 
     // month ボタンをクリック
-    fireEvent.click(screen.getByRole("button", { name: "今月" }));
-    expect(mockOnPeriodChange).toHaveBeenCalledTimes(2);
-    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(2, "month");
+    await user.click(screen.getByRole("button", { name: "今月" }));
+    expect(mockOnPeriodChange).toHaveBeenCalledTimes(3);
+    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(3, "month");
 
     // all ボタンをクリック
-    fireEvent.click(screen.getByRole("button", { name: "全期間" }));
-    expect(mockOnPeriodChange).toHaveBeenCalledTimes(3);
-    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(3, "all");
-
-    // today ボタンをクリック
-    fireEvent.click(screen.getByRole("button", { name: "今日" }));
+    await user.click(screen.getByRole("button", { name: "全期間" }));
     expect(mockOnPeriodChange).toHaveBeenCalledTimes(4);
-    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(4, "today");
+    expect(mockOnPeriodChange).toHaveBeenNthCalledWith(4, "all");
   });
 });
