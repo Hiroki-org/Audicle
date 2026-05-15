@@ -197,10 +197,7 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
         });
     } else {
         // position
-        sorted = [...items].sort((a, b) => {
-            const comparison = (a.position ?? 0) - (b.position ?? 0);
-            return sortOrder === 'desc' ? -comparison : comparison;
-        });
+        sorted = [...items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     }
 
     return {
