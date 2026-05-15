@@ -3,6 +3,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useUserSettings, useUpdateUserSettingsMutation } from "../useUserSettings";
 import React from "react";
 import { useSession } from "next-auth/react";
+import type {
+  UpdateSettingsSuccessResponse,
+  UserSettings,
+  UserSettingsResponse,
+} from "@/types/settings";
 
 const originalFetch = global.fetch;
 
@@ -17,6 +22,17 @@ describe("useUserSettings hook", () => {
   const mockSession = {
     data: { user: { email: "test@example.com" } },
     status: "authenticated",
+  };
+  const mockSettings: UserSettings = {
+    playback_speed: 1.5,
+    voice_model: "ja-JP-Standard-B",
+    language: "ja-JP",
+    color_theme: "ocean",
+  };
+  const mockSettingsResponse: UserSettingsResponse = {
+    ...mockSettings,
+    created_at: "2024-01-01T00:00:00.000Z",
+    updated_at: "2024-01-01T00:00:00.000Z",
   };
 
   beforeEach(() => {
@@ -53,11 +69,9 @@ describe("useUserSettings hook", () => {
 
   describe("useUserSettings", () => {
     it("should fetch user settings successfully", async () => {
-      const mockSettings = { theme: "dark", playbackSpeed: 1.5 };
-
       fetchMock.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockSettings,
+        json: async () => mockSettingsResponse,
       } as Response);
 
       const { result } = renderHook(() => useUserSettings(), { wrapper });
@@ -65,7 +79,7 @@ describe("useUserSettings hook", () => {
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
       expect(fetchMock).toHaveBeenCalledWith("/api/settings/get");
-      expect(result.current.data).toEqual(mockSettings);
+      expect(result.current.data).toEqual(mockSettingsResponse);
     });
 
     it("should handle API error with specific message", async () => {
@@ -92,6 +106,16 @@ describe("useUserSettings hook", () => {
       await waitFor(() => expect(result.current.isError).toBe(true));
 
       expect(result.current.error?.message).toBe("設定の取得に失敗しました");
+    });
+
+    it("should surface network errors while fetching settings", async () => {
+      fetchMock.mockRejectedValueOnce(new Error("Network unavailable"));
+
+      const { result } = renderHook(() => useUserSettings(), { wrapper });
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error?.message).toBe("Network unavailable");
     });
 
     it("should not fetch if userEmail is missing", async () => {
@@ -121,8 +145,11 @@ describe("useUserSettings hook", () => {
 
   describe("useUpdateUserSettingsMutation", () => {
     it("should update user settings successfully and invalidate queries", async () => {
-      const mockSettings = { theme: "light", playbackSpeed: 1.0 };
-      const mockResponse = { success: true };
+      const mockResponse: UpdateSettingsSuccessResponse = {
+        success: true,
+        message: "Settings updated successfully",
+        data: mockSettingsResponse,
+      };
 
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
 
@@ -133,7 +160,7 @@ describe("useUserSettings hook", () => {
 
       const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
 
-      result.current.mutate(mockSettings as any);
+      result.current.mutate(mockSettings);
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
@@ -150,8 +177,6 @@ describe("useUserSettings hook", () => {
     });
 
     it("should handle mutation API error with specific message", async () => {
-      const mockSettings = { theme: "light", playbackSpeed: 1.0 };
-
       fetchMock.mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: "Mutation specific error" }),
@@ -159,7 +184,7 @@ describe("useUserSettings hook", () => {
 
       const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
 
-      result.current.mutate(mockSettings as any);
+      result.current.mutate(mockSettings);
 
       await waitFor(() => expect(result.current.isError).toBe(true));
 
@@ -167,8 +192,6 @@ describe("useUserSettings hook", () => {
     });
 
     it("should handle mutation API error with default message", async () => {
-      const mockSettings = { theme: "light", playbackSpeed: 1.0 };
-
       fetchMock.mockResolvedValueOnce({
         ok: false,
         json: async () => ({}),
@@ -176,11 +199,51 @@ describe("useUserSettings hook", () => {
 
       const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
 
-      result.current.mutate(mockSettings as any);
+      result.current.mutate(mockSettings);
 
       await waitFor(() => expect(result.current.isError).toBe(true));
 
       expect(result.current.error?.message).toBe("設定の保存に失敗しました");
+    });
+
+    it("should surface network errors while updating settings", async () => {
+      fetchMock.mockRejectedValueOnce(new Error("Network unavailable"));
+
+      const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
+
+      result.current.mutate(mockSettings);
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error?.message).toBe("Network unavailable");
+    });
+
+    it("documents unauthenticated mutation cache invalidation behavior", async () => {
+      (useSession as jest.Mock).mockReturnValue({
+        data: null,
+        status: "unauthenticated",
+      });
+      const mockResponse: UpdateSettingsSuccessResponse = {
+        success: true,
+        message: "Settings updated successfully",
+        data: mockSettingsResponse,
+      };
+      const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
+
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
+
+      result.current.mutate(mockSettings);
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: ["user-settings", undefined],
+      });
     });
   });
 });
