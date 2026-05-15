@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { render, screen, act, type RenderResult } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import { AutoCloseComponent } from "../AutoCloseComponent";
 
 const mockPush = jest.fn();
@@ -15,7 +15,7 @@ jest.mock("next/navigation", () => ({
 
 describe("AutoCloseComponent", () => {
   let originalWindowClose: () => void;
-  let renderResult: RenderResult | null = null;
+  let renderResult: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -29,10 +29,13 @@ describe("AutoCloseComponent", () => {
   });
 
   afterEach(() => {
-    renderResult = null;
-    jest.clearAllTimers();
-    jest.useRealTimers();
+    if (renderResult && renderResult.unmount) {
+      renderResult.unmount();
+    }
+    // Restore window.close and real timers
     window.close = originalWindowClose;
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it("renders the correct UI and article title", () => {
