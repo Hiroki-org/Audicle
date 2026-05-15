@@ -1,7 +1,3 @@
-/**
- * @jest-environment jsdom
- */
-
 import React from 'react';
 import { render, screen, act } from "@testing-library/react";
 import { AutoCloseComponent } from "../AutoCloseComponent";
@@ -33,8 +29,8 @@ describe("AutoCloseComponent", () => {
       renderResult.unmount();
     }
     // Restore window.close and real timers
+    jest.clearAllTimers();
     window.close = originalWindowClose;
-    jest.runOnlyPendingTimers();
     jest.useRealTimers();
   });
 
