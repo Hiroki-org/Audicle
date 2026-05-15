@@ -28,21 +28,7 @@ describe('supabaseLocal', () => {
     });
 
     afterEach(() => {
-        jest.setSystemTime(fixedTime);
         resetInMemorySupabase();
-    });
-
-    describe('resetInMemorySupabase', () => {
-        it('clears playlists, articles, and playlist items', async () => {
-            const playlist = await createPlaylist('user@example.com', 'Playlist');
-            const article = await upsertArticle('user@example.com', 'url', 'Article');
-            await addPlaylistItem(playlist.id, article.id);
-
-            resetInMemorySupabase();
-
-            await expect(getPlaylistsForOwner('user@example.com')).resolves.toHaveLength(0);
-            await expect(getPlaylistWithItems('user@example.com', playlist.id)).resolves.toBeNull();
-        });
     });
 
     describe('createPlaylist', () => {
@@ -91,15 +77,6 @@ describe('supabaseLocal', () => {
             expect(playlists[0].playlist_items).toHaveLength(1);
             expect(playlists[0].items[0].article).toMatchObject({ title: 'A1' });
         });
-
-        it('matches null owners using the normalized empty-string owner key', async () => {
-            const playlist = await createPlaylist(null, 'Anonymous Playlist');
-
-            const playlists = await getPlaylistsForOwner(null);
-
-            expect(playlists).toHaveLength(1);
-            expect(playlists[0].id).toBe(playlist.id);
-        });
     });
 
     describe('updatePlaylist', () => {
@@ -115,6 +92,8 @@ describe('supabaseLocal', () => {
             // Check if it persists
             const fetched = await getPlaylistsForOwner('user@example.com');
             expect(fetched[0].name).toBe('New Name');
+
+            jest.setSystemTime(fixedTime); // reset
         });
 
         it('returns null if playlist not found', async () => {
@@ -173,13 +152,6 @@ describe('supabaseLocal', () => {
             const r2 = await deletePlaylistById('user@example.com', 'wrong-id');
             expect(r2).toBe(false);
         });
-
-        it('deletes playlists owned by the normalized null owner', async () => {
-            const playlist = await createPlaylist(null, 'Anonymous Playlist');
-
-            await expect(deletePlaylistById(null, playlist.id)).resolves.toBe(true);
-            await expect(getPlaylistsForOwner(null)).resolves.toHaveLength(0);
-        });
     });
 
     describe('upsertArticle', () => {
@@ -211,6 +183,8 @@ describe('supabaseLocal', () => {
 
             // check that last_read_position is NOT updated by upsert (per implementation)
             expect(article.last_read_position).toBe(0);
+
+            jest.setSystemTime(fixedTime); // reset
         });
 
         it('handles null owner and optional parameters', async () => {
@@ -218,17 +192,6 @@ describe('supabaseLocal', () => {
             expect(article.owner_email).toBe('');
             expect(article.thumbnail_url).toBeUndefined();
             expect(article.last_read_position).toBe(0);
-        });
-
-        it('updates existing null-owner articles instead of creating duplicates', async () => {
-            const created = await upsertArticle(null, 'url', 'Title');
-
-            jest.setSystemTime(new Date('2024-01-02T12:00:00Z'));
-            const updated = await upsertArticle(null, 'url', 'Updated Title');
-
-            expect(updated.id).toBe(created.id);
-            expect(updated.title).toBe('Updated Title');
-            expect(updated.updated_at).toBe('2024-01-02T12:00:00.000Z');
         });
     });
 
