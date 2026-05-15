@@ -29,7 +29,7 @@ export default function RootLayout({
         <script
           data-storage-key={STORAGE_KEYS.COLOR_THEME}
           data-default-theme={DEFAULT_SETTINGS.color_theme}
-          data-valid-themes={COLOR_THEMES.map((t) => t.value).join(",")}
+          data-valid-themes={JSON.stringify(COLOR_THEMES.map((t) => t.value))}
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -37,12 +37,13 @@ export default function RootLayout({
                   const script = document.currentScript;
                   const storageKey = script.getAttribute('data-storage-key');
                   const defaultTheme = script.getAttribute('data-default-theme');
-                  const validThemes = script.getAttribute('data-valid-themes').split(',');
+                  const validThemes = JSON.parse(script.getAttribute('data-valid-themes') || '[]');
+                  const fallbackTheme = validThemes.includes(defaultTheme) ? defaultTheme : validThemes[0];
 
-                  let theme = localStorage.getItem(storageKey) || defaultTheme;
+                  let theme = localStorage.getItem(storageKey) || fallbackTheme;
 
                   if (!validThemes.includes(theme)) {
-                    theme = defaultTheme;
+                    theme = fallbackTheme;
                   }
 
                   document.documentElement.setAttribute('data-theme', theme);

@@ -11,10 +11,6 @@ const COLOR_MAP: Record<string, string> = {
 }
 
 test.describe('Theme FOUC prevention', () => {
-    test.beforeEach(async ({ page }) => {
-        // No-op: keep default context handling. We'll create unauthenticated contexts per-test.
-    })
-
     test('Guest: localStorage theme is applied before hydration', async ({ browser }) => {
         const theme = 'purple'
         const ctx = await browser.newContext()
@@ -78,6 +74,20 @@ test.describe('Theme FOUC prevention', () => {
     test('Guest: default ocean when localStorage not set', async ({ browser }) => {
         // No theme in localStorage
         const ctx = await browser.newContext()
+        const p = await ctx.newPage()
+        p.on('console', msg => console.log('PAGE LOG:', msg.type(), msg.text()))
+        await p.goto('/', { waitUntil: 'domcontentloaded' })
+
+        const domTheme = await p.evaluate(() => document.documentElement.getAttribute('data-theme'))
+        expect(domTheme).toBe('ocean')
+        await ctx.close()
+    })
+
+    test('Guest: invalid localStorage theme falls back before hydration', async ({ browser }) => {
+        const ctx = await browser.newContext()
+        await ctx.addInitScript({
+            content: `localStorage.setItem('${THEME_STORAGE_KEY}', 'invalid,theme')`,
+        })
         const p = await ctx.newPage()
         p.on('console', msg => console.log('PAGE LOG:', msg.type(), msg.text()))
         await p.goto('/', { waitUntil: 'domcontentloaded' })
