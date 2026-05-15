@@ -47,6 +47,10 @@ const inMemoryDB: {
     playlist_items: [],
 };
 
+function normalizeOwnerEmail(email: string | null): string {
+    return email ?? '';
+}
+
 export function resetInMemorySupabase() {
     inMemoryDB.playlists = [];
     inMemoryDB.articles = [];
@@ -56,9 +60,10 @@ export function resetInMemorySupabase() {
 export async function createPlaylist(email: string | null, name: string, description?: string | null) {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
+    const ownerEmail = normalizeOwnerEmail(email);
     const playlist: Playlist = {
         id,
-        owner_email: email || '',
+        owner_email: ownerEmail,
         name,
         description: description || undefined,
         visibility: 'private',
@@ -73,8 +78,9 @@ export async function createPlaylist(email: string | null, name: string, descrip
 }
 
 export async function getPlaylistsForOwner(email: string | null) {
+    const ownerEmail = normalizeOwnerEmail(email);
     return inMemoryDB.playlists
-        .filter(p => p.owner_email === email)
+        .filter(p => p.owner_email === ownerEmail)
         .map(p => {
             const rawItems = inMemoryDB.playlist_items.filter(i => i.playlist_id === p.id);
             const itemsWithArticle: PlaylistItemWithArticle[] = rawItems.map(pi => ({
@@ -101,16 +107,18 @@ export async function updatePlaylist(playlistId: string, updates: Partial<Playli
 }
 
 export async function setDefaultPlaylist(ownerEmail: string, playlistId: string) {
+    const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
     // Unset default for all other playlists of this owner
     inMemoryDB.playlists.forEach(p => {
-        if (p.owner_email === ownerEmail) {
+        if (p.owner_email === normalizedOwnerEmail) {
             p.is_default = p.id === playlistId;
         }
     });
 }
 
 export async function deletePlaylistById(ownerEmail: string | null, id: string) {
-    const idx = inMemoryDB.playlists.findIndex(p => p.id === id && p.owner_email === ownerEmail);
+    const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
+    const idx = inMemoryDB.playlists.findIndex(p => p.id === id && p.owner_email === normalizedOwnerEmail);
     if (idx === -1) return false;
     const [removed] = inMemoryDB.playlists.splice(idx, 1);
     // remove associated items
@@ -119,12 +127,13 @@ export async function deletePlaylistById(ownerEmail: string | null, id: string) 
 }
 
 export async function upsertArticle(ownerEmail: string | null, url: string, title: string, thumbnail_url?: string | null, last_read_position?: number) {
-    let article = inMemoryDB.articles.find(a => a.owner_email === ownerEmail && a.url === url);
+    const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
+    let article = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.url === url);
     const now = new Date().toISOString();
     if (!article) {
         article = {
             id: crypto.randomUUID(),
-            owner_email: ownerEmail || '',
+            owner_email: normalizedOwnerEmail,
             url,
             title,
             thumbnail_url: thumbnail_url || undefined,
@@ -163,7 +172,8 @@ export async function addPlaylistItem(playlistId: string, articleId: string) {
 }
 
 export async function getPlaylistWithItems(ownerEmail: string | null, id: string, sort?: { field?: string; order?: 'asc' | 'desc' }) {
-    const playlist = inMemoryDB.playlists.find(p => p.id === id && p.owner_email === ownerEmail);
+    const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
+    const playlist = inMemoryDB.playlists.find(p => p.id === id && p.owner_email === normalizedOwnerEmail);
     if (!playlist) return null;
 
     // Collect items with article info
