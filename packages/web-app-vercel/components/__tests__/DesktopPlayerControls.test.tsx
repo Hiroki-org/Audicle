@@ -2,7 +2,6 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DesktopPlayerControls } from "../DesktopPlayerControls";
-import { zIndex } from "@/lib/zIndex";
 
 // プレイリストのモック関数を準備
 const mockWrapIndex = jest.fn((index) => index);
@@ -56,6 +55,8 @@ describe("DesktopPlayerControls", () => {
     const externalLink = screen.getByTitle("元記事を開く");
     expect(externalLink).toBeInTheDocument();
     expect(externalLink).toHaveAttribute("href", defaultProps.url);
+    expect(externalLink).toHaveAttribute("target", "_blank");
+    expect(externalLink).toHaveAttribute("rel", "noreferrer");
 
     // ダウンロードボタンが表示されていること
     expect(screen.getByTestId("download-button")).toBeInTheDocument();
@@ -105,9 +106,23 @@ describe("DesktopPlayerControls", () => {
     );
 
     expect(screen.getByTestId("desktop-shuffle-button")).toBeInTheDocument();
-    expect(screen.getByTestId("desktop-prev-button")).toBeInTheDocument();
-    expect(screen.getByTestId("desktop-next-button")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-prev-button")).toHaveAttribute("href", "/playlist/0");
+    expect(screen.getByTestId("desktop-next-button")).toHaveAttribute("href", "/playlist/2");
     expect(screen.getByTestId("desktop-repeat-button")).toBeInTheDocument();
+  });
+
+  it("marks shuffle button as active when shuffle is enabled", () => {
+    render(
+      <DesktopPlayerControls
+        {...defaultProps}
+        playlistState={{ ...defaultProps.playlistState, isPlaylistMode: true, shuffle: true }}
+      />
+    );
+
+    const shuffleButton = screen.getByTestId("desktop-shuffle-button");
+    expect(shuffleButton).toHaveClass("text-green-500");
+    expect(shuffleButton).toHaveAttribute("aria-label", "シャッフル: オン");
+    expect(shuffleButton).toHaveAttribute("title", "シャッフル: オン");
   });
 
   it("calls correct functions when playlist controls are clicked", async () => {
@@ -158,7 +173,7 @@ describe("DesktopPlayerControls", () => {
 
     const prevButton = screen.getByTestId("desktop-prev-button");
 
-    // We use fireEvent because userEvent might not trigger the click handler for elements acting disabled
+    // Keep a reference to the dispatched event so defaultPrevented can be asserted.
     const clickEvent = new MouseEvent("click", {
       bubbles: true,
       cancelable: true,
