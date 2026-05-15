@@ -172,6 +172,63 @@ describe('/api/synthesize route', () => {
         expect(res.status).toBe(200);
     });
 
+    it('limits concurrent TTS requests and waits for all chunks to settle before returning an error', async () => {
+        (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
+
+        (getStorageProvider as jest.Mock).mockReturnValue({
+            headObject: jest.fn().mockResolvedValue({ exists: false }),
+            uploadObject: jest.fn().mockResolvedValue('https://storage.example/audio.mp3'),
+            generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/audio.mp3')
+        });
+        (getKv as jest.Mock).mockResolvedValue(null);
+
+        let activeRequests = 0;
+        let maxActiveRequests = 0;
+        let completedRequests = 0;
+        let synthesizeCallCount = 0;
+
+        mockSynthesizeSpeech.mockImplementation(() => {
+            const callIndex = ++synthesizeCallCount;
+            activeRequests++;
+            maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    activeRequests--;
+                    completedRequests++;
+
+                    if (callIndex === 2) {
+                        reject(new Error('Synthetic chunk failure'));
+                        return;
+                    }
+
+                    resolve([{ audioContent: Buffer.from(`audio-${callIndex}`) }]);
+                }, 10);
+            });
+        });
+
+        const req: any = {
+            json: async () => ({
+                chunks: [
+                    { text: 'chunk one' },
+                    { text: 'chunk two' },
+                    { text: 'chunk three' },
+                    { text: 'chunk four' },
+                    { text: 'chunk five' },
+                ],
+                voice: 'ja-JP',
+            })
+        };
+
+        const res = await routeModule.POST(req as any);
+
+        expect(res.status).toBe(500);
+        expect(synthesizeCallCount).toBe(5);
+        expect(completedRequests).toBe(5);
+        expect(maxActiveRequests).toBeGreaterThanOrEqual(2);
+        expect(maxActiveRequests).toBeLessThanOrEqual(3);
+    });
+
     describe('Error handling', () => {
         it('returns 400 for SyntaxError', async () => {
             (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
