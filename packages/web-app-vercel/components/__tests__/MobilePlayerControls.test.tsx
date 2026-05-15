@@ -65,10 +65,12 @@ describe("MobilePlayerControls", () => {
     const nextLink = screen.getByTitle("次の記事");
     expect(prevLink).toBeInTheDocument();
     expect(prevLink).toHaveAttribute("aria-disabled", "false");
-    expect(prevLink).not.toHaveAttribute("tabIndex", "-1");
+    expect(prevLink).not.toHaveAttribute("tabindex");
+    expect(prevLink).toHaveAttribute("href", "/item/0");
     expect(nextLink).toBeInTheDocument();
     expect(nextLink).toHaveAttribute("aria-disabled", "false");
-    expect(nextLink).not.toHaveAttribute("tabIndex", "-1");
+    expect(nextLink).not.toHaveAttribute("tabindex");
+    expect(nextLink).toHaveAttribute("href", "/item/2");
   });
 
   it("calls play and pause functions correctly", () => {
