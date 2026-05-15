@@ -20,6 +20,7 @@ export const dynamic = 'force-dynamic';
 
 // Google Cloud TTS APIの最大リクエストバイト数
 const MAX_TTS_BYTES = 5000;
+const SYNTHESIZE_CHUNK_CONCURRENCY = 3;
 
 /**
  * Google Cloud TTS APIエラーの種類
@@ -102,6 +103,42 @@ function getLanguageCode(voiceModel: string): string {
 function calculateArticleHash(chunks: string[]): string {
     const content = chunks.join('\n');
     return calculateTextHash(content, 0).substring(0, 16);
+}
+
+async function mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    mapper: (_item: T, _index: number) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+    if (items.length === 0) {
+        return [];
+    }
+
+    const results = new Array<PromiseSettledResult<R>>(items.length);
+    let nextIndex = 0;
+    const workerCount = Math.max(1, Math.min(limit, items.length));
+
+    const worker = async () => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex;
+            nextIndex++;
+
+            try {
+                results[currentIndex] = {
+                    status: 'fulfilled',
+                    value: await mapper(items[currentIndex], currentIndex),
+                };
+            } catch (reason) {
+                results[currentIndex] = {
+                    status: 'rejected',
+                    reason,
+                };
+            }
+        }
+    };
+
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
 }
 
 // Google Cloud TTS クライアント
@@ -529,6 +566,7 @@ export async function POST(request: NextRequest) {
                 }
 
                 log('warn', '人気記事の署名付きURLの取得に失敗しました。通常のフローにフォールバックします。');
+                chunkSkippedHead = false;
             }
 
             if (cacheIndex) {
@@ -614,27 +652,21 @@ export async function POST(request: NextRequest) {
             }
         };
 
-        // バッチ処理で同時実行数を制御（同時実行数 5）
-        const CONCURRENCY_LIMIT = 5;
-        const chunkResults: ChunkResult[] = [];
-
-        for (let i = 0; i < textChunks.length; i += CONCURRENCY_LIMIT) {
-            const batch = textChunks.slice(i, i + CONCURRENCY_LIMIT);
-            // Promise.allSettled を使用して部分的な失敗でもリソースリークを防ぐ
-            const batchPromises = batch.map((chunk: string, index: number) => processChunk(chunk, i + index));
-            const batchResults = await Promise.allSettled(batchPromises);
-
-            for (const result of batchResults) {
-                if (result.status === 'fulfilled') {
-                    chunkResults.push(result.value);
-                } else {
-                    log('error', `チャンクの処理に失敗しました`, { error: result.reason });
-                    throw result.reason;
-                }
-            }
+        const settledChunkResults = await mapWithConcurrency(
+            textChunks,
+            SYNTHESIZE_CHUNK_CONCURRENCY,
+            processChunk,
+        );
+        const failedChunkResult = settledChunkResults.find(
+            (result): result is PromiseRejectedResult => result.status === 'rejected',
+        );
+        if (failedChunkResult) {
+            log('error', 'チャンクの処理に失敗しました', { error: failedChunkResult.reason });
+            throw failedChunkResult.reason;
         }
 
-        for (const result of chunkResults) {
+        for (const settledResult of settledChunkResults) {
+            const result = (settledResult as PromiseFulfilledResult<ChunkResult>).value;
             audioUrls.push(result.url);
             audioBuffers.push(result.buffer);
             if (result.hit) {
@@ -739,22 +771,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // When not in production, include the original error message for easier
-        // debugging. Do not include sensitive details in production.
-        interface SynthesizeErrorResponse {
-            error: string;
-            detail?: string;
-            errorType?: string;
-        }
-
-        const responseBody: SynthesizeErrorResponse = {
-            error: 'Failed to synthesize speech',
-            errorType: 'UNKNOWN'
-        };
-        if (process.env.NODE_ENV !== 'production' && error instanceof Error) {
-            responseBody.detail = error.message;
-        }
-
-        return NextResponse.json(responseBody, { status: 500, headers: corsHeaders });
+        return NextResponse.json(
+            {
+                error: 'Failed to synthesize speech',
+                errorType: 'UNKNOWN',
+            },
+            { status: 500, headers: corsHeaders }
+        );
     }
 }
