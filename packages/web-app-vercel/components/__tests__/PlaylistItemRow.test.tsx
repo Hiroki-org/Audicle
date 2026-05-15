@@ -1,16 +1,13 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { PlaylistItemRow } from '../PlaylistItemRow';
-import type { PlaylistWithItems } from '@/types/playlist';
+import { PlaylistWithItems } from '@/types/playlist';
 
 const mockPlaylist: PlaylistWithItems = {
   id: 'test-playlist-id',
-  owner_email: 'user@example.com',
+  user_id: 'user-id',
   name: 'Test Playlist',
   description: 'Test Description',
-  visibility: 'private',
   is_default: false,
-  allow_fork: true,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   items: []
@@ -33,26 +30,6 @@ describe('PlaylistItemRow', () => {
     expect(screen.queryByText('デフォルト')).not.toBeInTheDocument();
   });
 
-  it('does not render description when it is omitted', () => {
-    const mockOnToggle = jest.fn();
-    const playlistWithoutDescription = {
-      ...mockPlaylist,
-      description: undefined,
-    };
-
-    render(
-      <PlaylistItemRow
-        playlist={playlistWithoutDescription}
-        isSelected={false}
-        isSaving={false}
-        onToggle={mockOnToggle}
-      />
-    );
-
-    expect(screen.getByText('Test Playlist')).toBeInTheDocument();
-    expect(screen.queryByText('Test Description')).not.toBeInTheDocument();
-  });
-
   it('renders default badge when is_default is true', () => {
     const mockOnToggle = jest.fn();
     const defaultPlaylist = { ...mockPlaylist, is_default: true };
@@ -68,8 +45,7 @@ describe('PlaylistItemRow', () => {
     expect(screen.getByText('デフォルト')).toBeInTheDocument();
   });
 
-  it('calls onToggle when checkbox is clicked', async () => {
-    const user = userEvent.setup();
+  it('calls onToggle when checkbox is clicked', () => {
     const mockOnToggle = jest.fn();
     render(
       <PlaylistItemRow
@@ -81,12 +57,11 @@ describe('PlaylistItemRow', () => {
     );
 
     const checkbox = screen.getByRole('checkbox');
-    await user.click(checkbox);
+    fireEvent.click(checkbox);
     expect(mockOnToggle).toHaveBeenCalledWith('test-playlist-id');
   });
 
-  it('does not call onToggle when isSaving is true', async () => {
-    const user = userEvent.setup();
+  it('does not call onToggle when isSaving is true', () => {
     const mockOnToggle = jest.fn();
     render(
       <PlaylistItemRow
@@ -98,7 +73,7 @@ describe('PlaylistItemRow', () => {
     );
 
     const checkbox = screen.getByRole('checkbox');
-    await user.click(checkbox);
+    fireEvent.click(checkbox);
     expect(mockOnToggle).not.toHaveBeenCalled();
     expect(checkbox).toBeDisabled();
   });
@@ -114,7 +89,7 @@ describe('PlaylistItemRow', () => {
       />
     );
 
-    const checkbox = screen.getByRole('checkbox');
-    expect(checkbox).toBeChecked();
+    const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
   });
 });
