@@ -27,11 +27,12 @@ function parseAuthResult(finalUrl) {
     throw new Error("アクセストークンが見つかりませんでした");
   }
 
+  const parsedExpiresAt = expiresAt !== null ? Number(expiresAt) : NaN;
   return {
     accessToken,
-    expiresAt:
-      Number(expiresAt) ||
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    expiresAt: Number.isFinite(parsedExpiresAt) && parsedExpiresAt > 0
+      ? parsedExpiresAt
+      : Date.now() + 7 * 24 * 60 * 60 * 1000,
     email: email || "",
   };
 }

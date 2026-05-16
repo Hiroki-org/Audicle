@@ -12,11 +12,14 @@ type ExtensionTokenPayload = {
 };
 
 function getExtensionAuthSecret(): string {
-    const secret = process.env.EXTENSION_AUTH_SECRET || process.env.AUTH_SECRET;
-    if (!secret) {
-        throw new Error('EXTENSION_AUTH_SECRET or AUTH_SECRET must be configured');
+    if (process.env.EXTENSION_AUTH_SECRET) {
+        return process.env.EXTENSION_AUTH_SECRET;
     }
-    return secret;
+    console.warn('WARNING: EXTENSION_AUTH_SECRET is not set. Falling back to AUTH_SECRET. Rotating AUTH_SECRET will also invalidate all extension tokens.');
+    if (process.env.AUTH_SECRET) {
+        return process.env.AUTH_SECRET;
+    }
+    throw new Error('EXTENSION_AUTH_SECRET or AUTH_SECRET must be configured');
 }
 
 function getExtensionTokenExpirySeconds(): number {

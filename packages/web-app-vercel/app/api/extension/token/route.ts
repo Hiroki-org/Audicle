@@ -28,6 +28,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL(signInUrl, request.url));
     }
 
+    const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) ?? [];
+    if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(session.user.email)) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
     const { token, expiresAt, email } = createExtensionToken({
         id: session.user.id,
         email: session.user.email,
