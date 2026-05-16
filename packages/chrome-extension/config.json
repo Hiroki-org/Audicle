@@ -9,7 +9,6 @@
   "jumpBatchSize": 3,
   "initialBatchSize": 5,
   "debug": false,
-  "webAppUrl": "https://audicle-phi.vercel.app",
   "voiceModel": "ja-JP-Standard-B",
   "serverUrls": {
     "vercel_app": "https://audicle-phi.vercel.app",

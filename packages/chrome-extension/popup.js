@@ -38,8 +38,13 @@ function parseAuthResult(finalUrl) {
 }
 
 async function loadExtensionConfig() {
-  const response = await fetch(chrome.runtime.getURL("config.json"));
-  return await response.json();
+  try {
+    const response = await fetch(chrome.runtime.getURL("config.json"));
+    return await response.json();
+  } catch (e) {
+    console.error("Failed to load config.json:", e);
+    throw new Error("failed to load config.json: " + e.message);
+  }
 }
 
 function launchWebAuthFlow(url) {

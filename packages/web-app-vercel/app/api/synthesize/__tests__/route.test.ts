@@ -130,6 +130,31 @@ describe('/api/synthesize route', () => {
         expect(verifyExtensionToken).toHaveBeenCalledWith('extension-token');
     });
 
+    it('rejects invalid extension bearer token', async () => {
+        (auth as jest.Mock).mockResolvedValue(null);
+        (verifyExtensionToken as jest.Mock).mockImplementation(() => {
+            throw new Error('Invalid token');
+        });
+
+        (getStorageProvider as jest.Mock).mockReturnValue({
+            headObject: jest.fn(),
+            uploadObject: jest.fn(),
+            generatePresignedGetUrl: jest.fn()
+        });
+
+        const req: any = {
+            headers: {
+                get: (name: string) => (name.toLowerCase() === 'authorization' ? 'Bearer bad-token' : null)
+            },
+            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' })
+        };
+
+        const res = await routeModule.POST(req as any);
+        expect(res.status).toBe(401);
+        expect(verifyExtensionToken).toHaveBeenCalledWith('bad-token');
+        expect(getStorageProvider().uploadObject).not.toHaveBeenCalled();
+    });
+
     it('supports base64-encoded GOOGLE_APPLICATION_CREDENTIALS_JSON', async () => {
         (auth as jest.Mock).mockResolvedValue({ user: { email: 'user@example.com' } });
 

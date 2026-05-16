@@ -390,8 +390,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
         }
 
+        const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) ?? [];
         // 許可リストチェック
-        if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(authenticatedEmail)) {
+        if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(authenticatedEmail.toLowerCase())) {
             log('warn', 'アクセスが拒否されました', { email: authenticatedEmail });
             return NextResponse.json({ error: 'Access denied' }, { status: 403, headers: corsHeaders });
         }

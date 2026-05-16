@@ -16,9 +16,9 @@ It provides a comfortable "reading while doing something else" experience by int
 - **Synchronized Highlighting**: The paragraph currently being played is highlighted in real-time, allowing you to see at a glance where it is being read.
 - **Playback Controls**: Toggle reading mode ON/OFF and pause/resume playback from the popup.
 
-## ⚙️ Configuration
+## ⚙️ Deployment configuration
 
-Before loading or releasing the extension for a custom deployment, ensure you update the `webAppUrl` and `serverUrls.vercel_app` in `packages/chrome-extension/config.json`. They are currently hardcoded to the production URL (`https://audicle-phi.vercel.app`), so if your Vercel deployment URL differs, you must change this file manually.
+Before loading or releasing the extension for a custom deployment, ensure you update the `serverUrls.vercel_app` in `packages/chrome-extension/config.json`. They are currently hardcoded to the production URL (`https://audicle-phi.vercel.app`), so if your Vercel deployment URL differs, you must change this file manually.
 
 ## 📖 How to Use
 

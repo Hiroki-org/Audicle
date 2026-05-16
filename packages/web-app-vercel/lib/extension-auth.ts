@@ -11,13 +11,20 @@ type ExtensionTokenPayload = {
     exp?: number;
 };
 
+let cachedExtensionAuthSecret: string | null = null;
+
 function getExtensionAuthSecret(): string {
+    if (cachedExtensionAuthSecret) {
+        return cachedExtensionAuthSecret;
+    }
     if (process.env.EXTENSION_AUTH_SECRET) {
-        return process.env.EXTENSION_AUTH_SECRET;
+        cachedExtensionAuthSecret = process.env.EXTENSION_AUTH_SECRET;
+        return cachedExtensionAuthSecret;
     }
     console.warn('WARNING: EXTENSION_AUTH_SECRET is not set. Falling back to AUTH_SECRET. Rotating AUTH_SECRET will also invalidate all extension tokens.');
     if (process.env.AUTH_SECRET) {
-        return process.env.AUTH_SECRET;
+        cachedExtensionAuthSecret = process.env.AUTH_SECRET;
+        return cachedExtensionAuthSecret;
     }
     throw new Error('EXTENSION_AUTH_SECRET or AUTH_SECRET must be configured');
 }
