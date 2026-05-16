@@ -30,6 +30,34 @@ let chunkSize = 200; // 200文字ごとに分割（0にすると分割なし）
 let config = null;
 let isDebug = false;
 
+function getSynthesisOptions() {
+  return {
+    articleUrl: window.location.href,
+    voiceModel: config?.voiceModel,
+  };
+}
+
+function createFetchRequest(text) {
+  return {
+    command: "fetch",
+    text,
+    ...getSynthesisOptions(),
+  };
+}
+
+function createBatchFetchRequest(batch) {
+  const options = getSynthesisOptions();
+  return {
+    command: "batchFetch",
+    batch: batch.map((item) => ({
+      ...item,
+      articleUrl: options.articleUrl,
+      voiceModel: options.voiceModel,
+    })),
+    ...options,
+  };
+}
+
 function debugLog(...args) {
   if (isDebug) {
     console.log(...args);
@@ -163,10 +191,7 @@ function requestAudioSequentially(startIndex, endIndex, callback) {
 
   // 各リクエストを順次キューに追加
   requests.forEach((request, index) => {
-    const requestData = {
-      command: "fetch",
-      text: request.text,
-    };
+    const requestData = createFetchRequest(request.text);
 
     addToRequestQueue(requestData, (response) => {
       if (response && response.audioDataUrl) {
@@ -1400,7 +1425,7 @@ function prefetchNext(startIndex) {
     setTimeout(
       () => {
         chrome.runtime.sendMessage(
-          { command: "fetch", text: item.text },
+          createFetchRequest(item.text),
           (response) => {
             if (response && response.audioDataUrl) {
               audioCache.set(i, response.audioDataUrl);
@@ -1434,7 +1459,7 @@ function fetchBatch(startIndex) {
     playFromCache(startIndex);
     return;
   }
-  chrome.runtime.sendMessage({ command: "batchFetch", batch }, (response) => {
+  chrome.runtime.sendMessage(createBatchFetchRequest(batch), (response) => {
     if (response && response.audioDataUrls) {
       response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
         audioCache.set(index, audioDataUrl);
@@ -1463,7 +1488,7 @@ function prefetchBatch(startIndex) {
   if (batch.length > 0) {
     setTimeout(() => {
       chrome.runtime.sendMessage(
-        { command: "batchFetch", batch },
+        createBatchFetchRequest(batch),
         (response) => {
           if (response && response.audioDataUrls) {
             response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
@@ -1577,7 +1602,7 @@ function fetchRemainingInBackground(priorityStartIndex) {
 
   // バッチをリクエストキューに追加
   batches.forEach((batch) => {
-    addToRequestQueue({ command: "batchFetch", batch }, (response) => {
+    addToRequestQueue(createBatchFetchRequest(batch), (response) => {
       if (response && response.audioDataUrls) {
         response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
           audioCache.set(index, audioDataUrl);
@@ -1616,7 +1641,7 @@ function fullBatchFetch(callback) {
 
   // バッチをリクエストキューに追加
   batches.forEach((batch) => {
-    addToRequestQueue({ command: "batchFetch", batch }, (response) => {
+    addToRequestQueue(createBatchFetchRequest(batch), (response) => {
       if (response && response.audioDataUrls) {
         response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
           audioCache.set(index, audioDataUrl);

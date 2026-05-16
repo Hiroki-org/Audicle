@@ -42,6 +42,14 @@
     <div class="control-group">
       <button id="pause-resume-btn">一時停止</button>
     </div>
+    <div class="auth-group">
+      <div id="auth-status">Audicle 未ログイン</div>
+      <button type="button" id="audicle-login-btn">Audicle にログイン</button>
+      <button type="button" id="audicle-logout-btn" style="display: none">ログアウト</button>
+      <small class="auth-note"
+        >表示中ページ本文を Audicle API へ送信して音声化します。</small
+      >
+    </div>
     <script src="popup.js"></script>
   </body>
 </html>

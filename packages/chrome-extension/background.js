@@ -9,7 +9,7 @@ class AudioSynthesizer {
    * @param {string} text - 変換するテキスト
    * @returns {Promise<string>} - audioDataUrl (data:audio/mpeg;base64,...)
    */
-  async synthesize(text) {
+  async synthesize(text, options = {}) {
     throw new Error("synthesize method must be implemented");
   }
 }
@@ -56,6 +56,86 @@ class RemoteAudioSynthesizer extends AudioSynthesizer {
       console.error(`[${this.name}] Error:`, error);
       throw new Error(`${this.name} synthesis failed: ${error.message}`);
     }
+  }
+}
+
+class VercelAppSynthesizer extends AudioSynthesizer {
+  constructor(config) {
+    super();
+    this.webAppUrl = config.webAppUrl || config.serverUrls?.vercel_app;
+    this.voiceModel = config.voiceModel || "ja-JP-Standard-B";
+  }
+
+  async getAuthToken() {
+    const { audicleAuth } = await chrome.storage.local.get(["audicleAuth"]);
+    const token = audicleAuth?.accessToken;
+    const expiresAt = Number(audicleAuth?.expiresAt);
+
+    if (!token || (Number.isFinite(expiresAt) && Date.now() >= expiresAt - 60 * 1000)) {
+      throw new Error("Audicle にログインしてください");
+    }
+
+    return token;
+  }
+
+  async synthesize(text, options = {}) {
+    if (!this.webAppUrl) {
+      throw new Error("Vercel App URL が設定されていません");
+    }
+
+    const cleanedText = cleanText(text);
+    const token = await this.getAuthToken();
+
+    const response = await fetch(`${this.webAppUrl}/api/synthesize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        text: cleanedText,
+        voice_model: options.voiceModel || this.voiceModel,
+        articleUrl: options.articleUrl,
+      }),
+    });
+
+    if (response.status === 401) {
+      await chrome.storage.local.remove(["audicleAuth"]);
+      throw new Error("Audicle のログイン期限が切れました。再ログインしてください。");
+    }
+
+    if (response.status === 403) {
+      throw new Error("Audicle へのアクセス権限がありません。管理者にお問い合わせください。");
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Vercel API error: ${response.status} ${response.statusText} ${errorText}`);
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+
+      if (data.audio) {
+        return `data:audio/mpeg;base64,${data.audio}`;
+      }
+
+      if (Array.isArray(data.audioUrls) && data.audioUrls[0]) {
+        const audioResponse = await fetch(data.audioUrls[0]);
+        if (!audioResponse.ok) {
+          throw new Error("Vercel API response contains an invalid audio URL");
+        }
+        const blob = await audioResponse.blob();
+        return await blobToDataURL(blob);
+      }
+
+      throw new Error("Vercel API response does not contain audio");
+    }
+
+    const blob = await response.blob();
+    return await blobToDataURL(blob);
   }
 }
 
@@ -157,6 +237,8 @@ class SynthesizerFactory {
         return new GoogleCloudTTSDockerSynthesizer(config);
       case "api_server":
         return new APIServerSynthesizer(config);
+      case "vercel_app":
+        return new VercelAppSynthesizer(config);
       default:
         throw new Error(`Unknown synthesizer type: ${type}`);
     }
@@ -238,7 +320,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           config.synthesizerType,
           config
         );
-        const audioDataUrl = await synthesizer.synthesize(message.text);
+        const audioDataUrl = await synthesizer.synthesize(message.text, {
+          articleUrl: message.articleUrl,
+          voiceModel: message.voiceModel || config.voiceModel,
+        });
 
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
@@ -268,7 +353,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           config.synthesizerType,
           config
         );
-        const audioDataUrl = await synthesizer.synthesize(message.text);
+        const audioDataUrl = await synthesizer.synthesize(message.text, {
+          articleUrl: message.articleUrl,
+          voiceModel: message.voiceModel || config.voiceModel,
+        });
         sendResponse({ audioDataUrl: audioDataUrl });
       } catch (error) {
         console.error("Speech synthesis error (fetch):", error);
@@ -287,9 +375,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         config
       );
 
-      const promises = message.batch.map(async ({ index, text }) => {
+      const promises = message.batch.map(async ({ index, text, articleUrl, voiceModel }) => {
         try {
-          const audioDataUrl = await synthesizer.synthesize(text);
+          const audioDataUrl = await synthesizer.synthesize(text, {
+            articleUrl: articleUrl || message.articleUrl,
+            voiceModel: voiceModel || message.voiceModel || config.voiceModel,
+          });
           return { index, audioDataUrl };
         } catch (error) {
           console.error("Speech synthesis error for index", index, ":", error);
@@ -313,9 +404,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         config
       );
 
-      const promises = message.batch.map(async ({ index, text }) => {
+      const promises = message.batch.map(async ({ index, text, articleUrl, voiceModel }) => {
         try {
-          const audioDataUrl = await synthesizer.synthesize(text);
+          const audioDataUrl = await synthesizer.synthesize(text, {
+            articleUrl: articleUrl || message.articleUrl,
+            voiceModel: voiceModel || message.voiceModel || config.voiceModel,
+          });
           return { index, audioDataUrl };
         } catch (error) {
           console.error("Speech synthesis error for index", index, ":", error);
