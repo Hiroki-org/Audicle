@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL(signInUrl, request.url));
     }
 
-    const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) ?? [];
-    if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(session.user.email)) {
+    const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) ?? [];
+    if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(session.user.email.toLowerCase())) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
