@@ -99,9 +99,13 @@ class VercelAppSynthesizer extends AudioSynthesizer {
       }),
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       await chrome.storage.local.remove(["audicleAuth"]);
       throw new Error("Audicle のログイン期限が切れました。再ログインしてください。");
+    }
+
+    if (response.status === 403) {
+      throw new Error("Audicle へのアクセス権限がありません。管理者にお問い合わせください。");
     }
 
     if (!response.ok) {

@@ -8,7 +8,10 @@
     "https://*.google.com/",
     "http://localhost:8001/*",
     "http://localhost:8000/*",
-    "https://audicle-phi.vercel.app/*"
+    "https://audicle-phi.vercel.app/*",
+    "https://*.public.blob.vercel-storage.com/*",
+    "https://*.supabase.co/*",
+    "https://storage.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background.js"
