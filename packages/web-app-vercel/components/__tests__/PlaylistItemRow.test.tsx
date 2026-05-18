@@ -1,13 +1,15 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PlaylistItemRow } from '../PlaylistItemRow';
-import { PlaylistWithItems } from '@/types/playlist';
+import type { PlaylistWithItems } from '@/types/playlist';
 
 const mockPlaylist: PlaylistWithItems = {
   id: 'test-playlist-id',
-  user_id: 'user-id',
+  owner_email: 'user@example.com',
   name: 'Test Playlist',
   description: 'Test Description',
+  visibility: 'private',
   is_default: false,
+  allow_fork: false,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   items: []
