@@ -122,6 +122,16 @@ describe("useUserSettings hook", () => {
       expect(result.current.fetchStatus).toBe("idle");
       expect(fetchMock).not.toHaveBeenCalled();
     });
+
+    it("should surface network errors", async () => {
+      fetchMock.mockRejectedValueOnce(new Error("Network request failed"));
+
+      const { result } = renderHook(() => useUserSettings(), { wrapper });
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error?.message).toBe("Network request failed");
+    });
   });
 
   describe("useUpdateUserSettingsMutation", () => {
@@ -185,10 +195,47 @@ describe("useUserSettings hook", () => {
       expect(result.current.error?.message).toBe("設定の保存に失敗しました");
     });
 
+    it("should surface mutation network errors", async () => {
+      fetchMock.mockRejectedValueOnce(new Error("Network request failed"));
+
+      const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
+
+      result.current.mutate(mockSettings);
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error?.message).toBe("Network request failed");
+    });
+
     it("should invalidate user settings query with undefined email when session is missing", async () => {
       (useSession as jest.Mock).mockReturnValue({
         data: null,
         status: "unauthenticated",
+      });
+      const mockResponse = { success: true };
+      const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
+
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
+
+      result.current.mutate(mockSettings);
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+        expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+          queryKey: ["user-settings", undefined],
+        });
+      });
+    });
+
+    it("should invalidate user settings query with undefined email when user has no email", async () => {
+      (useSession as jest.Mock).mockReturnValue({
+        data: { user: {} },
+        status: "authenticated",
       });
       const mockResponse = { success: true };
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
