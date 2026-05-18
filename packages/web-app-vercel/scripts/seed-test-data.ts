@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 import { config } from "dotenv";
 import { resolve } from "path";
+import { readFileSync } from "fs";
 
 // .env.test.local を読み込む
 config({ path: resolve(__dirname, "../.env.test.local") });
@@ -129,7 +130,7 @@ async function runMigrations() {
             if (constraints !== null) {
                 console.log("✓ articles テーブルにアクセス可能");
             }
-        } catch {
+        } catch (e) {
             console.log("⚠️ マイグレーションの手動実行が必要かもしれません");
         }
     } else {
@@ -410,38 +411,11 @@ async function seedTestData() {
     // 5. デフォルトプレイリストの作成
     console.log("5. デフォルトプレイリストを作成中...");
 
-    const { data: existingDefaultPlaylists, error: existingDefaultPlaylistsError } = await supabase
-        .from("playlists")
-        .select("id")
-        .eq("owner_email", TEST_USER_EMAIL)
-        .eq("is_default", true);
-
-    if (existingDefaultPlaylistsError) {
-        console.error("既存プレイリストの取得に失敗:", existingDefaultPlaylistsError);
-        process.exit(1);
-    }
-
-    const existingDefaultPlaylistIds = existingDefaultPlaylists?.map((playlist) => playlist.id) ?? [];
-    if (existingDefaultPlaylistIds.length > 0) {
-        const { error: itemsDeleteError } = await supabase
-            .from("playlist_items")
-            .delete()
-            .in("playlist_id", existingDefaultPlaylistIds);
-        if (itemsDeleteError) {
-            console.error("プレイリストアイテムの削除に失敗:", itemsDeleteError);
-            process.exit(1);
-        }
-    }
-
-    const { error: playlistsDeleteError } = await supabase
+    await supabase
         .from("playlists")
         .delete()
         .eq("owner_email", TEST_USER_EMAIL)
         .eq("is_default", true);
-    if (playlistsDeleteError) {
-        console.error("既存プレイリストの削除に失敗:", playlistsDeleteError);
-        process.exit(1);
-    }
 
     const { data: defaultPlaylist, error: playlistError } = await supabase
         .from("playlists")
