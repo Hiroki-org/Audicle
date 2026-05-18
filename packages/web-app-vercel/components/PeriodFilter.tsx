@@ -5,7 +5,7 @@ import type { Period } from "@/types/stats";
 
 interface PeriodFilterProps {
   activePeriod: Period;
-  onPeriodChange: (_period: Period) => void;
+  onPeriodChange: (period: Period) => void;
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -27,7 +27,6 @@ export function PeriodFilter({
         <Button
           key={period}
           onClick={() => onPeriodChange(period)}
-          aria-pressed={activePeriod === period}
           variant={activePeriod === period ? "default" : "outline"}
           size="sm"
           className={
