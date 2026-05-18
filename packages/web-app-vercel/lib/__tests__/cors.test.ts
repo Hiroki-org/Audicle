@@ -32,8 +32,7 @@ describe("getCorsHeaders", () => {
 
     expect(headers).toEqual({
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
+      "Access-Control-Allow-Headers": "Content-Type",
       Vary: "Origin",
     });
     expect(headers["Access-Control-Allow-Origin"]).toBeUndefined();
@@ -47,8 +46,7 @@ describe("getCorsHeaders", () => {
 
     expect(headers).toEqual({
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
+      "Access-Control-Allow-Headers": "Content-Type",
       Vary: "Origin",
     });
     expect(headers["Access-Control-Allow-Origin"]).toBeUndefined();
@@ -62,8 +60,7 @@ describe("getCorsHeaders", () => {
 
     expect(headers).toEqual({
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
+      "Access-Control-Allow-Headers": "Content-Type",
       Vary: "Origin",
       "Access-Control-Allow-Origin": "https://example.com",
       "Access-Control-Allow-Credentials": "true",
