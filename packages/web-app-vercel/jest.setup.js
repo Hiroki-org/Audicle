@@ -4,8 +4,6 @@ import { TextEncoder, TextDecoder } from "util";
 
 // React 18: act() を正しく扱うためのフラグ
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-// eslint-disable-next-line no-undef
-global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Next.js のグローバル変数をモック
 global.Request = class Request {
