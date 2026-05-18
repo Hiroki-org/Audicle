@@ -27,8 +27,14 @@ describe("PlaylistCompletionScreen", () => {
 
     expect(screen.getByText("プレイリストの再生が完了しました")).toBeInTheDocument();
     expect(screen.getByText("お気に入り記事")).toBeInTheDocument();
-    expect(screen.getByText(/5記事/)).toBeInTheDocument();
-    expect(screen.getByText(/を聴き終えました/)).toBeInTheDocument();
+    expect(
+      screen.getByText((_, element) => {
+        if (!element || element.tagName.toLowerCase() !== "p") {
+          return false;
+        }
+        return element.textContent === "「お気に入り記事」(5記事)を聴き終えました";
+      })
+    ).toBeInTheDocument();
   });
 
   it("calls onReplay when 'もう一度聴く' button is clicked", () => {
