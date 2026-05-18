@@ -312,6 +312,12 @@ describe('supabaseLocal', () => {
             expect(playlist?.items[1].article?.title).toBe('Apple'); // pos 2
         });
 
+        it('sorts by position desc when requested', async () => {
+            const playlist = await getPlaylistWithItems('user@example.com', pId, { field: 'position', order: 'desc' });
+            expect(playlist?.items[0].article?.title).toBe('Apple'); // pos 2
+            expect(playlist?.items[1].article?.title).toBe('Zebra'); // pos 1
+        });
+
         it('sorts by title asc/desc', async () => {
             const asc = await getPlaylistWithItems('user@example.com', pId, { field: 'title', order: 'asc' });
             expect(asc?.items[0].article?.title).toBe('Apple');

@@ -210,7 +210,11 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
         });
     } else {
         // position
-        sorted = [...items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+        sorted = [...items].sort((a, b) =>
+            sortOrder === 'desc'
+                ? (b.position ?? 0) - (a.position ?? 0)
+                : (a.position ?? 0) - (b.position ?? 0)
+        );
     }
 
     return {

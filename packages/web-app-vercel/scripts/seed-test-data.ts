@@ -410,23 +410,23 @@ async function seedTestData() {
     // 5. デフォルトプレイリストの作成
     console.log("5. デフォルトプレイリストを作成中...");
 
-    // delete all playlists and their items for this user to start fresh
-    const { data: existingPlaylists, error: existingPlaylistsError } = await supabase
+    const { data: existingDefaultPlaylists, error: existingDefaultPlaylistsError } = await supabase
         .from("playlists")
         .select("id")
-        .eq("owner_email", TEST_USER_EMAIL);
+        .eq("owner_email", TEST_USER_EMAIL)
+        .eq("is_default", true);
 
-    if (existingPlaylistsError) {
-        console.error("既存プレイリストの取得に失敗:", existingPlaylistsError);
+    if (existingDefaultPlaylistsError) {
+        console.error("既存プレイリストの取得に失敗:", existingDefaultPlaylistsError);
         process.exit(1);
     }
 
-    const existingPlaylistIds = existingPlaylists?.map((playlist) => playlist.id) ?? [];
-    if (existingPlaylistIds.length > 0) {
+    const existingDefaultPlaylistIds = existingDefaultPlaylists?.map((playlist) => playlist.id) ?? [];
+    if (existingDefaultPlaylistIds.length > 0) {
         const { error: itemsDeleteError } = await supabase
             .from("playlist_items")
             .delete()
-            .in("playlist_id", existingPlaylistIds);
+            .in("playlist_id", existingDefaultPlaylistIds);
         if (itemsDeleteError) {
             console.error("プレイリストアイテムの削除に失敗:", itemsDeleteError);
             process.exit(1);
@@ -436,7 +436,8 @@ async function seedTestData() {
     const { error: playlistsDeleteError } = await supabase
         .from("playlists")
         .delete()
-        .eq("owner_email", TEST_USER_EMAIL);
+        .eq("owner_email", TEST_USER_EMAIL)
+        .eq("is_default", true);
     if (playlistsDeleteError) {
         console.error("既存プレイリストの削除に失敗:", playlistsDeleteError);
         process.exit(1);
