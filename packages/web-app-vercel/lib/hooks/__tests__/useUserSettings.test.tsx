@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useUserSettings, useUpdateUserSettingsMutation } from "../useUserSettings";
 import React from "react";
 import { useSession } from "next-auth/react";
+import type { UserSettings } from "@/types/settings";
 
 const originalFetch = global.fetch;
 
@@ -14,9 +15,16 @@ jest.mock("next-auth/react", () => ({
 describe("useUserSettings hook", () => {
   let queryClient: QueryClient;
   let fetchMock: jest.SpiedFunction<typeof fetch>;
+  let wrapper: React.FC<{ children: React.ReactNode }>;
   const mockSession = {
     data: { user: { email: "test@example.com" } },
     status: "authenticated",
+  };
+  const mockSettings: UserSettings = {
+    playback_speed: 1.5,
+    voice_model: "ja-JP-Standard-B",
+    language: "ja-JP",
+    color_theme: "purple",
   };
 
   beforeEach(() => {
@@ -37,6 +45,9 @@ describe("useUserSettings hook", () => {
         mutations: { retry: false },
       },
     });
+    wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
     (useSession as jest.Mock).mockReturnValue(mockSession);
   });
 
@@ -47,14 +58,8 @@ describe("useUserSettings hook", () => {
     }
   });
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-
   describe("useUserSettings", () => {
     it("should fetch user settings successfully", async () => {
-      const mockSettings = { theme: "dark", playbackSpeed: 1.5 };
-
       fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => mockSettings,
@@ -121,7 +126,6 @@ describe("useUserSettings hook", () => {
 
   describe("useUpdateUserSettingsMutation", () => {
     it("should update user settings successfully and invalidate queries", async () => {
-      const mockSettings = { theme: "light", playbackSpeed: 1.0 };
       const mockResponse = { success: true };
 
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
@@ -133,9 +137,14 @@ describe("useUserSettings hook", () => {
 
       const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
 
-      result.current.mutate(mockSettings as any);
+      result.current.mutate(mockSettings);
 
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+        expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+          queryKey: ["user-settings", "test@example.com"],
+        });
+      });
 
       expect(fetchMock).toHaveBeenCalledWith("/api/settings/update", {
         method: "PUT",
@@ -143,15 +152,10 @@ describe("useUserSettings hook", () => {
         body: JSON.stringify(mockSettings),
       });
 
-      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-        queryKey: ["user-settings", "test@example.com"],
-      });
       expect(result.current.data).toEqual(mockResponse);
     });
 
     it("should handle mutation API error with specific message", async () => {
-      const mockSettings = { theme: "light", playbackSpeed: 1.0 };
-
       fetchMock.mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: "Mutation specific error" }),
@@ -159,7 +163,7 @@ describe("useUserSettings hook", () => {
 
       const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
 
-      result.current.mutate(mockSettings as any);
+      result.current.mutate(mockSettings);
 
       await waitFor(() => expect(result.current.isError).toBe(true));
 
@@ -167,8 +171,6 @@ describe("useUserSettings hook", () => {
     });
 
     it("should handle mutation API error with default message", async () => {
-      const mockSettings = { theme: "light", playbackSpeed: 1.0 };
-
       fetchMock.mockResolvedValueOnce({
         ok: false,
         json: async () => ({}),
@@ -176,11 +178,36 @@ describe("useUserSettings hook", () => {
 
       const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
 
-      result.current.mutate(mockSettings as any);
+      result.current.mutate(mockSettings);
 
       await waitFor(() => expect(result.current.isError).toBe(true));
 
       expect(result.current.error?.message).toBe("設定の保存に失敗しました");
+    });
+
+    it("should invalidate user settings query with undefined email when session is missing", async () => {
+      (useSession as jest.Mock).mockReturnValue({
+        data: null,
+        status: "unauthenticated",
+      });
+      const mockResponse = { success: true };
+      const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
+
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
+
+      result.current.mutate(mockSettings);
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+        expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+          queryKey: ["user-settings", undefined],
+        });
+      });
     });
   });
 });
