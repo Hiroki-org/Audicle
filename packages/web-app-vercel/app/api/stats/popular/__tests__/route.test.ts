@@ -153,8 +153,10 @@ describe('GET /api/stats/popular', () => {
 
         expect(mockLimit).toHaveBeenCalledWith(50);
 
-        // Verify today calculation (2023-10-15 00:00:00)
-        expect(mockGte).toHaveBeenCalledWith('last_accessed_at', '2023-10-15T00:00:00.000Z');
+        // Verify today calculation
+        const expectedToday = new Date('2023-10-15T12:00:00Z');
+        expectedToday.setHours(0, 0, 0, 0);
+        expect(mockGte).toHaveBeenCalledWith('last_accessed_at', expectedToday.toISOString());
         expect(mockEq).toHaveBeenCalledWith('domain', 'test.com');
     });
 

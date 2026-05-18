@@ -107,7 +107,17 @@ AUTH_SECRET=your-random-secret
 # アクセス制御
 ALLOWED_USERS=user1@example.com,user2@example.com
 ALLOWED_EMAILS=user1@example.com,user2@example.com
+
+# Chrome拡張機能連携
+# required: allows requests from extension origins
+ALLOWED_ORIGINS=https://your-domain.vercel.app,chrome-extension://<extension-id>
+# required: redirect origin for chrome.identity.launchWebAuthFlow
+ALLOWED_EXTENSION_REDIRECT_ORIGINS=https://<extension-id>.chromiumapp.org
+# optional: secret for extension token, falls back to AUTH_SECRET
+EXTENSION_AUTH_SECRET=your-extension-token-secret
 ```
+
+> **Note**: `<extension-id>` はChromeの「拡張機能を管理」ページ (Developer modeをON) にある「ID」から取得できます。
 
 ### 環境変数の取得方法
 
