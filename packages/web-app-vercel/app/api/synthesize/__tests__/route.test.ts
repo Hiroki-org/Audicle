@@ -16,6 +16,10 @@ jest.mock('@/lib/storage', () => ({
     getStorageProvider: jest.fn()
 }));
 
+jest.mock('@/lib/extension-auth', () => ({
+    verifyExtensionToken: jest.fn()
+}));
+
 jest.mock('@/lib/db/cacheIndex', () => ({
     getCacheIndex: jest.fn(),
     addCachedChunk: jest.fn(),
@@ -45,6 +49,7 @@ jest.mock('@google-cloud/text-to-speech', () => {
 import { auth } from '@/lib/auth';
 import { getKv } from '@/lib/kv';
 import { getStorageProvider } from '@/lib/storage';
+import { verifyExtensionToken } from '@/lib/extension-auth';
 
 // Import the handler after mocks
 import * as routeModule from '../route';
@@ -96,6 +101,58 @@ describe('/api/synthesize route', () => {
         expect(Array.isArray(body.audioUrls)).toBe(true);
         expect(body.audioUrls.length).toBe(1);
         expect(body.audioUrls[0]).toBe('https://storage.example/audio.mp3');
+    });
+
+    it('accepts extension bearer token when session is not available', async () => {
+        (auth as jest.Mock).mockResolvedValue(null);
+        (verifyExtensionToken as jest.Mock).mockReturnValue({
+            sub: 'extension-user-id',
+            email: 'user@example.com',
+        });
+
+        (getStorageProvider as jest.Mock).mockReturnValue({
+            headObject: jest.fn().mockResolvedValue({ exists: false }),
+            uploadObject: jest.fn().mockResolvedValue('https://storage.example/audio.mp3'),
+            generatePresignedGetUrl: jest.fn().mockResolvedValue('https://storage.example/audio.mp3')
+        });
+
+        (getKv as jest.Mock).mockResolvedValue(null);
+
+        const req: any = {
+            headers: {
+                get: (name: string) => (name.toLowerCase() === 'authorization' ? 'Bearer extension-token' : null)
+            },
+            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' })
+        };
+
+        const res = await routeModule.POST(req as any);
+        expect(res.status).toBe(200);
+        expect(verifyExtensionToken).toHaveBeenCalledWith('extension-token');
+    });
+
+    it('rejects invalid extension bearer token', async () => {
+        (auth as jest.Mock).mockResolvedValue(null);
+        (verifyExtensionToken as jest.Mock).mockImplementation(() => {
+            throw new Error('Invalid token');
+        });
+
+        (getStorageProvider as jest.Mock).mockReturnValue({
+            headObject: jest.fn(),
+            uploadObject: jest.fn(),
+            generatePresignedGetUrl: jest.fn()
+        });
+
+        const req: any = {
+            headers: {
+                get: (name: string) => (name.toLowerCase() === 'authorization' ? 'Bearer bad-token' : null)
+            },
+            json: async () => ({ chunks: [{ text: 'hello world' }], voice: 'ja-JP' })
+        };
+
+        const res = await routeModule.POST(req as any);
+        expect(res.status).toBe(401);
+        expect(verifyExtensionToken).toHaveBeenCalledWith('bad-token');
+        expect(getStorageProvider().uploadObject).not.toHaveBeenCalled();
     });
 
     it('supports base64-encoded GOOGLE_APPLICATION_CREDENTIALS_JSON', async () => {

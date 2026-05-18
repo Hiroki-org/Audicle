@@ -12,6 +12,7 @@ import { calculateTextHash } from '@/lib/textHash';
 import { getStorageProvider } from '@/lib/storage';
 import { GoogleError } from 'google-gax';
 import { removeSeparatorCharacters } from '@/lib/textCleaner';
+import { verifyExtensionToken } from '@/lib/extension-auth';
 
 // Node.js runtimeを明示的に指定（Google Cloud TTS SDKはEdge Runtimeで動作しない）
 export const runtime = 'nodejs';
@@ -327,16 +328,35 @@ export async function POST(request: NextRequest) {
 
     try {
         log('info', 'リクエスト受信');
-        // 認証チェック
+        // 認証チェック（Webセッション or 拡張機能Bearerトークン）
         const session = await auth();
-        if (!session?.user?.email) {
+        let authenticatedEmail = session?.user?.email ?? null;
+
+        if (!authenticatedEmail) {
+            const authorization = request.headers?.get?.('authorization');
+            const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+
+            if (token) {
+                try {
+                    const extensionUser = verifyExtensionToken(token);
+                    authenticatedEmail = extensionUser.email;
+                } catch (tokenError) {
+                    log('warn', '拡張機能トークンの検証に失敗しました', {
+                        error: tokenError instanceof Error ? tokenError.message : tokenError
+                    });
+                }
+            }
+        }
+
+        if (!authenticatedEmail) {
             log('warn', '認証されていないリクエスト');
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
         }
 
+        const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) ?? [];
         // 許可リストチェック
-        if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(session.user.email)) {
-            log('warn', 'アクセスが拒否されました', { email: session.user.email });
+        if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(authenticatedEmail.toLowerCase())) {
+            log('warn', 'アクセスが拒否されました', { email: authenticatedEmail });
             return NextResponse.json({ error: 'Access denied' }, { status: 403, headers: corsHeaders });
         }
 
