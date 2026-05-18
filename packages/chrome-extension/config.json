@@ -1,5 +1,5 @@
 {
-  "synthesizerType": "api_server",
+  "synthesizerType": "vercel_app",
   "playbackRate": 1.5,
   "prefetchAhead": 2,
   "maxRetries": 2,
@@ -9,7 +9,9 @@
   "jumpBatchSize": 3,
   "initialBatchSize": 5,
   "debug": false,
+  "voiceModel": "ja-JP-Standard-B",
   "serverUrls": {
+    "vercel_app": "https://audicle-phi.vercel.app",
     "edge_tts": "http://localhost:8001",
     "edge_tts_docker": "http://localhost:8001",
     "google_cloud_tts": "http://localhost:8002",
