@@ -25,10 +25,25 @@ describe('supabaseLocal', () => {
 
     beforeEach(() => {
         resetInMemorySupabase();
+        jest.setSystemTime(fixedTime);
     });
 
     afterEach(() => {
         resetInMemorySupabase();
+        jest.setSystemTime(fixedTime);
+    });
+
+    describe('resetInMemorySupabase', () => {
+        it('clears playlists, articles, and playlist items', async () => {
+            const playlist = await createPlaylist('user@example.com', 'My Playlist');
+            const article = await upsertArticle('user@example.com', 'https://test.com', 'Test Title');
+            await addPlaylistItem(playlist.id, article.id);
+
+            resetInMemorySupabase();
+
+            expect(await getPlaylistsForOwner('user@example.com')).toHaveLength(0);
+            expect(await getPlaylistWithItems('user@example.com', playlist.id)).toBeNull();
+        });
     });
 
     describe('createPlaylist', () => {
@@ -92,8 +107,6 @@ describe('supabaseLocal', () => {
             // Check if it persists
             const fetched = await getPlaylistsForOwner('user@example.com');
             expect(fetched[0].name).toBe('New Name');
-
-            jest.setSystemTime(fixedTime); // reset
         });
 
         it('returns null if playlist not found', async () => {
@@ -180,11 +193,7 @@ describe('supabaseLocal', () => {
             expect(article.title).toBe('New Title');
             expect(article.thumbnail_url).toBe('new.jpg');
             expect(article.updated_at).toBe('2024-01-02T12:00:00.000Z');
-
-            // check that last_read_position is NOT updated by upsert (per implementation)
-            expect(article.last_read_position).toBe(0);
-
-            jest.setSystemTime(fixedTime); // reset
+            expect(article.last_read_position).toBe(20);
         });
 
         it('handles null owner and optional parameters', async () => {
@@ -192,6 +201,15 @@ describe('supabaseLocal', () => {
             expect(article.owner_email).toBe('');
             expect(article.thumbnail_url).toBeUndefined();
             expect(article.last_read_position).toBe(0);
+        });
+
+        it('updates an existing null-owner article instead of duplicating it', async () => {
+            const initial = await upsertArticle(null, 'url', 'Old Title');
+            const updated = await upsertArticle(null, 'url', 'New Title', undefined, 30);
+
+            expect(updated.id).toBe(initial.id);
+            expect(updated.title).toBe('New Title');
+            expect(updated.last_read_position).toBe(30);
         });
     });
 
@@ -217,6 +235,24 @@ describe('supabaseLocal', () => {
 
             expect(item1.id).toBe(item2.id);
             expect(item2.position).toBe(1);
+        });
+    });
+
+    describe('null owner operations', () => {
+        it('reads and deletes playlists stored for a null owner', async () => {
+            const playlist = await createPlaylist(null, 'Anonymous Playlist');
+            const article = await upsertArticle(null, 'anonymous-url', 'Anonymous Article');
+            await addPlaylistItem(playlist.id, article.id);
+
+            const playlists = await getPlaylistsForOwner(null);
+            expect(playlists).toHaveLength(1);
+            expect(playlists[0].items[0].article?.id).toBe(article.id);
+
+            const playlistWithItems = await getPlaylistWithItems(null, playlist.id);
+            expect(playlistWithItems?.id).toBe(playlist.id);
+
+            expect(await deletePlaylistById(null, playlist.id)).toBe(true);
+            expect(await getPlaylistsForOwner(null)).toHaveLength(0);
         });
     });
 
@@ -257,7 +293,8 @@ describe('supabaseLocal', () => {
             await addPlaylistItem(pId, a1.id); // Added later
 
             jest.setSystemTime(new Date('2024-01-01T12:00:00Z'));
-            await addPlaylistItem(pId, a2.id); // Added earlier (pos 2 because added second, though added_at is older? Wait, our tests use fake timers, let's manually control position)
+            // Position is assigned from insertion order even when fake timers control added_at.
+            await addPlaylistItem(pId, a2.id);
         });
 
         afterEach(() => {
