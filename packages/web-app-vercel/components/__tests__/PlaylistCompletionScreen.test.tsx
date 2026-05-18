@@ -23,18 +23,13 @@ describe("PlaylistCompletionScreen", () => {
   });
 
   it("renders completion message and playlist information correctly", () => {
-    render(<PlaylistCompletionScreen {...defaultProps} />);
+    const { container } = render(<PlaylistCompletionScreen {...defaultProps} />);
 
     expect(screen.getByText("プレイリストの再生が完了しました")).toBeInTheDocument();
-    expect(screen.getByText("お気に入り記事")).toBeInTheDocument();
-    expect(
-      screen.getByText((_, element) => {
-        if (!element || element.tagName.toLowerCase() !== "p") {
-          return false;
-        }
-        return element.textContent === "「お気に入り記事」(5記事)を聴き終えました";
-      })
-    ).toBeInTheDocument();
+
+    // Find the paragraph element containing the summary text and verify its exact text content
+    const summaryParagraph = container.querySelector('p.text-zinc-400');
+    expect(summaryParagraph).toHaveTextContent("「お気に入り記事」(5記事)を聴き終えました");
   });
 
   it("calls onReplay when 'もう一度聴く' button is clicked", () => {
