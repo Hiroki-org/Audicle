@@ -33,6 +33,10 @@ export function useUpdateUserSettingsMutation() {
 
     return useMutation({
         mutationFn: async (settings: UserSettings) => {
+            if (!userEmail) {
+                throw new Error("ログインが必要です");
+            }
+
             const response = await fetch("/api/settings/update", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
