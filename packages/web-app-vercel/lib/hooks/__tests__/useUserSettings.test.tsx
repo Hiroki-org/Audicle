@@ -207,54 +207,40 @@ describe("useUserSettings hook", () => {
       expect(result.current.error?.message).toBe("Network request failed");
     });
 
-    it("should invalidate user settings query with undefined email when session is missing", async () => {
+    it("should reject without network request when session is missing", async () => {
       (useSession as jest.Mock).mockReturnValue({
         data: null,
         status: "unauthenticated",
       });
-      const mockResponse = { success: true };
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
-
-      fetchMock.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
 
       const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
 
       result.current.mutate(mockSettings);
 
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
-        expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-          queryKey: ["user-settings", undefined],
-        });
-      });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error?.message).toBe("ログインが必要です");
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(invalidateQueriesSpy).not.toHaveBeenCalled();
     });
 
-    it("should invalidate user settings query with undefined email when user has no email", async () => {
+    it("should reject without network request when user has no email", async () => {
       (useSession as jest.Mock).mockReturnValue({
         data: { user: {} },
         status: "authenticated",
       });
-      const mockResponse = { success: true };
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
-
-      fetchMock.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
 
       const { result } = renderHook(() => useUpdateUserSettingsMutation(), { wrapper });
 
       result.current.mutate(mockSettings);
 
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
-        expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-          queryKey: ["user-settings", undefined],
-        });
-      });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error?.message).toBe("ログインが必要です");
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(invalidateQueriesSpy).not.toHaveBeenCalled();
     });
   });
 });
