@@ -18,7 +18,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || buildTimeSupabaseUrl
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || buildTimeSupabaseAnonKey
 
 if (!hasSupabaseConfig) {
-    console.warn('Missing Supabase environment variables, using build/test placeholder values.')
+    console.warn('Missing Supabase environment variables, using build/test/local development placeholder values.')
 }
 
 if (process.env.NODE_ENV === 'test' && supabaseUrl === buildTimeSupabaseUrl) {
