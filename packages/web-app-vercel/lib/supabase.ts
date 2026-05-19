@@ -1,28 +1,23 @@
 import { createClient } from '@supabase/supabase-js'
 
-const isProductionBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
-const isProductionRuntime = process.env.NODE_ENV === 'production' && !isProductionBuildPhase
-const hasSupabaseConfig = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-)
+const isProductionRuntime = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build';
+const hasSupabaseConfig = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (isProductionRuntime && !hasSupabaseConfig) {
-    throw new Error('Missing required Supabase environment variables in production')
+if (isProductionRuntime) {
+    if (!hasSupabaseConfig) {
+        throw new Error('Missing required Supabase environment variables in production');
+    }
 }
 
-// These placeholders are only reachable during build/test paths; production runtime fails fast above.
-const buildTimeSupabaseUrl = 'https://example.supabase.co'
-const buildTimeSupabaseAnonKey = 'build-time-placeholder-anon-key'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || buildTimeSupabaseUrl
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || buildTimeSupabaseAnonKey
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-key'
 
 if (!hasSupabaseConfig) {
-    console.warn('Missing Supabase environment variables, using build/test placeholder values.')
+    console.warn('Missing Supabase environment variables, using dummy values. This should only happen during build or test.')
 }
 
-if (process.env.NODE_ENV === 'test' && supabaseUrl === buildTimeSupabaseUrl) {
-    console.warn('WARNING: Using placeholder Supabase URL in test environment. API calls will fail.')
+if (process.env.NODE_ENV === 'test' && supabaseUrl.includes('example.supabase.co')) {
+    console.warn('⚠️  WARNING: Using dummy Supabase URL in test environment. API calls will fail.');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
