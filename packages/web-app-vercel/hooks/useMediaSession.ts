@@ -302,6 +302,5 @@ export function useMediaSession({
   return {
     updateMetadata,
     updatePlaybackState,
-    updatePositionState,
   };
 }

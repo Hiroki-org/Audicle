@@ -6,7 +6,6 @@ interface PlaylistItemRowProps {
   playlist: PlaylistWithItems;
   isSelected: boolean;
   isSaving: boolean;
-  // eslint-disable-next-line no-unused-vars
   onToggle: (playlistId: string) => void;
 }
 
