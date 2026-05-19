@@ -98,6 +98,42 @@ _tts_semaphore = None
 SENTENCE_SPLIT_REGEX = re.compile(r'([。！？\n])')
 COMMA_SPLIT_REGEX = re.compile(r'(、)')
 
+
+def _force_split(text: str, limit: int) -> List[str]:
+    """Force splits text into chunks up to `limit` bytes, respecting multibyte characters."""
+    chunks = []
+    start = 0
+    while start < len(text):
+        low = start + 1
+        high = min(len(text), start + limit)
+        end = low
+        while low <= high:
+            mid = (low + high) // 2
+            if len(text[start:mid].encode('utf-8')) <= limit:
+                end = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+        chunks.append(text[start:end])
+        start = end
+    return chunks
+
+
+def _split_and_merge(text: str, pattern: Pattern) -> List[str]:
+    """Splits text by pattern and merges delimiters into preceding strings."""
+    parts = [s for s in pattern.split(text) if s]
+    merged = []
+    i = 0
+    while i < len(parts):
+        current = parts[i]
+        while i + 1 < len(parts) and pattern.fullmatch(parts[i + 1]):
+            current += parts[i + 1]
+            i += 1
+        merged.append(current)
+        i += 1
+    return merged
+
+
 def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     """
     Recursively splits text into chunks smaller than `limit` bytes using `separators`.
@@ -108,61 +144,17 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
         separators: A list of regex patterns to split by, in order of priority.
                     Patterns should capture the delimiter (e.g., r'([。])') so it can be preserved.
     """
-    # Check if text fits in limit
     if len(text.encode('utf-8')) <= limit:
         return [text]
 
-    # If no separators left, force split by byte limit
     if not separators:
-        chunks = []
-        start = 0
-        while start < len(text):
-            end = start + limit
-            # Adjust end to avoid splitting multi-byte characters
-            # and ensure chunk size <= limit
-            while len(text[start:end].encode('utf-8')) > limit:
-                end -= 1
+        return _force_split(text, limit)
 
-            # Safety check to prevent infinite loop if a single char > limit (unlikely for UTF-8 and decent limit)
-            if end <= start:
-                end = start + 1
-
-            chunks.append(text[start:end])
-            start = end
-        return chunks
-
-    # Use first separator
     sep_pattern = separators[0]
     next_separators = separators[1:]
 
-    # Split text. Regex should capture delimiters so they are included in the list.
-    # e.g., re.split(r'([。])', "A。B") -> ["A", "。", "B"]
-    # Use compiled pattern split
-    parts = [s for s in sep_pattern.split(text) if s]
+    parts = _split_and_merge(text, sep_pattern)
 
-    # Merge punctuation/delimiters back to the previous sentence
-    merged_parts = []
-    i = 0
-    while i < len(parts):
-        current = parts[i]
-
-        # Check if next part matches the separator pattern (is a delimiter)
-        if i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
-             current += parts[i+1]
-             i += 1
-
-             # Handle consecutive delimiters (e.g., "Hello!!!")
-             # Keep appending as long as they match the pattern
-             while i + 1 < len(parts) and sep_pattern.fullmatch(parts[i+1]):
-                 current += parts[i+1]
-                 i += 1
-
-        merged_parts.append(current)
-        i += 1
-
-    parts = merged_parts
-
-    # Accumulate parts into chunks
     chunks = []
     current_chunk = ""
     current_chunk_len = 0
@@ -181,7 +173,6 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     if current_chunk:
         chunks.append((current_chunk, current_chunk_len))
 
-    # Recursively process any chunks that are still too big
     final_chunks = []
     for chunk_text, chunk_len in chunks:
         if chunk_len > limit:
@@ -190,7 +181,6 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
             final_chunks.append(chunk_text)
 
     return final_chunks
-
 
 def _split_text(text: str) -> List[str]:
     """テキストをGoogle Cloud TTS APIの制限内に分割する"""
