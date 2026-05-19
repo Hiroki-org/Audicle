@@ -7,26 +7,19 @@ export class CorsError extends Error {
     }
 }
 
-let cachedAllowedOriginsEnv: string | undefined;
-let cachedAllowedOrigins = new Set<string>();
-
-function getAllowedOrigins(): Set<string> {
-    const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '';
-    if (allowedOriginsEnv !== cachedAllowedOriginsEnv) {
-        cachedAllowedOriginsEnv = allowedOriginsEnv;
-        cachedAllowedOrigins = new Set(
-            allowedOriginsEnv
-                .split(',')
-                .map((origin) => origin.trim())
-                .filter(Boolean),
-        );
-    }
-    return cachedAllowedOrigins;
-}
 
 export function getCorsHeaders(request: NextRequest): Record<string, string> {
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
+
+    // The check is moved inside the function to avoid throwing an error during Next.js static build phase
+    if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+        console.error('ALLOWED_ORIGINS must be configured in production. Set it to a comma-separated list of allowed origins.');
+    }
+
     const origin = request?.headers?.get?.('origin') ?? null;
-    const allowedOrigins = getAllowedOrigins();
 
     const headers: Record<string, string> = {
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -35,19 +28,12 @@ export function getCorsHeaders(request: NextRequest): Record<string, string> {
     };
 
     if (origin) {
-        if (allowedOrigins.size === 0) {
-            if (process.env.NODE_ENV === 'production') {
-                console.error('ALLOWED_ORIGINS must be configured in production. Set it to a comma-separated list of allowed origins.');
-            }
-            throw new CorsError('Allowed origins are not configured');
-        }
-
-        if (!allowedOrigins.has(origin)) {
+        if (allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
             throw new CorsError('Origin not allowed');
+        } else if (allowedOrigins.includes(origin)) {
+            headers['Access-Control-Allow-Origin'] = origin;
+            headers['Access-Control-Allow-Credentials'] = 'true';
         }
-
-        headers['Access-Control-Allow-Origin'] = origin;
-        headers['Access-Control-Allow-Credentials'] = 'true';
     }
 
     return headers;

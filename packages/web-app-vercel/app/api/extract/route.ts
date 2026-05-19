@@ -12,27 +12,27 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function OPTIONS(request: NextRequest) {
-  try {
-    const headers = getCorsHeaders(request);
-    return NextResponse.json({}, { headers });
-  } catch (error) {
-    if (error instanceof CorsError) {
-      return new NextResponse(null, { status: 403, statusText: "Forbidden" });
+    try {
+        const headers = getCorsHeaders(request);
+        return NextResponse.json({}, { headers });
+    } catch (error) {
+        if (error instanceof CorsError) {
+            return new NextResponse(null, { status: 403, statusText: "Forbidden" });
+        }
+        throw error;
     }
-    throw error;
-  }
 }
 
 export async function POST(request: NextRequest) {
   let corsHeaders: Record<string, string>;
-  try {
-    corsHeaders = getCorsHeaders(request);
-  } catch (error) {
-    if (error instanceof CorsError) {
-      return NextResponse.json({ error: "Forbidden: Origin not allowed" }, { status: 403 });
+    try {
+        corsHeaders = getCorsHeaders(request);
+    } catch (error) {
+        if (error instanceof CorsError) {
+            return NextResponse.json({ error: "Forbidden: Origin not allowed" }, { status: 403 });
+        }
+        throw error;
     }
-    throw error;
-  }
 
   try {
     const { url } = await request.json();
