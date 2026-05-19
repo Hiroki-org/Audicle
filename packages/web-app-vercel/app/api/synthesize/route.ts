@@ -495,20 +495,13 @@ export async function POST(request: NextRequest) {
                 }
             };
 
-            let headChecked = false;
-            let objectExists = false;
-
-            const checkWithHead = async (): Promise<void> => {
-                if (headChecked) {
-                    return;
-                }
-                headChecked = true;
+            const checkHeadObject = async (): Promise<boolean> => {
                 log('info', `R2キャッシュをチェック中 (headObject): ${cacheKey}`);
                 const result = await storage.headObject(cacheKey).catch((error: unknown) => {
                     log('error', `キー ${cacheKey} のキャッシュチェックに失敗しました`, { error });
                     return null;
                 });
-                objectExists = result?.exists ?? false;
+                return result?.exists ?? false;
             };
 
             // 人気記事の場合：全チャンクがキャッシュ済みと仮定してhead()をスキップ
@@ -524,6 +517,8 @@ export async function POST(request: NextRequest) {
                 log('warn', '人気記事の署名付きURLの取得に失敗しました。通常のフローにフォールバックします。');
             }
 
+            let objectExists = false;
+
             if (cacheIndex) {
                 if (isCachedByIndex) {
                     // Supabaseインデックスにキャッシュ済み → head()スキップ！
@@ -536,7 +531,7 @@ export async function POST(request: NextRequest) {
                     }
 
                     log('warn', '署名付きURLの取得に失敗しました。head()チェックにフォールバックします。');
-                    await checkWithHead();
+                    objectExists = await checkHeadObject();
                     if (objectExists) {
                         const fallbackHit = await recordCachedHit();
                         if (fallbackHit) {
@@ -551,8 +546,7 @@ export async function POST(request: NextRequest) {
 
             // 通常フロー or Supabaseインデックスなし or ミス → head()でチェック
             if (!cacheIndex || !isCachedByIndex) {
-                log('info', `🔍 R2キャッシュをチェック中 (head()): ${cacheKey}`);
-                await checkWithHead();
+                objectExists = await checkHeadObject();
             }
 
             if (objectExists) {
