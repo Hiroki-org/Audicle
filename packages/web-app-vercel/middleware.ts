@@ -5,7 +5,13 @@ import { auth } from "@/lib/auth";
 export async function middleware(request: NextRequest) {
     // APIルート、認証ルートはスキップ
     const pathname = request.nextUrl.pathname;
-    if (pathname.startsWith('/api') || pathname.startsWith('/auth')) {
+    const isPublicRoute =
+        pathname === '/api' ||
+        pathname.startsWith('/api/') ||
+        pathname === '/auth' ||
+        pathname.startsWith('/auth/');
+
+    if (isPublicRoute) {
         return NextResponse.next();
     }
 
