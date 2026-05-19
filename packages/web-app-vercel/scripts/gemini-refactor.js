@@ -115,7 +115,6 @@ async function generateRefactoringSuggestions(files, maxFiles) {
   const topFiles = files.slice(0, Math.min(maxFiles, files.length));
 
   if (topFiles.length === 0) {
-    console.log("No files to analyze. Exiting.");
     process.exit(0);
   }
 
