@@ -1,8 +1,7 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DesktopPlayerControls, DesktopPlayerControlsProps } from "../DesktopPlayerControls";
-import { zIndex } from "@/lib/zIndex";
 
 // Mock the zIndex to avoid issues with undefined references during test execution
 jest.mock("@/lib/zIndex", () => ({
@@ -70,6 +69,13 @@ describe("DesktopPlayerControls", () => {
       render(<DesktopPlayerControls {...defaultProps} isPlaybackLoading={true} />);
       expect(screen.getByTestId("playback-loading")).toBeInTheDocument();
       expect(screen.getByTestId("playback-loading")).toBeDisabled();
+    });
+
+    it("should render only the loading control while playback is loading and playing", () => {
+      render(<DesktopPlayerControls {...defaultProps} isPlaybackLoading={true} isPlaying={true} />);
+      expect(screen.getByTestId("playback-loading")).toBeInTheDocument();
+      expect(screen.queryByTestId("pause-button")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("play-button")).not.toBeInTheDocument();
     });
 
     it("should not render playlist controls if not in playlist mode", () => {
