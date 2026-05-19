@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCorsHeaders } from "../cors";
+import { getCorsHeaders, CorsError } from "../cors";
 
 describe("getCorsHeaders", () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -38,18 +38,12 @@ describe("getCorsHeaders", () => {
     expect(headers["Access-Control-Allow-Origin"]).toBeUndefined();
   });
 
-  it("should return default headers when origin is not in ALLOWED_ORIGINS", () => {
+  it("should throw CorsError when origin is not in ALLOWED_ORIGINS", () => {
     process.env.ALLOWED_ORIGINS = "http://localhost:3000";
     const request = createMockRequest("http://malicious-site.com");
 
-    const headers = getCorsHeaders(request);
-
-    expect(headers).toEqual({
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      Vary: "Origin",
-    });
-    expect(headers["Access-Control-Allow-Origin"]).toBeUndefined();
+    expect(() => getCorsHeaders(request)).toThrow(CorsError);
+    expect(() => getCorsHeaders(request)).toThrow("Origin not allowed");
   });
 
   it("should return CORS headers when origin is allowed", () => {
