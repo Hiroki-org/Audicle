@@ -1,13 +1,5 @@
 import { NextRequest } from 'next/server';
 
-export class CorsError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'CorsError';
-    }
-}
-
-
 export function getCorsHeaders(request: NextRequest): Record<string, string> {
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
         .split(',')
@@ -27,13 +19,9 @@ export function getCorsHeaders(request: NextRequest): Record<string, string> {
         Vary: 'Origin',
     };
 
-    if (origin) {
-        if (allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
-            throw new CorsError('Origin not allowed');
-        } else if (allowedOrigins.includes(origin)) {
-            headers['Access-Control-Allow-Origin'] = origin;
-            headers['Access-Control-Allow-Credentials'] = 'true';
-        }
+    if (origin && allowedOrigins.includes(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin;
+        headers['Access-Control-Allow-Credentials'] = 'true';
     }
 
     return headers;
