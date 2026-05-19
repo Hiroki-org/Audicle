@@ -15,12 +15,15 @@ import {
   type AudioPlaybackSource,
 } from "@/contexts/AudioPlaybackContext";
 import { Chunk } from "@/types/api";
-import { Playlist } from "@/types/playlist";
 import { extractContent, parseApiErrorMessage } from "@/lib/api";
 import { articleStorage } from "@/lib/articleStorage";
 import { logger } from "@/lib/logger";
 import { useDownload } from "@/hooks/useDownload";
 import { usePlaylists } from "@/lib/hooks/usePlaylists";
+import {
+  hasPlaylistLoadSettled,
+  resolveSelectedPlaylistId,
+} from "@/lib/readerPlaylistReadiness";
 import { PlaybackSpeedDial } from "@/components/PlaybackSpeedDial";
 import { recordArticleStats } from "@/lib/articleStats";
 import { parseHTMLToParagraphs } from "@/lib/paragraphParser";
@@ -57,7 +60,7 @@ export default function ReaderPageClient() {
   const indexFromQuery = searchParams.get("index");
   const autoplayFromQuery = searchParams.get("autoplay") === "true";
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const userEmail = session?.user?.email;
 
   // プレイリスト再生コンテキスト
@@ -87,8 +90,23 @@ export default function ReaderPageClient() {
   const [itemId, setItemId] = useState<string | null>(null);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
-  const { data: playlistsData = [], isSuccess: arePlaylistsLoaded } = usePlaylists();
-  const playlists = playlistsData;
+  const {
+    data: playlists = [],
+    isError: arePlaylistsError,
+    isFetched: arePlaylistsFetched,
+    isSuccess: arePlaylistsSuccess,
+  } = usePlaylists();
+  const arePlaylistsLoaded = hasPlaylistLoadSettled({
+    isError: arePlaylistsError,
+    isFetched: arePlaylistsFetched,
+    isSuccess: arePlaylistsSuccess,
+    sessionStatus,
+    userEmail,
+  });
+  const effectiveSelectedPlaylistId = resolveSelectedPlaylistId(
+    selectedPlaylistId,
+    playlists,
+  );
 
   // NOTE: Playlist selection should be deterministic via query params or default playlist.
   const [hasLoadedFromQuery, setHasLoadedFromQuery] = useState(false);
@@ -312,10 +330,10 @@ export default function ReaderPageClient() {
         // プレイリストに記事を追加
         let newArticleId: string | null = null;
         try {
-          if (!selectedPlaylistId) {
+          if (!effectiveSelectedPlaylistId) {
             throw new Error("追加先のプレイリストが選択されていません。");
           }
-          const targetPlaylistId = selectedPlaylistId;
+          const targetPlaylistId = effectiveSelectedPlaylistId;
 
           // プレイリストに直接追加
           const itemResponse = await fetch(
@@ -369,7 +387,7 @@ export default function ReaderPageClient() {
 
         // デフォルトプレイリストに追加した場合のみキャッシュ無効化
         const modifiedPlaylist = playlists.find(
-          (p) => p.id === selectedPlaylistId,
+          (p) => p.id === effectiveSelectedPlaylistId,
         );
 
         if (userEmail && modifiedPlaylist?.is_default) {
@@ -383,7 +401,8 @@ export default function ReaderPageClient() {
         // プレイリスト周りのクエリがある場合は維持しておく
         const redirectUrl = createReaderUrl({
           articleUrl: articleUrl,
-          playlistId: playlistIdFromQuery || selectedPlaylistId || undefined,
+          playlistId:
+            playlistIdFromQuery || effectiveSelectedPlaylistId || undefined,
           playlistIndex: indexFromQuery
             ? parseInt(indexFromQuery, 10)
             : undefined,
@@ -397,7 +416,16 @@ export default function ReaderPageClient() {
         setIsLoading(false);
       }
     },
-    [router, selectedPlaylistId, queryClient, userEmail, playlists],
+    [
+      router,
+      effectiveSelectedPlaylistId,
+      queryClient,
+      userEmail,
+      playlists,
+      playlistIdFromQuery,
+      indexFromQuery,
+      autoplayFromQuery,
+    ],
   );
 
   // サーバーから記事（IDまたはURLで指定）を取得してステートにセットし、localStorageに保存するヘルパー
@@ -528,13 +556,6 @@ export default function ReaderPageClient() {
       selectVoiceModel(settings.voice_model, detectedLanguage),
     );
   }, [settings.voice_model, detectedLanguage]);
-
-  // デフォルトのプレイリストを選択
-  useEffect(() => {
-    if (playlists.length > 0 && !selectedPlaylistId) {
-      setSelectedPlaylistId(playlists[0].id);
-    }
-  }, [playlists, selectedPlaylistId]);
 
   // 記事IDが指定されている場合は読み込み
   useEffect(() => {
@@ -968,7 +989,7 @@ export default function ReaderPageClient() {
                   追加先:
                 </label>
                 <select
-                  value={selectedPlaylistId}
+                  value={effectiveSelectedPlaylistId}
                   onChange={(e) => setSelectedPlaylistId(e.target.value)}
                   className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
                   disabled={isLoading || playlists.length === 0}
