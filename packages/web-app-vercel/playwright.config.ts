@@ -8,6 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env.local') })
 // .env.test.localを読み込む（テスト専用の環境変数，優先される）
 dotenv.config({ path: path.resolve(__dirname, '.env.test.local') })
 
+
 export default defineConfig({
     testDir: './tests',
     fullyParallel: true,
