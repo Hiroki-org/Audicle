@@ -1,9 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import {
-  DEFAULT_PLAYLIST_BADGE_LABEL,
-  PlaylistItemRow,
-} from "../PlaylistItemRow";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { PlaylistItemRow } from "../PlaylistItemRow";
 import { PlaylistWithItems } from "@/types/playlist";
 
 const mockPlaylist: PlaylistWithItems = {
@@ -37,7 +33,7 @@ describe("PlaylistItemRow", () => {
 
     expect(screen.getByText("Test Playlist")).toBeInTheDocument();
     expect(screen.getByText("Test description")).toBeInTheDocument();
-    expect(screen.queryByText(DEFAULT_PLAYLIST_BADGE_LABEL)).not.toBeInTheDocument();
+    expect(screen.queryByText("デフォルト")).not.toBeInTheDocument();
   });
 
   it("renders without description", () => {
@@ -66,11 +62,10 @@ describe("PlaylistItemRow", () => {
       />
     );
 
-    expect(screen.getByText(DEFAULT_PLAYLIST_BADGE_LABEL)).toBeInTheDocument();
+    expect(screen.getByText("デフォルト")).toBeInTheDocument();
   });
 
-  it("calls onToggle with playlist.id when checkbox is clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onToggle with playlist.id when checkbox is clicked", () => {
     render(
       <PlaylistItemRow
         playlist={mockPlaylist}
@@ -81,14 +76,13 @@ describe("PlaylistItemRow", () => {
     );
 
     const checkbox = screen.getByRole("checkbox");
-    await user.click(checkbox);
+    fireEvent.click(checkbox);
 
     expect(mockOnToggle).toHaveBeenCalledTimes(1);
     expect(mockOnToggle).toHaveBeenCalledWith(mockPlaylist.id);
   });
 
-  it("calls onToggle when label is clicked", async () => {
-    const user = userEvent.setup();
+  it("calls onToggle when label is clicked", () => {
     render(
       <PlaylistItemRow
         playlist={mockPlaylist}
@@ -98,9 +92,8 @@ describe("PlaylistItemRow", () => {
       />
     );
 
-    const labelEl = screen.getByText("Test Playlist").closest("label");
-    expect(labelEl).not.toBeNull();
-    await user.click(labelEl!);
+    const label = screen.getByText("Test Playlist");
+    fireEvent.click(label);
 
     expect(mockOnToggle).toHaveBeenCalledTimes(1);
     expect(mockOnToggle).toHaveBeenCalledWith(mockPlaylist.id);
@@ -131,8 +124,7 @@ describe("PlaylistItemRow", () => {
     expect(checkbox).not.toBeChecked();
   });
 
-  it("disables checkbox and prevents onToggle when isSaving is true", async () => {
-    const user = userEvent.setup();
+  it("disables checkbox and prevents onToggle when isSaving is true", () => {
     render(
       <PlaylistItemRow
         playlist={mockPlaylist}
@@ -145,12 +137,11 @@ describe("PlaylistItemRow", () => {
     const checkbox = screen.getByRole("checkbox");
     expect(checkbox).toBeDisabled();
 
-    await user.click(checkbox);
+    fireEvent.click(checkbox);
     expect(mockOnToggle).not.toHaveBeenCalled();
 
-    const labelEl = screen.getByText("Test Playlist").closest("label");
-    expect(labelEl).not.toBeNull();
-    await user.click(labelEl!);
+    const label = screen.getByText("Test Playlist");
+    fireEvent.click(label);
     expect(mockOnToggle).not.toHaveBeenCalled();
   });
 });
