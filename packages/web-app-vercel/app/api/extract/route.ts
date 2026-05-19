@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders } from "@/lib/cors";
+import { getCorsHeaders, CorsError } from '@/lib/cors';
 import { Readability } from "@mozilla/readability";
 import { normalizeArticleText } from "@/lib/parseArticle";
 import { parseHTML } from "linkedom";
@@ -12,16 +12,27 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function OPTIONS(request: NextRequest) {
-  return NextResponse.json(
-    {},
-    {
-      headers: getCorsHeaders(request),
-    },
-  );
+    try {
+        const headers = getCorsHeaders(request);
+        return NextResponse.json({}, { headers });
+    } catch (error) {
+        if (error instanceof CorsError) {
+            return new NextResponse(null, { status: 403, statusText: "Forbidden" });
+        }
+        throw error;
+    }
 }
 
 export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
+  let corsHeaders: Record<string, string>;
+    try {
+        corsHeaders = getCorsHeaders(request);
+    } catch (error) {
+        if (error instanceof CorsError) {
+            return NextResponse.json({ error: "Forbidden: Origin not allowed" }, { status: 403 });
+        }
+        throw error;
+    }
 
   try {
     const { url } = await request.json();

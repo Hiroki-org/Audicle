@@ -15,7 +15,6 @@ import {
   type AudioPlaybackSource,
 } from "@/contexts/AudioPlaybackContext";
 import { Chunk } from "@/types/api";
-import { Playlist } from "@/types/playlist";
 import { extractContent, parseApiErrorMessage } from "@/lib/api";
 import { articleStorage } from "@/lib/articleStorage";
 import { logger } from "@/lib/logger";
@@ -87,8 +86,15 @@ export default function ReaderPageClient() {
   const [itemId, setItemId] = useState<string | null>(null);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
-  const { data: playlistsData = [], isSuccess: arePlaylistsLoaded } = usePlaylists();
+  const {
+    data: playlistsData = [],
+    isSuccess: arePlaylistsSuccess,
+    isError: arePlaylistsError,
+    isFetched: arePlaylistsFetched,
+  } = usePlaylists();
   const playlists = playlistsData;
+  const arePlaylistsLoaded =
+    !userEmail || arePlaylistsSuccess || arePlaylistsError || arePlaylistsFetched;
 
   // NOTE: Playlist selection should be deterministic via query params or default playlist.
   const [hasLoadedFromQuery, setHasLoadedFromQuery] = useState(false);
@@ -312,10 +318,10 @@ export default function ReaderPageClient() {
         // プレイリストに記事を追加
         let newArticleId: string | null = null;
         try {
-          if (!selectedPlaylistId) {
+          const targetPlaylistId = selectedPlaylistId || playlists[0]?.id || "";
+          if (!targetPlaylistId) {
             throw new Error("追加先のプレイリストが選択されていません。");
           }
-          const targetPlaylistId = selectedPlaylistId;
 
           // プレイリストに直接追加
           const itemResponse = await fetch(
@@ -369,7 +375,7 @@ export default function ReaderPageClient() {
 
         // デフォルトプレイリストに追加した場合のみキャッシュ無効化
         const modifiedPlaylist = playlists.find(
-          (p) => p.id === selectedPlaylistId,
+          (p) => p.id === (selectedPlaylistId || playlists[0]?.id),
         );
 
         if (userEmail && modifiedPlaylist?.is_default) {
@@ -383,7 +389,8 @@ export default function ReaderPageClient() {
         // プレイリスト周りのクエリがある場合は維持しておく
         const redirectUrl = createReaderUrl({
           articleUrl: articleUrl,
-          playlistId: playlistIdFromQuery || selectedPlaylistId || undefined,
+          playlistId:
+            playlistIdFromQuery || selectedPlaylistId || playlists[0]?.id || undefined,
           playlistIndex: indexFromQuery
             ? parseInt(indexFromQuery, 10)
             : undefined,
