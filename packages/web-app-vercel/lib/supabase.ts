@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
 const isProductionBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
-const isProductionRuntime = process.env.NODE_ENV === 'production' && !isProductionBuildPhase
+const isServer = typeof window === 'undefined'
+const isProductionRuntime = process.env.NODE_ENV === 'production' && isServer && !isProductionBuildPhase
 const hasSupabaseConfig = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 )
@@ -10,7 +11,7 @@ if (isProductionRuntime && !hasSupabaseConfig) {
     throw new Error('Missing required Supabase environment variables in production')
 }
 
-// These placeholders are only reachable during build/test paths; production runtime fails fast above.
+// These placeholders are only reachable during build/test/local development paths.
 const buildTimeSupabaseUrl = 'https://example.supabase.co'
 const buildTimeSupabaseAnonKey = 'build-time-placeholder-anon-key'
 
