@@ -1,8 +1,7 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DesktopPlayerControls, DesktopPlayerControlsProps } from "../DesktopPlayerControls";
-import { zIndex } from "@/lib/zIndex";
 
 // Mock the zIndex to avoid issues with undefined references during test execution
 jest.mock("@/lib/zIndex", () => ({
@@ -80,19 +79,61 @@ describe("DesktopPlayerControls", () => {
       expect(screen.queryByTestId("desktop-repeat-button")).not.toBeInTheDocument();
     });
 
-
-    it("should have correct href for previous and next links", () => {
-      render(<DesktopPlayerControls {...defaultProps} playlistState={{ ...defaultProps.playlistState, isPlaylistMode: true }} />);
-      expect(screen.getByTestId("desktop-prev-button")).toHaveAttribute("href", "/item/0");
-      expect(screen.getByTestId("desktop-next-button")).toHaveAttribute("href", "/item/2");
-    });
-
-    it("should render playlist controls if in playlist mode", () => {
+    it("should render playlist controls with correct links if in playlist mode", () => {
       render(<DesktopPlayerControls {...defaultProps} playlistState={{ ...defaultProps.playlistState, isPlaylistMode: true }} />);
       expect(screen.getByTestId("desktop-shuffle-button")).toBeInTheDocument();
-      expect(screen.getByTestId("desktop-prev-button")).toBeInTheDocument();
-      expect(screen.getByTestId("desktop-next-button")).toBeInTheDocument();
+      expect(screen.getByTestId("desktop-prev-button")).toHaveAttribute("href", "/item/0");
+      expect(screen.getByTestId("desktop-next-button")).toHaveAttribute("href", "/item/2");
       expect(screen.getByTestId("desktop-repeat-button")).toBeInTheDocument();
+    });
+
+    it("should disable previous and next buttons correctly", () => {
+      render(
+        <DesktopPlayerControls
+          {...defaultProps}
+          playlistState={{ ...defaultProps.playlistState, isPlaylistMode: true }}
+          canMovePrevious={false}
+          canMoveNext={false}
+        />
+      );
+
+      const prevButton = screen.getByTestId("desktop-prev-button");
+      const nextButton = screen.getByTestId("desktop-next-button");
+
+      expect(prevButton).toHaveAttribute("aria-disabled", "true");
+      expect(nextButton).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("should disable previous and next buttons when playlist context is not ready", () => {
+      render(
+        <DesktopPlayerControls
+          {...defaultProps}
+          playlistState={{ ...defaultProps.playlistState, isPlaylistMode: true }}
+          isPlaylistContextReady={false}
+        />
+      );
+
+      const prevButton = screen.getByTestId("desktop-prev-button");
+      const nextButton = screen.getByTestId("desktop-next-button");
+
+      expect(prevButton).toHaveAttribute("aria-disabled", "true");
+      expect(nextButton).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("should disable previous and next buttons when item hrefs are unavailable", () => {
+      render(
+        <DesktopPlayerControls
+          {...defaultProps}
+          playlistState={{ ...defaultProps.playlistState, isPlaylistMode: true }}
+          getPlaylistItemHref={jest.fn(() => undefined)}
+        />
+      );
+
+      const prevButton = screen.getByTestId("desktop-prev-button");
+      const nextButton = screen.getByTestId("desktop-next-button");
+
+      expect(prevButton).toHaveAttribute("aria-disabled", "true");
+      expect(nextButton).toHaveAttribute("aria-disabled", "true");
     });
 
     it("should render add to playlist button if articleId is provided", () => {
@@ -169,23 +210,6 @@ describe("DesktopPlayerControls", () => {
       render(<DesktopPlayerControls {...defaultProps} />);
       await user.click(screen.getByTestId("download-button"));
       expect(defaultProps.startDownload).toHaveBeenCalledTimes(1);
-    });
-
-    it("should disable previous and next buttons correctly", () => {
-      render(
-        <DesktopPlayerControls
-          {...defaultProps}
-          playlistState={{ ...defaultProps.playlistState, isPlaylistMode: true }}
-          canMovePrevious={false}
-          canMoveNext={false}
-        />
-      );
-
-      const prevButton = screen.getByTestId("desktop-prev-button");
-      const nextButton = screen.getByTestId("desktop-next-button");
-
-      expect(prevButton).toHaveAttribute("aria-disabled", "true");
-      expect(nextButton).toHaveAttribute("aria-disabled", "true");
     });
   });
 });
