@@ -15,6 +15,7 @@ import {
   type AudioPlaybackSource,
 } from "@/contexts/AudioPlaybackContext";
 import { Chunk } from "@/types/api";
+import { Playlist } from "@/types/playlist";
 import { extractContent, parseApiErrorMessage } from "@/lib/api";
 import { articleStorage } from "@/lib/articleStorage";
 import { logger } from "@/lib/logger";
@@ -28,7 +29,6 @@ import { selectVoiceModel } from "@/lib/voiceSelector";
 import { UserSettings, DEFAULT_SETTINGS } from "@/types/settings";
 import { createReaderUrl } from "@/lib/urlBuilder";
 import { getPlaylistSortKey } from "@/lib/playlist-utils";
-import { isReaderPlaylistGateReady } from "./playlistLoadState";
 
 function convertParagraphsToChunks(htmlContent: string): {
   chunks: Chunk[];
@@ -57,7 +57,7 @@ export default function ReaderPageClient() {
   const indexFromQuery = searchParams.get("index");
   const autoplayFromQuery = searchParams.get("autoplay") === "true";
   const queryClient = useQueryClient();
-  const { data: session, status: sessionStatus } = useSession();
+  const { data: session } = useSession();
   const userEmail = session?.user?.email;
 
   // プレイリスト再生コンテキスト
@@ -87,20 +87,8 @@ export default function ReaderPageClient() {
   const [itemId, setItemId] = useState<string | null>(null);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
-  const {
-    data: playlistsData = [],
-    isSuccess: arePlaylistsSuccess,
-    isError: arePlaylistsError,
-    isFetched: arePlaylistsFetched,
-  } = usePlaylists();
+  const { data: playlistsData = [], isSuccess: arePlaylistsLoaded } = usePlaylists();
   const playlists = playlistsData;
-  const arePlaylistsLoaded = isReaderPlaylistGateReady({
-    sessionStatus,
-    userEmail,
-    arePlaylistsSuccess,
-    arePlaylistsError,
-    arePlaylistsFetched,
-  });
 
   // NOTE: Playlist selection should be deterministic via query params or default playlist.
   const [hasLoadedFromQuery, setHasLoadedFromQuery] = useState(false);
@@ -324,10 +312,10 @@ export default function ReaderPageClient() {
         // プレイリストに記事を追加
         let newArticleId: string | null = null;
         try {
-          const targetPlaylistId = selectedPlaylistId || playlists[0]?.id || "";
-          if (!targetPlaylistId) {
+          if (!selectedPlaylistId) {
             throw new Error("追加先のプレイリストが選択されていません。");
           }
+          const targetPlaylistId = selectedPlaylistId;
 
           // プレイリストに直接追加
           const itemResponse = await fetch(
@@ -381,7 +369,7 @@ export default function ReaderPageClient() {
 
         // デフォルトプレイリストに追加した場合のみキャッシュ無効化
         const modifiedPlaylist = playlists.find(
-          (p) => p.id === (selectedPlaylistId || playlists[0]?.id),
+          (p) => p.id === selectedPlaylistId,
         );
 
         if (userEmail && modifiedPlaylist?.is_default) {
@@ -395,8 +383,7 @@ export default function ReaderPageClient() {
         // プレイリスト周りのクエリがある場合は維持しておく
         const redirectUrl = createReaderUrl({
           articleUrl: articleUrl,
-          playlistId:
-            playlistIdFromQuery || selectedPlaylistId || playlists[0]?.id || undefined,
+          playlistId: playlistIdFromQuery || selectedPlaylistId || undefined,
           playlistIndex: indexFromQuery
             ? parseInt(indexFromQuery, 10)
             : undefined,

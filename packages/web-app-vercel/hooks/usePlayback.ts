@@ -59,6 +59,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
     }
     return DEFAULT_PLAYBACK_RATE;
   });
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioUrlRef = useRef<string | null>(null);
   const onArticleEndRef = useRef<(() => void) | undefined>(onArticleEnd);
@@ -70,7 +71,6 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
   // このRefを通じて呼び出すことで、常に最新の `playFromIndex` を参照できるようにし、循環参照を回避します。
   const playFromIndexRef = useRef<(index: number) => Promise<void>>(async () => { });
   const positionStateCleanupRef = useRef<(() => void) | null>(null);
-  const updatePositionStateRef = useRef<() => void>(() => {});
 
   // 現在のチャンクID
   const currentChunkId =
@@ -189,6 +189,43 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
     currentAudioUrlRef.current = null;
   }, []);
 
+  const updateMediaSessionPositionState = useCallback(() => {
+    if (!("mediaSession" in navigator)) return;
+    const mediaSession = navigator.mediaSession;
+    const setPositionState = (mediaSession as unknown as {
+      setPositionState?: (state: {
+        duration: number;
+        position?: number;
+        playbackRate?: number;
+      }) => void;
+    }).setPositionState;
+
+    if (!setPositionState || typeof setPositionState !== "function") return;
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const duration = audio.duration;
+    if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) {
+      return;
+    }
+    const position =
+      typeof audio.currentTime === "number" && Number.isFinite(audio.currentTime)
+        ? Math.min(Math.max(audio.currentTime, 0), duration)
+        : undefined;
+
+    const playbackRate =
+      typeof audio.playbackRate === "number" && Number.isFinite(audio.playbackRate)
+        ? audio.playbackRate
+        : undefined;
+
+    try {
+      setPositionState.call(mediaSession, { duration, position, playbackRate });
+    } catch (error) {
+      // Safari/PWA など実装差分があり得るため、握りつぶさずログだけ残す
+      logger.warn('Failed to set Media Session position state', error);
+    }
+  }, []);
+
   const installPositionStateUpdater = useCallback((audio: HTMLAudioElement) => {
     if (typeof (audio as any).addEventListener !== "function") {
       return;
@@ -196,7 +233,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
 
     positionStateCleanupRef.current?.();
 
-    const handler = () => updatePositionStateRef.current();
+    const handler = () => updateMediaSessionPositionState();
     audio.addEventListener("timeupdate", handler);
     audio.addEventListener("durationchange", handler);
     audio.addEventListener("ratechange", handler);
@@ -211,7 +248,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       audio.removeEventListener("ratechange", handler);
       audio.removeEventListener("loadedmetadata", handler);
     };
-  }, []);
+  }, [updateMediaSessionPositionState]);
 
   const seekToSeconds = useCallback((positionSeconds: number) => {
     const audio = audioRef.current;
@@ -223,8 +260,8 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
         ? Math.min(Math.max(positionSeconds, 0), duration)
         : Math.max(positionSeconds, 0);
     audio.currentTime = next;
-    updatePositionStateRef.current();
-  }, []);
+    updateMediaSessionPositionState();
+  }, [updateMediaSessionPositionState]);
 
   const seekBySeconds = useCallback((deltaSeconds: number) => {
     const audio = audioRef.current;
@@ -673,7 +710,7 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
   );
 
   // Media Session APIの設定（バックグラウンド再生対応）
-  const { updatePositionState } = useMediaSession({
+  useMediaSession({
     title: articleTitle || "記事を読み上げ中",
     artist: articleAuthor,
     isPlaying,
@@ -704,10 +741,6 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
       };
     },
   });
-
-  useEffect(() => {
-    updatePositionStateRef.current = updatePositionState;
-  }, [updatePositionState]);
 
   // クリーンアップ
   useEffect(() => {
