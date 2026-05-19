@@ -672,9 +672,6 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
     [chunks, playFromIndex]
   );
 
-
-
-
   // Media Session APIの設定（バックグラウンド再生対応）
   const { updatePositionState } = useMediaSession({
     title: articleTitle || "記事を読み上げ中",
@@ -711,7 +708,6 @@ export function usePlayback({ chunks, articleUrl, voiceModel, playbackSpeed, onC
   useEffect(() => {
     updatePositionStateRef.current = updatePositionState;
   }, [updatePositionState]);
-
 
   // クリーンアップ
   useEffect(() => {
