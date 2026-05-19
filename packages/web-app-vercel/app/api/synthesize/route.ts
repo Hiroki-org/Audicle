@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCorsHeaders, CorsError } from '@/lib/cors';
+import { getCorsHeaders } from '@/lib/cors';
 import { randomUUID } from 'crypto';
 import { auth } from '@/lib/auth';
 import { getKv } from '@/lib/kv';
@@ -311,15 +311,9 @@ class TTSError extends Error {
 }
 
 export async function OPTIONS(request: NextRequest) {
-    try {
-        const headers = getCorsHeaders(request);
-        return NextResponse.json({}, { headers });
-    } catch (error) {
-        if (error instanceof CorsError) {
-            return new NextResponse(null, { status: 403, statusText: "Forbidden" });
-        }
-        throw error;
-    }
+    return NextResponse.json({}, {
+        headers: getCorsHeaders(request),
+    });
 }
 
 export async function POST(request: NextRequest) {
@@ -329,15 +323,7 @@ export async function POST(request: NextRequest) {
         console[level](JSON.stringify({ requestId, level, message, ...data }));
     };
 
-    let corsHeaders: Record<string, string>;
-    try {
-        corsHeaders = getCorsHeaders(request);
-    } catch (error) {
-        if (error instanceof CorsError) {
-            return NextResponse.json({ error: "Forbidden: Origin not allowed" }, { status: 403 });
-        }
-        throw error;
-    }
+    const corsHeaders = getCorsHeaders(request);
 
     try {
         log('info', 'リクエスト受信');
