@@ -103,16 +103,11 @@ def _force_split(text: str, limit: int) -> List[str]:
     chunks = []
     start = 0
     while start < len(text):
-        low = start + 1
-        high = min(len(text), start + limit)
-        end = low
-        while low <= high:
-            mid = (low + high) // 2
-            if len(text[start:mid].encode('utf-8')) <= limit:
-                end = mid
-                low = mid + 1
-            else:
-                high = mid - 1
+        end = start + limit
+        while len(text[start:end].encode('utf-8')) > limit:
+            end -= 1
+        if end <= start:
+            end = start + 1
         chunks.append(text[start:end])
         start = end
     return chunks
@@ -124,12 +119,13 @@ def _split_and_merge(text: str, pattern: Pattern) -> List[str]:
     i = 0
     while i < len(parts):
         current = parts[i]
-        while i + 1 < len(parts) and pattern.fullmatch(parts[i + 1]):
-            current += parts[i + 1]
+        while i + 1 < len(parts) and pattern.fullmatch(parts[i+1]):
+            current += parts[i+1]
             i += 1
         merged.append(current)
         i += 1
     return merged
+
 
 def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     """
