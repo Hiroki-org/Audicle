@@ -1,22 +1,28 @@
 import { createClient } from '@supabase/supabase-js'
 
-const isProductionRuntime = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build';
+const isProductionBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
+const isProductionRuntime = process.env.NODE_ENV === 'production' && !isProductionBuildPhase
+const hasSupabaseConfig = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+)
 
-if (isProductionRuntime) {
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        throw new Error('Missing required Supabase environment variables in production');
-    }
+if (isProductionRuntime && !hasSupabaseConfig) {
+    throw new Error('Missing required Supabase environment variables in production')
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-key'
+// These placeholders are only reachable during build/test paths; production runtime fails fast above.
+const buildTimeSupabaseUrl = 'https://example.supabase.co'
+const buildTimeSupabaseAnonKey = 'build-time-placeholder-anon-key'
 
-if (!isProductionRuntime && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
-    console.warn('Missing Supabase environment variables, using dummy values. This should only happen during build or test.')
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || buildTimeSupabaseUrl
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || buildTimeSupabaseAnonKey
+
+if (!hasSupabaseConfig) {
+    console.warn('Missing Supabase environment variables, using build/test placeholder values.')
 }
 
-if (process.env.NODE_ENV === 'test' && supabaseUrl.includes('example.supabase.co')) {
-    console.warn('⚠️  WARNING: Using dummy Supabase URL in test environment. API calls will fail.');
+if (process.env.NODE_ENV === 'test' && supabaseUrl === buildTimeSupabaseUrl) {
+    console.warn('WARNING: Using placeholder Supabase URL in test environment. API calls will fail.')
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
