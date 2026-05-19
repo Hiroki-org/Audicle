@@ -7,14 +7,26 @@ export class CorsError extends Error {
     }
 }
 
+let cachedAllowedOriginsEnv: string | undefined;
+let cachedAllowedOrigins = new Set<string>();
+
+function getAllowedOrigins(): Set<string> {
+    const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '';
+    if (allowedOriginsEnv !== cachedAllowedOriginsEnv) {
+        cachedAllowedOriginsEnv = allowedOriginsEnv;
+        cachedAllowedOrigins = new Set(
+            allowedOriginsEnv
+                .split(',')
+                .map((origin) => origin.trim())
+                .filter(Boolean),
+        );
+    }
+    return cachedAllowedOrigins;
+}
 
 export function getCorsHeaders(request: NextRequest): Record<string, string> {
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean);
-
     const origin = request?.headers?.get?.('origin') ?? null;
+    const allowedOrigins = getAllowedOrigins();
 
     const headers: Record<string, string> = {
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -23,14 +35,14 @@ export function getCorsHeaders(request: NextRequest): Record<string, string> {
     };
 
     if (origin) {
-        if (allowedOrigins.length === 0) {
+        if (allowedOrigins.size === 0) {
             if (process.env.NODE_ENV === 'production') {
                 console.error('ALLOWED_ORIGINS must be configured in production. Set it to a comma-separated list of allowed origins.');
             }
             throw new CorsError('Allowed origins are not configured');
         }
 
-        if (!allowedOrigins.includes(origin)) {
+        if (!allowedOrigins.has(origin)) {
             throw new CorsError('Origin not allowed');
         }
 
