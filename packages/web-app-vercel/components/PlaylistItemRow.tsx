@@ -2,6 +2,8 @@
 
 import { PlaylistWithItems } from "@/types/playlist";
 
+export const DEFAULT_PLAYLIST_BADGE_LABEL = "デフォルト";
+
 interface PlaylistItemRowProps {
   playlist: PlaylistWithItems;
   isSelected: boolean;
@@ -37,7 +39,7 @@ export function PlaylistItemRow({
         )}
         {playlist.is_default && (
           <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-            デフォルト
+            {DEFAULT_PLAYLIST_BADGE_LABEL}
           </p>
         )}
       </label>
