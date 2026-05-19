@@ -3,9 +3,9 @@ import type { NextRequest } from 'next/server';
 import { auth } from "@/lib/auth";
 
 export async function middleware(request: NextRequest) {
-    // APIルート、認証ルート、デバッグルートはスキップ
+    // APIルート、認証ルートはスキップ
     const pathname = request.nextUrl.pathname;
-    if (pathname.startsWith('/api') || pathname.startsWith('/auth') || pathname === '/debug') {
+    if (pathname.startsWith('/api') || pathname.startsWith('/auth')) {
         return NextResponse.next();
     }
 
