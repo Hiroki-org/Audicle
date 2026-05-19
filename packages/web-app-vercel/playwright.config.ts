@@ -8,6 +8,9 @@ dotenv.config({ path: path.resolve(__dirname, '.env.local') })
 // .env.test.localを読み込む（テスト専用の環境変数，優先される）
 dotenv.config({ path: path.resolve(__dirname, '.env.test.local') })
 
+console.log('[PLAYWRIGHT CONFIG] Loading config...');
+console.log('[PLAYWRIGHT CONFIG] NEXT_PUBLIC_SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log('[PLAYWRIGHT CONFIG] TEST_USER_EMAIL exists:', !!process.env.TEST_USER_EMAIL);
 
 export default defineConfig({
     testDir: './tests',
