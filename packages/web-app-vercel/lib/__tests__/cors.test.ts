@@ -76,20 +76,34 @@ describe("getCorsHeaders", () => {
     process.env.ALLOWED_ORIGINS = "";
     const request = createMockRequest("http://localhost:3000");
 
-    getCorsHeaders(request);
+    expect(() => getCorsHeaders(request)).toThrow(CorsError);
+    expect(() => getCorsHeaders(request)).toThrow(
+      "Allowed origins are not configured",
+    );
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "ALLOWED_ORIGINS must be configured in production. Set it to a comma-separated list of allowed origins.",
     );
   });
 
-  it("should not log an error if NODE_ENV is not production and ALLOWED_ORIGINS is empty", () => {
+  it("should reject configured origin checks if ALLOWED_ORIGINS is empty outside production", () => {
     process.env.NODE_ENV = "development";
     process.env.ALLOWED_ORIGINS = "";
     const request = createMockRequest("http://localhost:3000");
 
-    getCorsHeaders(request);
+    expect(() => getCorsHeaders(request)).toThrow(CorsError);
 
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it("should allow requests without an origin when ALLOWED_ORIGINS is empty", () => {
+    process.env.NODE_ENV = "production";
+    process.env.ALLOWED_ORIGINS = "";
+    const request = createMockRequest(null);
+
+    const headers = getCorsHeaders(request);
+
+    expect(headers["Access-Control-Allow-Origin"]).toBeUndefined();
     expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 });
