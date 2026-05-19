@@ -98,33 +98,35 @@ _tts_semaphore = None
 SENTENCE_SPLIT_REGEX = re.compile(r'([。！？\n])')
 COMMA_SPLIT_REGEX = re.compile(r'(、)')
 
-def _force_split(text: str, limit: int) -> list[str]:
+def _force_split(text: str, limit: int) -> List[str]:
     """Force splits text into chunks up to `limit` bytes, respecting multibyte characters."""
     chunks = []
     start = 0
     while start < len(text):
-        end = start + limit
-        while len(text[start:end].encode('utf-8')) > limit:
-            end -= 1
-        if end <= start:
-            end = start + 1
+        low = start + 1
+        high = min(len(text), start + limit)
+        end = low
+        while low <= high:
+            mid = (low + high) // 2
+            if len(text[start:mid].encode('utf-8')) <= limit:
+                end = mid
+                low = mid + 1
+            else:
+                high = mid - 1
         chunks.append(text[start:end])
         start = end
     return chunks
 
-def _split_and_merge(text: str, pattern: Pattern) -> list[str]:
+def _split_and_merge(text: str, pattern: Pattern) -> List[str]:
     """Splits text by pattern and merges delimiters into preceding strings."""
     parts = [s for s in pattern.split(text) if s]
     merged = []
     i = 0
     while i < len(parts):
         current = parts[i]
-        if i + 1 < len(parts) and pattern.fullmatch(parts[i+1]):
-             current += parts[i+1]
-             i += 1
-             while i + 1 < len(parts) and pattern.fullmatch(parts[i+1]):
-                 current += parts[i+1]
-                 i += 1
+        while i + 1 < len(parts) and pattern.fullmatch(parts[i + 1]):
+            current += parts[i + 1]
+            i += 1
         merged.append(current)
         i += 1
     return merged
