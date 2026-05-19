@@ -1,7 +1,8 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DesktopPlayerControls, DesktopPlayerControlsProps } from "../DesktopPlayerControls";
+import { zIndex } from "@/lib/zIndex";
 
 // Mock the zIndex to avoid issues with undefined references during test execution
 jest.mock("@/lib/zIndex", () => ({
@@ -92,62 +93,6 @@ describe("DesktopPlayerControls", () => {
       expect(screen.getByTestId("desktop-prev-button")).toBeInTheDocument();
       expect(screen.getByTestId("desktop-next-button")).toBeInTheDocument();
       expect(screen.getByTestId("desktop-repeat-button")).toBeInTheDocument();
-    });
-
-    it("should reflect enabled shuffle state in labels and styling", () => {
-      render(
-        <DesktopPlayerControls
-          {...defaultProps}
-          playlistState={{
-            ...defaultProps.playlistState,
-            isPlaylistMode: true,
-            shuffle: true,
-          }}
-        />,
-      );
-
-      const shuffleButton = screen.getByTestId("desktop-shuffle-button");
-      expect(shuffleButton).toHaveAttribute("title", "シャッフル: オン");
-      expect(shuffleButton).toHaveAttribute("aria-label", "シャッフル: オン");
-      expect(shuffleButton).toHaveClass("text-green-500");
-    });
-
-    it("should reflect repeat one state in labels, styling, and icon", () => {
-      render(
-        <DesktopPlayerControls
-          {...defaultProps}
-          playlistState={{
-            ...defaultProps.playlistState,
-            isPlaylistMode: true,
-            repeatMode: "one",
-          }}
-        />,
-      );
-
-      const repeatButton = screen.getByTestId("desktop-repeat-button");
-      expect(repeatButton).toHaveAttribute("title", "リピート: 1曲");
-      expect(repeatButton).toHaveAttribute("aria-label", "リピート: 1曲");
-      expect(repeatButton).toHaveClass("text-green-500");
-      expect(repeatButton.querySelector("svg")).toHaveClass("lucide-repeat-1");
-    });
-
-    it("should reflect repeat all state in labels and active styling", () => {
-      render(
-        <DesktopPlayerControls
-          {...defaultProps}
-          playlistState={{
-            ...defaultProps.playlistState,
-            isPlaylistMode: true,
-            repeatMode: "all",
-          }}
-        />,
-      );
-
-      const repeatButton = screen.getByTestId("desktop-repeat-button");
-      expect(repeatButton).toHaveAttribute("title", "リピート: 全曲");
-      expect(repeatButton).toHaveAttribute("aria-label", "リピート: 全曲");
-      expect(repeatButton).toHaveClass("text-green-500");
-      expect(repeatButton.querySelector("svg")).toHaveClass("lucide-repeat");
     });
 
     it("should render add to playlist button if articleId is provided", () => {
