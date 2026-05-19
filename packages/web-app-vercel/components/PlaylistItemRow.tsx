@@ -6,7 +6,7 @@ interface PlaylistItemRowProps {
   playlist: PlaylistWithItems;
   isSelected: boolean;
   isSaving: boolean;
-  onToggle: (_playlistId: string) => void;
+  onToggle: (playlistId: string) => void;
 }
 
 export function PlaylistItemRow({
