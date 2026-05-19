@@ -20,6 +20,7 @@ import { extractContent, parseApiErrorMessage } from "@/lib/api";
 import { articleStorage } from "@/lib/articleStorage";
 import { logger } from "@/lib/logger";
 import { useDownload } from "@/hooks/useDownload";
+import { usePlaylists } from "@/lib/hooks/usePlaylists";
 import { PlaybackSpeedDial } from "@/components/PlaybackSpeedDial";
 import { recordArticleStats } from "@/lib/articleStats";
 import { parseHTMLToParagraphs } from "@/lib/paragraphParser";
@@ -85,9 +86,10 @@ export default function ReaderPageClient() {
   const [articleId, setArticleId] = useState<string | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
-  const [arePlaylistsLoaded, setArePlaylistsLoaded] = useState(false);
+  const { data: playlistsData = [], isSuccess: arePlaylistsLoaded } = usePlaylists();
+  const playlists = playlistsData;
+
   // NOTE: Playlist selection should be deterministic via query params or default playlist.
   const [hasLoadedFromQuery, setHasLoadedFromQuery] = useState(false);
   const [isSpeedModalOpen, setIsSpeedModalOpen] = useState(false);
@@ -527,31 +529,12 @@ export default function ReaderPageClient() {
     );
   }, [settings.voice_model, detectedLanguage]);
 
-  // プレイリスト一覧を取得
+  // デフォルトのプレイリストを選択
   useEffect(() => {
-    const fetchPlaylists = async () => {
-      try {
-        const response = await fetch("/api/playlists");
-        if (response.ok) {
-          const data: Playlist[] = await response.json();
-          setPlaylists(data);
-
-          // APIレスポンスはデフォルトプレイリストが先頭に来るようにソートされているため，
-          // 最初のアイテムを選択すればよい
-          if (data.length > 0) {
-            setSelectedPlaylistId(data[0].id);
-          }
-        }
-      } catch (error) {
-        logger.error("プレイリストの読み込みに失敗", error);
-      } finally {
-        // プレイリスト読み込み完了をマーク
-        setArePlaylistsLoaded(true);
-      }
-    };
-
-    fetchPlaylists();
-  }, []);
+    if (playlists.length > 0 && !selectedPlaylistId) {
+      setSelectedPlaylistId(playlists[0].id);
+    }
+  }, [playlists, selectedPlaylistId]);
 
   // 記事IDが指定されている場合は読み込み
   useEffect(() => {
