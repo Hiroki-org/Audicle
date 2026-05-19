@@ -560,10 +560,7 @@ export async function POST(request: NextRequest) {
 
             // 通常フロー or Supabaseインデックスなし or ミス → head()でチェック
             if (!cacheIndex || !isCachedByIndex) {
-                if (!objectExists) {
-                    log('info', `🔍 R2キャッシュをチェック中 (head()): ${cacheKey}`);
-                    objectExists = await checkHeadObject();
-                }
+                objectExists = await checkHeadObject();
             }
 
             if (objectExists) {
