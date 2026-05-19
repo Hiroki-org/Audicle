@@ -20,7 +20,6 @@ async function convertSvgToPng(svgPath, pngPath, size) {
 
   const buffer = canvas.toBuffer("image/png");
   fs.writeFileSync(pngPath, buffer);
-  console.log(`Converted ${svgPath} to ${pngPath}`);
 }
 
 // 実行
