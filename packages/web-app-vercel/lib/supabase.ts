@@ -1,10 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 const isProductionBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
-const isServer = typeof window === 'undefined'
-// Production env validation is enforced on the server runtime. Client bundles
-// can only use NEXT_PUBLIC values that were inlined at build time.
-const isProductionRuntime = process.env.NODE_ENV === 'production' && isServer && !isProductionBuildPhase
+const isProductionRuntime = process.env.NODE_ENV === 'production' && !isProductionBuildPhase
 const hasSupabaseConfig = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 )
