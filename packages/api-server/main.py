@@ -288,7 +288,7 @@ async def extract_content(request: ExtractRequest):
 async def synthesize_speech(request: SynthesizeRequest):
     """テキストを音声化してMP3を返す"""
     try:
-        logger.info("Synthesizing text: %s...", request.text[:100])
+        logger.info("Synthesizing text of length: %d", len(request.text))
         logger.info("Using voice: %s", request.voice)
 
         text_chunks = await asyncio.to_thread(_split_text, request.text)
