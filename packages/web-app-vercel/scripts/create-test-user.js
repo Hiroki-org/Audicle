@@ -1,5 +1,20 @@
 const dns = require("node:dns");
 dns.setDefaultResultOrder("ipv4first");
+// Fix fetch ENOTFOUND issue on Node 20+
+if (typeof globalThis.fetch === 'function') {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    try {
+      return await originalFetch(url, options);
+    } catch (e) {
+      if (e.cause && e.cause.code === 'ENOTFOUND') {
+        console.warn(`[SEED] Retrying fetch due to ENOTFOUND: ${url}`);
+        return await originalFetch(url, options);
+      }
+      throw e;
+    }
+  };
+}
 require("dotenv").config({
   path: require("path").resolve(__dirname, "../.env.local"),
 });
