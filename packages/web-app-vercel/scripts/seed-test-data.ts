@@ -24,26 +24,29 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 
-async function fetchWithRetry<T>(fn: () => Promise<{ data: T | null; error: any }>, retries = 5, delay = 2000): Promise<{ data: T | null; error: any }> {
+async function fetchWithRetry<T>(fn: () => Promise<{ data: T | null; error: any }>, retries = 5, delay = 5000): Promise<{ data: T | null; error: any }> {
     let currentDelay = delay;
     for (let i = 0; i < retries; i++) {
         try {
             const res = await fn();
-            if (res.error && res.error.message && (res.error.message.includes('fetch failed') || res.error.message.includes('ENOTFOUND') || res.error.message.includes('ECONNRESET'))) {
+            // Network errors might manifest as thrown errors or within res.error depending on the client
+            if (res.error && res.error.message && (res.error.message.includes('fetch failed') || res.error.message.includes('ENOTFOUND') || res.error.message.includes('ECONNRESET') || res.error.message.includes('EAI_AGAIN') || res.error.message.includes('ETIMEDOUT') || res.error.message.includes('EHOSTUNREACH'))) {
                 throw new Error(res.error.message);
             }
             return res;
         } catch (error: any) {
-            const isNetworkError = error?.message?.includes('fetch failed') || error?.message?.includes('ENOTFOUND') || error?.message?.includes('ECONNRESET');
+            const errString = error?.message || error?.toString() || '';
+            const isNetworkError = errString.includes('fetch failed') || errString.includes('ENOTFOUND') || errString.includes('ECONNRESET') || errString.includes('EAI_AGAIN') || errString.includes('ETIMEDOUT') || errString.includes('EHOSTUNREACH');
+
             if (i === retries - 1 || !isNetworkError) {
                 if (error && !error.message) {
                     return { data: null, error };
                 }
                 throw error;
             }
-            console.log(`Network error caught, retrying in ${currentDelay}ms...`);
+            console.log(`Network error caught (${errString}), retrying in ${currentDelay}ms (attempt ${i+1}/${retries})...`);
             await new Promise(resolve => setTimeout(resolve, currentDelay));
-            currentDelay *= 2; // exponential backoff
+            currentDelay = Math.min(currentDelay * 2, 30000); // Max delay 30s
         }
     }
     return { data: null, error: new Error('Max retries reached') };
