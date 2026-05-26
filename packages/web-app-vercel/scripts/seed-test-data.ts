@@ -1,3 +1,5 @@
+import * as dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 import { config } from "dotenv";

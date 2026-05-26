@@ -1,3 +1,5 @@
+const dns = require("node:dns");
+dns.setDefaultResultOrder("ipv4first");
 require("dotenv").config({
   path: require("path").resolve(__dirname, "../.env.local"),
 });
