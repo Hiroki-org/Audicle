@@ -17,8 +17,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 
+
 const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
-    let retries = 5;
+    let retries = 15; // Increase to 15
     let lastError: any;
 
     while (retries > 0) {
@@ -28,8 +29,8 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
         } catch (error: any) {
             lastError = error;
             if (error.message?.includes('ENOTFOUND') || error.message?.includes('fetch failed')) {
-                console.log(`[SEED] Fetch failed (${error.message}), retrying... (${retries} attempts left)`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                console.log(`[SEED] Fetch failed (${error.message}), retrying in 3s... (${retries} attempts left)`);
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Increase wait to 3s
                 retries--;
             } else {
                 throw error;
