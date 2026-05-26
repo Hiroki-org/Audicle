@@ -261,4 +261,18 @@ describe('PUT /api/settings/update', () => {
         expect(data).toEqual({ error: 'Internal server error', success: false });
         expect(consoleErrorMock).toHaveBeenCalledWith('Error in PUT /api/settings/update:', expect.any(Error));
     });
+
+    it('returns 500 if Supabase upsert throws an exception', async () => {
+        (auth as jest.Mock).mockResolvedValue({ user: { id: 'test-user-id' } });
+
+        mockUpsert.mockImplementationOnce(() => { throw new Error('Supabase Exception'); });
+
+        const request = mockRequest({ playback_speed: 1.5 });
+        const response = await PUT(request);
+
+        expect(response.status).toBe(500);
+        const data = await response.json();
+        expect(data).toEqual({ error: 'Internal server error', success: false });
+        expect(consoleErrorMock).toHaveBeenCalledWith('Error in PUT /api/settings/update:', expect.any(Error));
+    });
 });
