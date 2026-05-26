@@ -591,21 +591,21 @@ export async function POST(request: NextRequest) {
             // 音声バッファを保存
             audioBuffers.push(audioBuffer);
 
-            // 3. ストレージに保存（失敗時はbase64にフォールバック）
+            // 3. ストレージに保存とSupabaseインデックス追加を並行実行（失敗時はbase64にフォールバック）
             try {
-                const storedUrl = await storage.uploadObject(cacheKey, audioBuffer, 'audio/mpeg', signedUrlTtlSeconds);
+                const uploadPromise = storage.uploadObject(cacheKey, audioBuffer, 'audio/mpeg', signedUrlTtlSeconds);
+
+                // 4. Supabaseインデックスに追加（articleUrlがある場合）のPromise（エラーは内部でキャッチして全体を失敗させない）
+                const indexPromise = articleUrl ?
+                    addCachedChunk(articleUrl, voiceToUse, textHash)
+                        .then(() => log('info', 'チャンクをSupabaseインデックスに追加しました', { textHash }))
+                        .catch(() => { /* addCachedChunk関数内で既にエラーログが出力されているため、ここではログ出力しない */ })
+                    : Promise.resolve();
+
+                const [storedUrl] = await Promise.all([uploadPromise, indexPromise]);
+
                 audioUrls.push(storedUrl);
                 log('info', `音声を作成しR2キャッシュに保存しました: ${cacheKey}`);
-
-                // 4. Supabaseインデックスに追加（articleUrlがある場合）
-                if (articleUrl) {
-                    try {
-                        await addCachedChunk(articleUrl, voiceToUse, textHash);
-                        log('info', 'チャンクをSupabaseインデックスに追加しました', { textHash });
-                    } catch {
-                        // addCachedChunk関数内で既にエラーログが出力されているため、ここではログ出力しない
-                    }
-                }
             } catch (putError) {
                 log('error', `音声のキャッシュへの保存に失敗しました。base64にフォールバックします: ${cacheKey}`, { error: putError });
                 const base64Audio = audioBuffer.toString('base64');
