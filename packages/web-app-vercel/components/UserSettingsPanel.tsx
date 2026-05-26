@@ -38,12 +38,17 @@ export default function UserSettingsPanel() {
   // Keep refs to the latest values for unmount flush
   const latestPreviewRef = useRef(previewTheme);
   const latestSettingsRef = useRef(settings);
+  const latestHasChangedRef = useRef(hasChanged);
+  const latestSessionRef = useRef(session);
+  const latestMutateAsyncRef = useRef(updateSettingsMutation.mutateAsync);
+
   useEffect(() => {
     latestPreviewRef.current = previewTheme;
-  }, [previewTheme]);
-  useEffect(() => {
     latestSettingsRef.current = settings;
-  }, [settings]);
+    latestHasChangedRef.current = hasChanged;
+    latestSessionRef.current = session;
+    latestMutateAsyncRef.current = updateSettingsMutation.mutateAsync;
+  }, [previewTheme, settings, hasChanged, session, updateSettingsMutation.mutateAsync]);
 
   // originalSettingsが変わったら、ローカル変更がない場合は同期
   useEffect(() => {
@@ -133,15 +138,18 @@ export default function UserSettingsPanel() {
   // On unmount: flush any unsaved theme changes immediately
   useEffect(() => {
     return () => {
-      if (!hasChanged) return;
+      if (!latestHasChangedRef.current) return;
       const finalPreview = latestPreviewRef.current;
       const finalSettings = latestSettingsRef.current;
+      const finalSession = latestSessionRef.current;
+      const mutateAsync = latestMutateAsyncRef.current;
+
       if (finalPreview !== finalSettings.color_theme) {
         // Fire and forget; it's fine to call async from cleanup
         (async () => {
           try {
-            if (session?.user?.email) {
-              await updateSettingsMutation.mutateAsync({
+            if (finalSession?.user?.email) {
+              await mutateAsync({
                 ...finalSettings,
                 color_theme: finalPreview,
               });
@@ -158,7 +166,6 @@ export default function UserSettingsPanel() {
         })();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = async () => {
