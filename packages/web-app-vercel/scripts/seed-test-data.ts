@@ -18,8 +18,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 
 
+
 const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
-    let retries = 15; // Increase to 15
+    let retries = 30; // Increase to 30
     let lastError: any;
 
     while (retries > 0) {
@@ -29,14 +30,15 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
         } catch (error: any) {
             lastError = error;
             if (error.message?.includes('ENOTFOUND') || error.message?.includes('fetch failed')) {
-                console.log(`[SEED] Fetch failed (${error.message}), retrying in 3s... (${retries} attempts left)`);
-                await new Promise(resolve => setTimeout(resolve, 3000)); // Increase wait to 3s
+                console.log(`[SEED] Fetch failed (${error.message}), retrying in 5s... (${retries} attempts left)`);
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Increase wait to 5s
                 retries--;
             } else {
                 throw error;
             }
         }
     }
+    console.error("[SEED] All fetch retries exhausted. This indicates a persistent DNS/Network issue in the GitHub Actions runner.");
     throw lastError;
 };
 
