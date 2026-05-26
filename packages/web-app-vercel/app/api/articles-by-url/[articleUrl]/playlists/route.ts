@@ -42,32 +42,12 @@ export async function GET(
 
         const articleId = article.id
 
-        // article_id を持つプレイリストアイテムを取得
-        const { data: playlistItems, error: playlistItemsError } = await supabase
-            .from('playlist_items')
-            .select('playlist_id')
-            .eq('article_id', articleId)
-
-        if (playlistItemsError) {
-            return NextResponse.json(
-                { error: 'Failed to fetch playlists' },
-                { status: 500 }
-            )
-        }
-
-        if (!playlistItems || playlistItems.length === 0) {
-            return NextResponse.json([])
-        }
-
-        // プレイリストIDのリストを取得
-        const playlistIds = playlistItems.map(item => item.playlist_id)
-
-        // プレイリストを取得（所有権フィルタリング付き、デフォルトプレイリスト優先）
+        // プレイリストを取得（所有権フィルタリングとarticle_idによる結合フィルタリング付き）
         const { data: playlists, error: playlistsError } = await supabase
             .from('playlists')
-            .select('*')
+            .select('*, playlist_items!inner(article_id)')
             .eq('owner_email', userEmail)
-            .in('id', playlistIds)
+            .eq('playlist_items.article_id', articleId)
             .order('is_default', { ascending: false })
             .order('created_at', { ascending: false })
 
@@ -78,7 +58,13 @@ export async function GET(
             )
         }
 
-        return NextResponse.json(playlists as Playlist[])
+        // Remove the nested playlist_items array before returning
+        const formattedPlaylists = playlists ? (playlists as any[]).map(p => {
+            const { playlist_items, ...rest } = p;
+            return rest;
+        }) : []
+
+        return NextResponse.json(formattedPlaylists as Playlist[])
     } catch (_error) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
