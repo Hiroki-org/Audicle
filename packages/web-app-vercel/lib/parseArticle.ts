@@ -36,9 +36,8 @@ export function normalizeArticleText(content: string): string {
                     const html = p.innerHTML || '';
                     const parts = html.split(/<br\s*\/?>(?:\s*<br\s*\/?>)+/i);
                     parts.forEach(part => {
-                        const text = document.createElement('div');
-                        text.innerHTML = part;
-                        const t = text.textContent?.trim();
+                        const { document: partDoc } = parseHTML(`<div>${part}</div>`);
+                        const t = partDoc.querySelector('div')?.textContent?.trim();
                         if (t) paragraphs.push(t);
                     });
                 });

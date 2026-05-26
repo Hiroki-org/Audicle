@@ -95,5 +95,16 @@ describe('normalizeArticleText', () => {
       const result = normalizeArticleText(html);
       expect(result).toBe('シンプルな引用');
     });
+
+    it('XSSペイロードが実行されず、テキストとして抽出されること', () => {
+      const html = `
+      <blockquote>
+        <p>安全なテキスト<br><br><img src="x" onerror="alert(1)"></p>
+      </blockquote>
+      `;
+      const result = normalizeArticleText(html);
+      expect(result).toContain('安全なテキスト');
+      expect(result).not.toContain('<img');
+    });
   });
 });
