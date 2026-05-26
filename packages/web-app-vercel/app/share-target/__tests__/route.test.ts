@@ -271,6 +271,129 @@ describe('Share Target Route Handlers', () => {
         })
     })
 
+
+    describe('Supabase (Remote) Error Paths', () => {
+        beforeEach(() => {
+            process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+
+            mockAuth.mockResolvedValue({
+                user: { id: 'test-user', email: 'test@example.com' },
+                expires: '2025-12-31',
+            });
+
+            mockGetOrCreateDefaultPlaylist.mockResolvedValue({
+                playlist: {
+                    id: 'playlist-1',
+                    owner_email: 'test@example.com',
+                    name: '読み込んだ記事',
+                    visibility: 'private',
+                    is_default: true,
+                    allow_fork: true,
+                    created_at: '2025-01-01T00:00:00Z',
+                    updated_at: '2025-01-01T00:00:00Z',
+                    items: [],
+                    item_count: 0,
+                },
+            });
+        });
+
+        it('記事の検索に失敗した場合はエラーページにリダイレクト', async () => {
+            (supabase.from as jest.Mock).mockReturnValue({
+                select: jest.fn().mockReturnThis(),
+                eq: jest.fn().mockReturnThis(),
+                maybeSingle: jest.fn().mockResolvedValue({ data: null, error: { message: 'Search error' } })
+            });
+
+            const request = new NextRequest('http://localhost:3000/share-target?url=https://example.com/article');
+            const response = await GET(request);
+
+            expect(response.status).toBe(307);
+            expect(response.headers.get('Location')).toContain('/share-target/error');
+        });
+
+        it('既存の記事のタイトル更新に失敗した場合はエラーページにリダイレクト', async () => {
+            const mockSelectSingle = jest.fn().mockResolvedValue({ data: null, error: { message: 'Update error' } });
+
+            (supabase.from as jest.Mock).mockImplementation((table) => {
+                if (table === 'articles') {
+                    return {
+                        select: jest.fn().mockReturnThis(),
+                        eq: jest.fn().mockReturnThis(),
+                        update: jest.fn().mockReturnThis(),
+                        maybeSingle: jest.fn().mockResolvedValueOnce({
+                            data: { id: 'article-1', title: 'Old Title', url: 'https://example.com/article' },
+                            error: null
+                        }),
+                        single: mockSelectSingle
+                    };
+                }
+            });
+
+            const request = new NextRequest('http://localhost:3000/share-target?url=https://example.com/article&title=New Title');
+            const response = await GET(request);
+
+            expect(response.status).toBe(307);
+            expect(response.headers.get('Location')).toContain('/share-target/error');
+        });
+
+        it('新規記事の作成に失敗した場合はエラーページにリダイレクト', async () => {
+            const mockInsertSingle = jest.fn().mockResolvedValue({ data: null, error: { message: 'Insert error' } });
+
+            (supabase.from as jest.Mock).mockImplementation((table) => {
+                if (table === 'articles') {
+                    return {
+                        select: jest.fn().mockReturnThis(),
+                        eq: jest.fn().mockReturnThis(),
+                        insert: jest.fn().mockReturnThis(),
+                        maybeSingle: jest.fn().mockResolvedValueOnce({ data: null, error: null }),
+                        single: mockInsertSingle
+                    };
+                }
+            });
+
+            const request = new NextRequest('http://localhost:3000/share-target?url=https://example.com/article');
+            const response = await GET(request);
+
+            expect(response.status).toBe(307);
+            expect(response.headers.get('Location')).toContain('/share-target/error');
+        });
+
+        it('プレイリストへの追加(RPC)に失敗した場合はエラーページにリダイレクト', async () => {
+            (supabase.from as jest.Mock).mockImplementation((table) => {
+                if (table === 'articles') {
+                    return {
+                        select: jest.fn().mockReturnThis(),
+                        eq: jest.fn().mockReturnThis(),
+                        maybeSingle: jest.fn().mockResolvedValueOnce({
+                            data: { id: 'article-1', title: 'Test Title', url: 'https://example.com/article' },
+                            error: null
+                        }),
+                    };
+                }
+            });
+
+            (supabase.rpc as jest.Mock).mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: null, error: { message: 'RPC error' } })
+            });
+
+            const request = new NextRequest('http://localhost:3000/share-target?url=https://example.com/article');
+            const response = await GET(request);
+
+            expect(response.status).toBe(307);
+            expect(response.headers.get('Location')).toContain('/share-target/error');
+        });
+
+        it('予期せぬエラーが発生した場合はエラーページにリダイレクト', async () => {
+            mockGetOrCreateDefaultPlaylist.mockRejectedValueOnce(new Error('Unexpected system error'));
+
+            const request = new NextRequest('http://localhost:3000/share-target?url=https://example.com/article');
+            const response = await GET(request);
+
+            expect(response.status).toBe(307);
+            expect(response.headers.get('Location')).toContain('/share-target/error');
+        });
+    });
+
     describe('URL validation during GET request', () => {
         it('http:// スキームは許可される', async () => {
             mockAuth.mockResolvedValue({
