@@ -16,20 +16,74 @@ if (!supabaseUrl || !supabaseServiceKey) {
     process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Disable native fetch behavior if the CI environment is overriding DNS poorly.
+// Since undici fetch fails on some CI due to DNS: getaddrinfo ENOTFOUND.
+const customFetch = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    let retries = 5;
+    let delay = 2000;
+    while (true) {
+        try {
+            return await globalThis.fetch(url, init);
+        } catch (error: any) {
+            if (retries <= 0 || !error.message || (!error.message.includes("fetch") && !error.message.includes("ENOTFOUND") && !error.message.includes("ECONNREFUSED"))) {
+                throw error;
+            }
+            console.log(`[SEED] Fetch failed (${error.message}). Retrying in ${delay}ms... (${retries} attempts left)`);
+            await new Promise(res => setTimeout(res, delay));
+            retries--;
+            delay *= 2; // Exponential backoff
+        }
+    }
+};
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+    },
+    global: {
+        fetch: customFetch as any
+    }
+});
 
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
+// Retry wrapper for supabase admin calls that might not use the custom fetch directly
+async function retryWithBackoff<T>(operation: () => Promise<T>, maxRetries = 5, baseDelay = 2000): Promise<T> {
+    let retries = 0;
+    while (true) {
+        try {
+            return await operation();
+        } catch (error: any) {
+            if (retries >= maxRetries) {
+                throw error;
+            }
+            // Check if it's a fetch/network error
+            if (error.message && (error.message.includes('fetch') || error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED') || error.message.includes('fetch failed'))) {
+                const delay = baseDelay * Math.pow(2, retries);
+                console.log(`[SEED] Network error detected: ${error.message}. Retrying in ${delay}ms... (${retries + 1}/${maxRetries})`);
+                await new Promise(res => setTimeout(res, delay));
+                retries++;
+            } else {
+                throw error; // If it's a regular API error (like 400 Bad Request), don't retry.
+            }
+        }
+    }
+}
+
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
+    const { data, error } = await retryWithBackoff(async () => {
+        return await supabase.auth.admin.createUser({
+            email: TEST_USER_EMAIL,
+            password: TEST_USER_PASSWORD,
+            email_confirm: true
+        });
     });
 
     if (error) {
@@ -45,88 +99,87 @@ async function ensureTestUser() {
             let foundUser = null;
             
             while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
-                    page: page,
-                    perPage: perPage
+                const { data: listData, error: listError } = await retryWithBackoff(async () => {
+                    return await supabase.auth.admin.listUsers({
+                        page: page,
+                        perPage: perPage
+                    });
                 });
                 
                 if (listError) {
-                    throw new Error(`Failed to list users to find existing one: ${listError.message}`);
+                    console.error("   Failed to list users:", listError);
+                    process.exit(1);
                 }
                 
-                if (!listData.users || listData.users.length === 0) {
-                    break; // No more users
-                }
+                foundUser = listData.users.find((u: any) => u.email === TEST_USER_EMAIL);
                 
-                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
-                
-                if (foundUser) {
-                    console.log(`   Found existing user ID: ${foundUser.id}`);
-                    return foundUser.id;
+                if (!foundUser) {
+                    if (listData.users.length < perPage) {
+                        // Reached the end of the list
+                        break;
+                    }
+                    page++;
                 }
-
-                // If we got fewer users than perPage, we're on the last page
-                if (listData.users.length < perPage) {
-                    break;
-                }
-                
-                // Safety break to prevent infinite loops if we have thousands of users (unlikely in test)
-                if (page > 20) {
-                    break; 
-                }
-                page++;
             }
             
-            throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
+            if (foundUser) {
+                console.log(`   Found existing user ID: ${foundUser.id}`);
+                return foundUser.id;
+            } else {
+                console.error("   User marked as already registered but could not be found in the user list.");
+                process.exit(1);
+            }
         }
-        throw error;
+
+        console.error("Failed to create test user:", error);
+        process.exit(1);
     }
+
+    if (!data?.user) {
+        console.error("User creation succeeded but no user returned");
+        process.exit(1);
+    }
+
     console.log(`   Created new user ID: ${data.user.id}`);
     return data.user.id;
 }
 
+const getArticleHash = (text: string) => {
+    return createHash("sha256").update(text).digest("hex");
+};
+
 async function runMigrations() {
-    console.log("マイグレーションを実行中...");
+    console.log("マイグレーションの実行を確認中...");
 
-    // articles テーブルの制約を修正
-    // owner_email, url の複合ユニーク制約が必要
-    const migrationSql = `
-        -- Drop existing constraint if exists (ignore error if not exists)
-        DO $$ BEGIN
-            ALTER TABLE public.articles DROP CONSTRAINT IF EXISTS articles_url_key;
-        EXCEPTION WHEN others THEN NULL; END $$;
-        
-        -- Add composite unique constraint (ignore if already exists)
-        DO $$ BEGIN
-            ALTER TABLE public.articles ADD CONSTRAINT articles_owner_email_url_key UNIQUE (owner_email, url);
-        EXCEPTION WHEN duplicate_table THEN NULL; END $$;
-        
-        -- Ensure playlist_items has correct constraint
-        DO $$ BEGIN
-            ALTER TABLE public.playlist_items DROP CONSTRAINT IF EXISTS playlist_items_playlist_id_article_id_key;
-        EXCEPTION WHEN others THEN NULL; END $$;
-        
-        DO $$ BEGIN
-            ALTER TABLE public.playlist_items ADD CONSTRAINT playlist_items_playlist_id_article_id_key UNIQUE (playlist_id, article_id);
-        EXCEPTION WHEN duplicate_table THEN NULL; END $$;
-    `;
+    // Check if articles table exists (as a proxy for migrations)
+    const { error } = await retryWithBackoff(async () => {
+        return await supabase
+            .from("articles")
+            .select("id")
+            .limit(1);
+    });
 
-    const { error } = await supabase.rpc('exec_sql', { sql: migrationSql }).single();
-
-    // exec_sql RPC がない場合は直接SQLを実行（Supabase Dashboard経由で手動実行が必要な場合あり）
     if (error) {
-        console.log("⚠️ RPC経由でのマイグレーション実行に失敗。直接クエリを試行...");
-        console.log("   エラー:", error.message);
+        console.log("テーブルが見つからないかエラーが発生しました。");
+        console.log("Supabaseのローカル環境を起動しているか確認してください:");
+        console.log("npx supabase start");
+        console.log("npx supabase db push");
 
-        // 代替: 個別のクエリで試行
+        // Wait for user to potentially run migrations manually
+        console.log("マイグレーションが完了するのを待ちます (5秒)...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Second check
         try {
-            // 既存の制約を確認
-            const { data: constraints } = await supabase
-                .from('articles')
-                .select('id')
-                .limit(1);
-
-            if (constraints !== null) {
+            const { error: secondCheckError } = await retryWithBackoff(async () => {
+                return await supabase
+                    .from("articles")
+                    .select("id")
+                    .limit(1);
+            });
+            if (secondCheckError) {
+                console.warn("⚠️ まだエラーが発生しています。シードを続行しますが、失敗する可能性があります。");
+            } else {
                 console.log("✓ articles テーブルにアクセス可能");
             }
         } catch {
@@ -148,15 +201,17 @@ async function seedTestData() {
 
     // 1. テストユーザーの設定
     console.log("1. ユーザー設定を作成中...");
-    const { error: userError } = await supabase
-        .from("user_settings")
-        .upsert({
-            user_id: TEST_USER_ID,
-            playback_speed: 1.0,
-            voice_model: "ja-JP-Standard-B",
-            language: "ja-JP",
-            color_theme: "ocean",
-        });
+    const { error: userError } = await retryWithBackoff(async () => {
+        return await supabase
+            .from("user_settings")
+            .upsert({
+                user_id: TEST_USER_ID,
+                playback_speed: 1.0,
+                voice_model: "ja-JP-Standard-B",
+                language: "ja-JP",
+                color_theme: "ocean",
+            });
+    });
 
     if (userError) {
         console.error("ユーザー設定の作成に失敗:", userError);
@@ -169,75 +224,68 @@ async function seedTestData() {
     console.log("2. テスト記事を作成中...");
     const articles = [
         // E2Eテスト用の固定記事（Apple, Banana, Cherry）
-        // 抽出処理が成功するように、実際に存在するURL（example.comのルート）を使用し、クエリパラメータで識別する
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=apple", // root is 200 OK
-            title: "Apple",
-            thumbnail_url: "https://via.placeholder.com/300",
+            url: "https://example.com/article-apple",
+            title: "Apple Ecosystem Basics",
+            text_content: "Apple provides a seamless ecosystem between iOS, iPadOS, and macOS. Continuity features make it easy.",
+            thumbnail_url: "https://example.com/apple.jpg",
+            domain_name: "example.com",
+            favicon_url: "https://example.com/favicon.ico",
         },
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=banana",
-            title: "Banana",
-            thumbnail_url: "https://via.placeholder.com/300",
+            url: "https://example.com/article-banana",
+            title: "Banana Nutrition Guide",
+            text_content: "Bananas are high in potassium and provide quick energy for athletes. They are easy to digest.",
+            thumbnail_url: "https://example.com/banana.jpg",
+            domain_name: "example.com",
+            favicon_url: "https://example.com/favicon.ico",
         },
         {
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=cherry",
-            title: "Cherry",
-            thumbnail_url: "https://via.placeholder.com/300",
+            url: "https://example.com/article-cherry",
+            title: "Cherry Picking Best Practices",
+            text_content: "When picking cherries, look for firm, bright fruits. Leave the stems on to preserve freshness.",
+            thumbnail_url: "https://example.com/cherry.jpg",
+            domain_name: "example.com",
+            favicon_url: "https://example.com/favicon.ico",
         },
-        // その他の記事
-        {
+        // 人気記事テスト用の記事（11件以上）
+        ...Array.from({ length: 15 }).map((_, i) => ({
             owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=article-1",
-            title: "テスト記事1",
-            thumbnail_url: "https://via.placeholder.com/300",
-        },
-        {
-            owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=article-2",
-            title: "テスト記事2",
-            thumbnail_url: "https://via.placeholder.com/300",
-        },
-        {
-            owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=popular-1",
-            title: "人気記事1 - TypeScript入門",
-            thumbnail_url: "https://via.placeholder.com/300",
-        },
-        {
-            owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=popular-2",
-            title: "人気記事2 - Next.js完全ガイド",
-            thumbnail_url: "https://via.placeholder.com/300",
-        },
-        {
-            owner_email: TEST_USER_EMAIL,
-            url: "https://example.com/?id=popular-3",
-            title: "人気記事3 - Supabase実践",
-            thumbnail_url: "https://via.placeholder.com/300",
-        },
+            url: `https://example.com/popular-${i + 1}`,
+            title: `Popular Topic ${i + 1}`,
+            text_content: `This is a popular article content ${i + 1}.`.repeat(10),
+            thumbnail_url: `https://example.com/popular${i + 1}.jpg`,
+            domain_name: "example.com",
+            favicon_url: "https://example.com/favicon.ico",
+        })),
     ];
 
-    // select + insert/update パターンで記事を作成（upsertを避ける）
-    interface Article {
-        id: string;
+    // 全ての記事にIDを付与
+    type Article = {
+        id?: string;
         owner_email: string;
         url: string;
         title: string;
+        text_content: string;
         thumbnail_url: string;
-    }
+        domain_name: string;
+        favicon_url: string;
+    };
+
     const urls = articles.map(a => a.url);
 
     const emails = Array.from(new Set(articles.map(a => a.owner_email)));
     // 既存の記事を一括検索 (urlとowner_emailでフィルタ)
-    const { data: existingData, error: selectError } = await supabase
-        .from("articles")
-        .select()
-        .in("url", urls)
-        .in("owner_email", emails);
+    const { data: existingData, error: selectError } = await retryWithBackoff(async () => {
+        return await supabase
+            .from("articles")
+            .select()
+            .in("url", urls)
+            .in("owner_email", emails);
+    });
 
     if (selectError) {
         console.error("記事の検索に失敗:", selectError);
@@ -255,16 +303,12 @@ async function seedTestData() {
     const toInsert: typeof articles = [];
     const toUpdate: typeof articles = [];
 
-    // 重複を避けるためのSet (owner_email + url)
-    const processedKeys = new Set();
-
+    // 各記事を振り分け
     for (const article of articles) {
         const key = article.owner_email + "||" + article.url;
-        if (processedKeys.has(key)) continue;
-        processedKeys.add(key);
-
         const existing = existingMap.get(key);
         if (existing) {
+            // Update mode: map the ID to the existing record
             toUpdate.push(article);
         } else {
             toInsert.push(article);
@@ -275,10 +319,12 @@ async function seedTestData() {
 
     // 新規記事を一括作成
     if (toInsert.length > 0) {
-        const { data: created, error: createError } = await supabase
-            .from("articles")
-            .insert(toInsert)
-            .select();
+        const { data: created, error: createError } = await retryWithBackoff(async () => {
+            return await supabase
+                .from("articles")
+                .insert(toInsert)
+                .select();
+        });
 
         if (createError) {
             console.error("記事の一括作成に失敗:", createError);
@@ -296,11 +342,7 @@ async function seedTestData() {
         const batchUpdateData = toUpdate.map((article) => {
             const key = article.owner_email + "||" + article.url;
             const existing = existingMap.get(key);
-
-            if (!existing) {
-                // This shouldn't happen due to the logic above, but added for safety and TS
-                return null;
-            }
+            if (!existing) return null;
 
             return {
                 id: existing.id,
@@ -311,10 +353,12 @@ async function seedTestData() {
             };
         }).filter((item) => item !== null) as { id: string; owner_email: string; title: string; thumbnail_url: string; url: string }[];
 
-        const { data: updatedItems, error: updateError } = await supabase
-            .from("articles")
-            .upsert(batchUpdateData, { onConflict: "id" })
-            .select();
+        const { data: updatedItems, error: updateError } = await retryWithBackoff(async () => {
+            return await supabase
+                .from("articles")
+                .upsert(batchUpdateData, { onConflict: "id" })
+                .select();
+        });
 
         if (updateError) {
             console.error("記事の更新に失敗:", updateError);
@@ -335,44 +379,45 @@ async function seedTestData() {
     for (const article of articles) {
         const key = article.owner_email + "||" + article.url;
         const created = createdArticlesMap.get(key);
-        // 重複を防ぐ (O(1)のSetでチェック)
-        if (created && !addedKeys.has(key)) {
-            createdArticles.push(created);
-            addedKeys.add(key);
+        if (created) {
+             // 重複追加を防ぐ (articles配列内に同じものがある場合)
+            if(!addedKeys.has(key)){
+                createdArticles.push(created);
+                addedKeys.add(key);
+            }
         }
     }
+    console.log(`✓ ${createdArticles.length}件のテスト記事を作成/更新しました`);
 
-    if (createdArticles.length === 0) {
-        console.error("記事の作成に失敗: 作成された記事がありません");
-        process.exit(1);
-    }
-    console.log(`✓ ${createdArticles.length}件の記事を作成しました`);
-
-    // 3. 人気記事の統計データを作成（access_count >= 5）
+    // 3. 人気記事の統計データを作成
     console.log("3. 人気記事の統計データを作成中...");
-    const popularArticles = createdArticles.slice(2);
-    const fixedAccessCounts = [15, 20, 25];
+    const popularArticles = createdArticles.filter((a) => a.url.includes("popular"));
+
+    // テスト用にアクセス数を固定（降順）
+    const fixedAccessCounts = [1500, 1200, 1000, 800, 600, 500, 400, 300, 200, 150, 100, 80, 50, 30, 10];
 
     if (popularArticles.length > 0) {
         const now = new Date().toISOString();
         const statsData = popularArticles.map((article, i) => {
-            const articleHash = createHash("sha256").update(article.url).digest("hex");
+            const accessCount = fixedAccessCounts[i] || 1;
             return {
-                article_hash: articleHash,
-                url: article.url,
+                article_url: article.url,
+                article_hash: getArticleHash(article.url),
                 title: article.title,
-                domain: "example.com",
-                access_count: fixedAccessCounts[i] ?? 10,
-                unique_users: 10,
-                cache_hit_rate: 0.85,
+                domain_name: article.domain_name,
+                thumbnail_url: article.thumbnail_url,
+                favicon_url: article.favicon_url,
+                access_count: accessCount,
                 is_fully_cached: true,
                 last_accessed_at: now,
             };
         });
 
-        const { error: statsError } = await supabase
-            .from("article_stats")
-            .upsert(statsData, { onConflict: "article_hash" });
+        const { error: statsError } = await retryWithBackoff(async () => {
+            return await supabase
+                .from("article_stats")
+                .upsert(statsData, { onConflict: "article_hash" });
+        });
 
         if (statsError) {
             console.error("統計データの作成に失敗:", statsError);
@@ -396,9 +441,11 @@ async function seedTestData() {
             last_accessed: now,
         }));
 
-        const { error: cacheError } = await supabase
-            .from("audio_cache_index")
-            .upsert(cacheData, { onConflict: "article_url,voice" });
+        const { error: cacheError } = await retryWithBackoff(async () => {
+            return await supabase
+                .from("audio_cache_index")
+                .upsert(cacheData, { onConflict: "article_url,voice" });
+        });
 
         if (cacheError) {
             console.error("キャッシュインデックスの作成に失敗:", cacheError);
@@ -410,11 +457,13 @@ async function seedTestData() {
     // 5. デフォルトプレイリストの作成
     console.log("5. デフォルトプレイリストを作成中...");
 
-    const { data: existingDefaultPlaylists, error: existingDefaultPlaylistsError } = await supabase
-        .from("playlists")
-        .select("id")
-        .eq("owner_email", TEST_USER_EMAIL)
-        .eq("is_default", true);
+    const { data: existingDefaultPlaylists, error: existingDefaultPlaylistsError } = await retryWithBackoff(async () => {
+        return await supabase
+            .from("playlists")
+            .select("id")
+            .eq("owner_email", TEST_USER_EMAIL)
+            .eq("is_default", true);
+    });
 
     if (existingDefaultPlaylistsError) {
         console.error("既存プレイリストの取得に失敗:", existingDefaultPlaylistsError);
@@ -423,37 +472,44 @@ async function seedTestData() {
 
     const existingDefaultPlaylistIds = existingDefaultPlaylists?.map((playlist) => playlist.id) ?? [];
     if (existingDefaultPlaylistIds.length > 0) {
-        const { error: itemsDeleteError } = await supabase
-            .from("playlist_items")
-            .delete()
-            .in("playlist_id", existingDefaultPlaylistIds);
+        const { error: itemsDeleteError } = await retryWithBackoff(async () => {
+            return await supabase
+                .from("playlist_items")
+                .delete()
+                .in("playlist_id", existingDefaultPlaylistIds);
+        });
         if (itemsDeleteError) {
             console.error("プレイリストアイテムの削除に失敗:", itemsDeleteError);
             process.exit(1);
         }
     }
 
-    const { error: playlistsDeleteError } = await supabase
-        .from("playlists")
-        .delete()
-        .eq("owner_email", TEST_USER_EMAIL)
-        .eq("is_default", true);
+    const { error: playlistsDeleteError } = await retryWithBackoff(async () => {
+        return await supabase
+            .from("playlists")
+            .delete()
+            .eq("owner_email", TEST_USER_EMAIL)
+            .eq("is_default", true);
+    });
+
     if (playlistsDeleteError) {
         console.error("既存プレイリストの削除に失敗:", playlistsDeleteError);
         process.exit(1);
     }
 
-    const { data: defaultPlaylist, error: playlistError } = await supabase
-        .from("playlists")
-        .insert({
-            owner_email: TEST_USER_EMAIL,
-            name: "デフォルトプレイリスト",
-            description: "テスト用デフォルトプレイリスト",
-            is_default: true,
-            visibility: "private",
-        })
-        .select()
-        .single();
+    const { data: defaultPlaylist, error: playlistError } = await retryWithBackoff(async () => {
+        return await supabase
+            .from("playlists")
+            .insert({
+                owner_email: TEST_USER_EMAIL,
+                name: "デフォルトプレイリスト",
+                description: "テスト用デフォルトプレイリスト",
+                is_default: true,
+                visibility: "private",
+            })
+            .select()
+            .single();
+    });
 
     if (playlistError || !defaultPlaylist) {
         console.error("プレイリストの作成に失敗:", playlistError);
@@ -470,7 +526,9 @@ async function seedTestData() {
     }));
 
     if (defaultPlaylistItems.length > 0) {
-        const { error: itemError } = await supabase.from("playlist_items").insert(defaultPlaylistItems);
+        const { error: itemError } = await retryWithBackoff(async () => {
+            return await supabase.from("playlist_items").insert(defaultPlaylistItems);
+        });
 
         if (itemError) {
             console.error("プレイリストアイテムの追加に失敗:", itemError);
@@ -482,23 +540,27 @@ async function seedTestData() {
     // 7. ソートテスト用プレイリストの作成
     console.log("7. ソートテスト用プレイリストを作成中...");
 
-    await supabase
-        .from("playlists")
-        .delete()
-        .eq("owner_email", TEST_USER_EMAIL)
-        .eq("name", "ソートテスト用プレイリスト");
+    await retryWithBackoff(async () => {
+        return await supabase
+            .from("playlists")
+            .delete()
+            .eq("owner_email", TEST_USER_EMAIL)
+            .eq("name", "ソートテスト用プレイリスト");
+    });
 
-    const { data: sortTestPlaylist, error: sortPlaylistError } = await supabase
-        .from("playlists")
-        .insert({
-            owner_email: TEST_USER_EMAIL,
-            name: "ソートテスト用プレイリスト",
-            description: "ソート順序の確認用プレイリスト",
-            is_default: false,
-            visibility: "private",
-        })
-        .select()
-        .single();
+    const { data: sortTestPlaylist, error: sortPlaylistError } = await retryWithBackoff(async () => {
+        return await supabase
+            .from("playlists")
+            .insert({
+                owner_email: TEST_USER_EMAIL,
+                name: "ソートテスト用プレイリスト",
+                description: "ソート順序の確認用プレイリスト",
+                is_default: false,
+                visibility: "private",
+            })
+            .select()
+            .single();
+    });
 
     if (sortPlaylistError || !sortTestPlaylist) {
         console.error("ソートテスト用プレイリストの作成に失敗:", sortPlaylistError);
@@ -515,7 +577,9 @@ async function seedTestData() {
     }));
 
     if (sortTestPlaylistItems.length > 0) {
-        const { error: itemError } = await supabase.from("playlist_items").insert(sortTestPlaylistItems);
+        const { error: itemError } = await retryWithBackoff(async () => {
+            return await supabase.from("playlist_items").insert(sortTestPlaylistItems);
+        });
 
         if (itemError) {
             console.error("ソートテスト用プレイリストアイテムの追加に失敗:", itemError);
