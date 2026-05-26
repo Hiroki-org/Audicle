@@ -532,6 +532,10 @@ async function seedTestData() {
 }
 
 seedTestData().catch((error) => {
+    if (error?.message?.includes("fetch failed") || error?.code === "ENOTFOUND" || error?.cause?.code === "ENOTFOUND") {
+        console.warn("⚠️ Supabase is unreachable (likely paused or deleted). Skipping seed data insertion.");
+        process.exit(0);
+    }
     console.error("エラーが発生しました:", error);
     process.exit(1);
 });
