@@ -184,9 +184,8 @@ async function fetchWithTimeout(
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         },
-        // @ts-ignore - duplex is needed for some fetch implementations but not in standard type
         duplex: "half",
-      });
+      } as RequestInit & { duplex?: "half" });
 
       // 認証が必要なサイトの場合は専用エラーをスロー
       if (response.status === 401 || response.status === 403) {
