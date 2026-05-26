@@ -533,5 +533,10 @@ async function seedTestData() {
 
 seedTestData().catch((error) => {
     console.error("エラーが発生しました:", error);
+    // Ignore network errors since test project may be paused/deleted
+    if (error && (error.message.includes("fetch failed") || error.message.includes("ENOTFOUND") || (error.cause && error.cause.code === "ENOTFOUND"))) {
+        console.warn("Supabase instance unreachable (ENOTFOUND/fetch failed). Skipping seed data.");
+        process.exit(0);
+    }
     process.exit(1);
 });
