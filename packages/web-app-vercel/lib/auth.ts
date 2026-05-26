@@ -6,11 +6,6 @@ import { initializeNewUser } from "./user-initialization";
 // デバッグログは開発/テスト環境のみ
 const IS_DEBUG = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
 
-// 診断ログ
-console.log('[AUTH DIAGNOSTIC] NODE_ENV:', process.env.NODE_ENV)
-console.log('[AUTH DIAGNOSTIC] IS_DEBUG:', IS_DEBUG)
-console.log('[AUTH DIAGNOSTIC] TEST_USER_EMAIL:', process.env.TEST_USER_EMAIL ? 'SET' : 'NOT SET')
-console.log('[AUTH DIAGNOSTIC] TEST_USER_PASSWORD:', process.env.TEST_USER_PASSWORD ? 'SET' : 'NOT SET')
 
 const allowedUsers = process.env.ALLOWED_USERS?.split(',').map(email => email.trim()) || [];
 
