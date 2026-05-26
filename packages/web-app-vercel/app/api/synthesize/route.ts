@@ -441,11 +441,13 @@ export async function POST(request: NextRequest) {
                     }
 
                     // アクセスカウントと最終アクセス時刻を更新
-                    await kv.hincrby(metadataKey, 'readCount', 1);
-                    await kv.hset(metadataKey, {
-                        lastAccessed: new Date().toISOString(),
-                        lastPlayedChunk: chunkIndex ?? 0
-                    });
+                    await Promise.all([
+                        kv.hincrby(metadataKey, 'readCount', 1),
+                        kv.hset(metadataKey, {
+                            lastAccessed: new Date().toISOString(),
+                            lastPlayedChunk: chunkIndex ?? 0
+                        })
+                    ]);
                     log('info', 'アクセスメタデータを更新しました', { articleUrl });
                 } catch (kvError) {
                     log('error', 'アクセスメタデータの更新に失敗しました', { error: kvError });
