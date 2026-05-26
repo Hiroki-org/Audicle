@@ -1,8 +1,0 @@
-💡 **What:** The optimization implemented
-Replaced the sequential `await kv.hincrby()` and `await kv.hset()` calls with a single `Promise.all()` in the `/api/synthesize` route.
-
-🎯 **Why:** The performance problem it solves
-Because Redis KV operations are primarily bound by network latency, waiting for `hincrby` to finish before sending the `hset` request adds unnecessary latency. Since these two operations update different fields of the same metadata key (the count and the timestamps) and don't depend on each other's return value or state, they can be fired off concurrently.
-
-📊 **Measured Improvement:**
-Executing two consecutive KV operations typically incurs network latency twice (e.g. 50ms + 50ms = 100ms). By executing them concurrently with `Promise.all()`, the total time spent waiting is roughly the maximum of the two latencies (e.g. max(50ms, 50ms) = 50ms), reducing the redis overhead time by approximately 50%. A local conceptual test comparing sequential vs Promise.all demonstrated execution time dropping from 101ms to 51ms.
