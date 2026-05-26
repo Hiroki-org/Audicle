@@ -75,8 +75,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 if (IS_DEBUG) {
                     console.log('[AUTH DEBUG] Test user - skipping whitelist check')
                 }
-                // テスト用ユーザーの初期化処理
-                await initializeNewUser(user.id, user.email || '');
+                // テスト用ユーザーの初期化処理を非同期で実行（ブロッキングを回避）
+                initializeNewUser(user.id, user.email || '').catch(console.error);
                 return true
             }
 
@@ -99,11 +99,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         async jwt({ token, account, profile }) {
             if (account) {
                 token.id = profile?.sub || account.providerAccountId;
+                // 新規ログイン時に初期化処理を非同期で実行（ブロッキングを回避）
+                initializeNewUser(token.id as string, profile?.email || '').catch(console.error);
             }
-
-            // 新規・既存問わず、常に初期化チェックを実行
-            // initializeNewUser内で存在チェックするため、既存ユーザーはスキップされる
-            await initializeNewUser(token.id as string, profile?.email || '');
 
             return token;
         },
