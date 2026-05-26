@@ -15,7 +15,15 @@ export interface UserInitializationResult {
  * @param userEmail ユーザーのメールアドレス
  * @returns 初期化結果
  */
+
+let isDatabaseUnreachable = false;
+
 export async function initializeNewUser(userId: string, userEmail: string): Promise<UserInitializationResult> {
+    if (isDatabaseUnreachable) {
+        console.warn('Skipping initializeNewUser because database was previously unreachable.');
+        return { success: false, error: 'Database unreachable' };
+    }
+
     try {
         // user_settings が既に存在するか確認
         const { data: existingSettings, error: checkError } = await supabase
@@ -33,6 +41,9 @@ export async function initializeNewUser(userId: string, userEmail: string): Prom
         // PGRST116 = not found（正常な状態）
         if (checkError && checkError.code !== 'PGRST116') {
             console.error('Error checking user settings:', checkError)
+            if (checkError.message?.includes('fetch failed') || checkError.message?.includes('ENOTFOUND')) {
+                isDatabaseUnreachable = true;
+            }
             return { success: false, error: 'Failed to check user settings' }
         }
 
@@ -67,6 +78,9 @@ export async function initializeNewUser(userId: string, userEmail: string): Prom
         return { success: true }
     } catch (error) {
         console.error('Unexpected error in initializeNewUser:', error)
+        if (error instanceof Error && (error.message.includes('fetch failed') || error.message.includes('ENOTFOUND'))) {
+            isDatabaseUnreachable = true;
+        }
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
