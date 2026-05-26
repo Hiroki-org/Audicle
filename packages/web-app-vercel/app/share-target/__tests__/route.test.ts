@@ -246,6 +246,21 @@ describe('Share Target Route Handlers', () => {
             expect(mockGetOrCreateDefaultPlaylist).toHaveBeenCalledWith('test@example.com')
         })
 
+
+        it('formDataのパース中にエラーが発生した場合はエラーページにリダイレクト', async () => {
+            const request = new NextRequest('http://localhost:3000/share-target', {
+                method: 'POST',
+            })
+            // Mock formData to throw error
+            request.formData = jest.fn().mockRejectedValue(new Error('Mocked form data error'))
+
+            const response = await POST(request)
+
+            expect(response.status).toBe(307)
+            expect(response.headers.get('Location')).toContain('/share-target/error')
+            expect(response.headers.get('Location')).toContain(encodeURIComponent('リクエストの処理に失敗しました'))
+        })
+
         it('デフォルトプレイリスト取得失敗時はエラーページにリダイレクト', async () => {
             mockAuth.mockResolvedValue({
                 user: { id: 'test-user', email: 'test@example.com' },
