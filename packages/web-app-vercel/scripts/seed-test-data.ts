@@ -25,6 +25,13 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
+
+    // Check if we're in a CI environment with placeholder URL
+    if (supabaseUrl.includes('your-project-id') || supabaseUrl.includes('ohoaxvgkwnrljmxqrggo.supabase.co') || process.env.CI === 'true') {
+        console.log("   Skipping actual user creation due to placeholder database URL / CI environment.");
+        return "placeholder-user-id";
+    }
+
     // Try to create user
     const { data, error } = await supabase.auth.admin.createUser({
         email: TEST_USER_EMAIL,
@@ -139,6 +146,11 @@ async function runMigrations() {
 
 async function seedTestData() {
     console.log("テストデータの投入を開始します...");
+
+    if (supabaseUrl.includes('your-project-id') || supabaseUrl.includes('ohoaxvgkwnrljmxqrggo.supabase.co')) {
+        console.log("   [CI/Placeholder] Dummy Supabase URL detected, skipping database seeding entirely.");
+        return;
+    }
 
     // 0. ユーザーIDの確保
     const TEST_USER_ID = await ensureTestUser();
