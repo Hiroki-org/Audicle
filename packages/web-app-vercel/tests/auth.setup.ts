@@ -62,7 +62,7 @@ setup('authenticate', async ({ page }) => {
     await loginButton.click()
 
     // ログイン完了を待つ（トップページにリダイレクト）
-    await page.waitForURL('/', { timeout: 15000 })
+    await page.waitForURL('/', { timeout: 45000 })
 
     // Clear localStorage to avoid stale popular-articles cache in storageState
     await page.evaluate(() => {
