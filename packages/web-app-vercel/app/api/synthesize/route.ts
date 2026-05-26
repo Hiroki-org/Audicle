@@ -487,7 +487,7 @@ export async function POST(request: NextRequest) {
         let headOperationsSkipped = 0;
 
 
-        const chunkResults = await Promise.all(textChunks.map(async (chunkText, i) => {
+        const chunkResults = await Promise.all(textChunks.map(async (chunkText: string, i: number) => {
             const cleanedChunkText = removeSeparatorCharacters(chunkText);
             const textHash = calculateTextHash(cleanedChunkText, i);
             const cacheKey = `${textHash}:${voiceToUse}.mp3`;
@@ -495,7 +495,7 @@ export async function POST(request: NextRequest) {
 
             let result = {
                 audioUrl: '',
-                audioBuffer: Buffer.alloc(0),
+                audioBuffer: Buffer.alloc(0) as Buffer,
                 cacheHit: false,
                 headOperationsSkipped: 0
             };
