@@ -19,19 +19,21 @@ if (!supabaseUrl || !supabaseServiceKey) {
 // Disable native fetch behavior if the CI environment is overriding DNS poorly.
 // Since undici fetch fails on some CI due to DNS: getaddrinfo ENOTFOUND.
 const customFetch = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    let retries = 5;
-    let delay = 2000;
+    let retries = 20; // Increase max retries
+    let delay = 1000; // Start with shorter delay to scale up evenly
     while (true) {
         try {
             return await globalThis.fetch(url, init);
         } catch (error: any) {
-            if (retries <= 0 || !error.message || (!error.message.includes("fetch") && !error.message.includes("ENOTFOUND") && !error.message.includes("ECONNREFUSED"))) {
+            // The error object thrown by fetch is often a TypeError without an obvious network string. We retry any TypeError.
+            if (retries <= 0 || (error.name !== "TypeError" && !error.message?.includes("fetch") && !error.message?.includes("ENOTFOUND") && !error.message?.includes("ECONNREFUSED"))) {
                 throw error;
             }
             console.log(`[SEED] Fetch failed (${error.message}). Retrying in ${delay}ms... (${retries} attempts left)`);
             await new Promise(res => setTimeout(res, delay));
             retries--;
-            delay *= 2; // Exponential backoff
+            // Limit delay backoff to max 10 seconds per loop
+            delay = Math.min(delay * 1.5, 10000);
         }
     }
 };
@@ -64,7 +66,7 @@ async function retryWithBackoff<T>(operation: () => Promise<T>, maxRetries = 5, 
             }
             // Check if it's a fetch/network error
             if (error.message && (error.message.includes('fetch') || error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED') || error.message.includes('fetch failed'))) {
-                const delay = baseDelay * Math.pow(2, retries);
+                const delay = Math.min(baseDelay * Math.pow(2, retries), 10000);
                 console.log(`[SEED] Network error detected: ${error.message}. Retrying in ${delay}ms... (${retries + 1}/${maxRetries})`);
                 await new Promise(res => setTimeout(res, delay));
                 retries++;
