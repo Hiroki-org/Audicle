@@ -193,7 +193,7 @@ async function handleShareTarget(
                 })
                 .single()) as {
                     data: { item_position: number; already_exists: boolean } | null;
-                    error: any;
+                    error: unknown;
                 }
 
             if (rpcError) {
