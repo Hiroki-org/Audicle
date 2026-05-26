@@ -24,11 +24,11 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 
-async function fetchWithRetry<T>(fn: () => Promise<{ data: T | null; error: any }>, retries = 3, delay = 1000): Promise<{ data: T | null; error: any }> {
+async function fetchWithRetry<T>(fn: () => Promise<{ data: T | null; error: any }>, retries = 5, delay = 2000): Promise<{ data: T | null; error: any }> {
+    let currentDelay = delay;
     for (let i = 0; i < retries; i++) {
         try {
             const res = await fn();
-            // Network errors might manifest as thrown errors or within res.error depending on the client
             if (res.error && res.error.message && (res.error.message.includes('fetch failed') || res.error.message.includes('ENOTFOUND') || res.error.message.includes('ECONNRESET'))) {
                 throw new Error(res.error.message);
             }
@@ -41,8 +41,9 @@ async function fetchWithRetry<T>(fn: () => Promise<{ data: T | null; error: any 
                 }
                 throw error;
             }
-            console.log(`Network error caught, retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+            console.log(`Network error caught, retrying in ${currentDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, currentDelay));
+            currentDelay *= 2; // exponential backoff
         }
     }
     return { data: null, error: new Error('Max retries reached') };
@@ -300,10 +301,10 @@ async function seedTestData() {
 
     // 新規記事を一括作成
     if (toInsert.length > 0) {
-        const { data: created, error: createError } = await supabase
+        const { data: created, error: createError } = await fetchWithRetry(() => supabase
             .from("articles")
             .insert(toInsert)
-            .select();
+            .select());
 
         if (createError) {
             console.error("記事の一括作成に失敗:", createError);
@@ -336,10 +337,10 @@ async function seedTestData() {
             };
         }).filter((item) => item !== null) as { id: string; owner_email: string; title: string; thumbnail_url: string; url: string }[];
 
-        const { data: updatedItems, error: updateError } = await supabase
+        const { data: updatedItems, error: updateError } = await fetchWithRetry(() => supabase
             .from("articles")
             .upsert(batchUpdateData, { onConflict: "id" })
-            .select();
+            .select());
 
         if (updateError) {
             console.error("記事の更新に失敗:", updateError);
@@ -395,9 +396,9 @@ async function seedTestData() {
             };
         });
 
-        const { error: statsError } = await supabase
+        const { error: statsError } = await fetchWithRetry(() => supabase
             .from("article_stats")
-            .upsert(statsData, { onConflict: "article_hash" });
+            .upsert(statsData, { onConflict: "article_hash" }));
 
         if (statsError) {
             console.error("統計データの作成に失敗:", statsError);
@@ -421,9 +422,9 @@ async function seedTestData() {
             last_accessed: now,
         }));
 
-        const { error: cacheError } = await supabase
+        const { error: cacheError } = await fetchWithRetry(() => supabase
             .from("audio_cache_index")
-            .upsert(cacheData, { onConflict: "article_url,voice" });
+            .upsert(cacheData, { onConflict: "article_url,voice" }));
 
         if (cacheError) {
             console.error("キャッシュインデックスの作成に失敗:", cacheError);
@@ -435,11 +436,11 @@ async function seedTestData() {
     // 5. デフォルトプレイリストの作成
     console.log("5. デフォルトプレイリストを作成中...");
 
-    const { data: existingDefaultPlaylists, error: existingDefaultPlaylistsError } = await supabase
+    const { data: existingDefaultPlaylists, error: existingDefaultPlaylistsError } = await fetchWithRetry(() => supabase
         .from("playlists")
         .select("id")
         .eq("owner_email", TEST_USER_EMAIL)
-        .eq("is_default", true);
+        .eq("is_default", true));
 
     if (existingDefaultPlaylistsError) {
         console.error("既存プレイリストの取得に失敗:", existingDefaultPlaylistsError);
@@ -468,7 +469,7 @@ async function seedTestData() {
         process.exit(1);
     }
 
-    const { data: defaultPlaylist, error: playlistError } = await supabase
+    const { data: defaultPlaylist, error: playlistError } = await fetchWithRetry(() => supabase
         .from("playlists")
         .insert({
             owner_email: TEST_USER_EMAIL,
@@ -478,7 +479,7 @@ async function seedTestData() {
             visibility: "private",
         })
         .select()
-        .single();
+        .single());
 
     if (playlistError || !defaultPlaylist) {
         console.error("プレイリストの作成に失敗:", playlistError);
@@ -513,7 +514,7 @@ async function seedTestData() {
         .eq("owner_email", TEST_USER_EMAIL)
         .eq("name", "ソートテスト用プレイリスト");
 
-    const { data: sortTestPlaylist, error: sortPlaylistError } = await supabase
+    const { data: sortTestPlaylist, error: sortPlaylistError } = await fetchWithRetry(() => supabase
         .from("playlists")
         .insert({
             owner_email: TEST_USER_EMAIL,
@@ -523,7 +524,7 @@ async function seedTestData() {
             visibility: "private",
         })
         .select()
-        .single();
+        .single());
 
     if (sortPlaylistError || !sortTestPlaylist) {
         console.error("ソートテスト用プレイリストの作成に失敗:", sortPlaylistError);

@@ -1,6 +1,0 @@
-🔧 Fix DNS ENOTFOUND flakiness in seed-test-data
-
-🎯 **What:**
-Added retry logic (`fetchWithRetry`) to network-heavy Supabase calls in `scripts/seed-test-data.ts`. The CI occasionally fails with `Error: getaddrinfo ENOTFOUND [URL]` or `TypeError: fetch failed` when calling Supabase Admin API (`createUser`).
-
-The retry logic wraps `createUser` and `listUsers` and basic queries to retry on network errors before bubbling them up to `process.exit(1)`.
