@@ -1,18 +1,25 @@
 import * as dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
 // Fix fetch ENOTFOUND issue on Node 20+
+// Wait for DNS cache or retry
 if (typeof globalThis.fetch === 'function') {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, options) => {
-    try {
-      return await originalFetch(url, options);
-    } catch (e) {
-      if (e.cause && e.cause.code === 'ENOTFOUND') {
-        console.warn(`[SEED] Retrying fetch due to ENOTFOUND: ${url}`);
+    let lastErr;
+    for (let i = 0; i < 3; i++) {
+      try {
         return await originalFetch(url, options);
+      } catch (e) {
+        lastErr = e;
+        if (e.cause && e.cause.code === 'ENOTFOUND') {
+          console.warn(`[SEED] Retrying fetch due to ENOTFOUND (${i+1}/3): ${url}`);
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+        throw e;
       }
-      throw e;
     }
+    throw lastErr;
   };
 }
 import { createClient } from "@supabase/supabase-js";
