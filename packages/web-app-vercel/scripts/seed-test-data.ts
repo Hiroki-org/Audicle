@@ -16,7 +16,40 @@ if (!supabaseUrl || !supabaseServiceKey) {
     process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
+    let retries = 5;
+    let lastError: any;
+
+    while (retries > 0) {
+        try {
+            const response = await fetch(url, options);
+            return response;
+        } catch (error: any) {
+            lastError = error;
+            if (error.message?.includes('ENOTFOUND') || error.message?.includes('fetch failed')) {
+                console.log(`[SEED] Fetch failed (${error.message}), retrying... (${retries} attempts left)`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                retries--;
+            } else {
+                throw error;
+            }
+        }
+    }
+    throw lastError;
+};
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+    },
+    global: {
+        fetch: customFetch
+    }
+});
+
 
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
