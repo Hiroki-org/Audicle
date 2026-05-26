@@ -1,0 +1,299 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test npm run start"
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
+      playwright-cache-hit: ${{ steps.playwright-cache.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Restore npm cache
+        id: cache-deps
+        uses: actions/cache@v5
+        with:
+          path: packages/web-app-vercel/node_modules
+          key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+          restore-keys: |
+            npm-deps-${{ runner.os }}-node-20-
+
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: npm ci
+        working-directory: packages/web-app-vercel
+
+      - name: Restore Playwright cache
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium firefox webkit
+        working-directory: packages/web-app-vercel
+
+  lint:
+    name: Lint (web-app-vercel)
+    needs: setup
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Restore npm cache
+        id: cache-deps
+        uses: actions/cache@v5
+        with:
+          path: packages/web-app-vercel/node_modules
+          key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: npm ci
+        working-directory: packages/web-app-vercel
+      - name: Run lint
+        run: npm run lint
+        working-directory: packages/web-app-vercel
+
+  lint-web-app:
+    name: Lint & Build (web-app)
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+        working-directory: packages/web-app
+      - name: Run lint
+        run: npm run lint
+        working-directory: packages/web-app
+      - name: Run build
+        run: npm run build
+        working-directory: packages/web-app
+
+  check-api-server:
+    name: Check (api-server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: packages/api-server
+      - name: Check syntax
+        run: python -m py_compile main.py
+        working-directory: packages/api-server
+
+  unit-test:
+    name: Unit Tests
+    needs: setup
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Restore npm cache
+        id: cache-deps
+        uses: actions/cache@v5
+        with:
+          path: packages/web-app-vercel/node_modules
+          key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: npm ci
+        working-directory: packages/web-app-vercel
+      - name: Run unit tests
+        run: npm run test:unit
+        working-directory: packages/web-app-vercel
+        env:
+          NODE_ENV: test
+
+  integration-test:
+    name: Integration Tests
+    needs: setup
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Restore npm cache
+        id: cache-deps
+        uses: actions/cache@v5
+        with:
+          path: packages/web-app-vercel/node_modules
+          key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: npm ci
+        working-directory: packages/web-app-vercel
+      - name: Run integration tests
+        run: npm run test:integration
+        working-directory: packages/web-app-vercel
+        env:
+          NODE_ENV: test
+
+  build:
+    name: Build
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Restore npm cache
+        uses: actions/cache@v5
+        with:
+          path: packages/web-app-vercel/node_modules
+          key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+
+      - name: Build Next.js
+        run: npm run build
+        working-directory: packages/web-app-vercel
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXT_PUBLIC_AUTH_ENV: test
+
+      - name: Verify Next.js output exists
+        run: test -d packages/web-app-vercel/.next
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: next-build
+          path: packages/web-app-vercel/.next
+          include-hidden-files: true
+          retention-days: 1
+
+  e2e-auth:
+    name: E2E Auth Setup
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Restore npm cache
+        uses: actions/cache@v5
+        with:
+          path: packages/web-app-vercel/node_modules
+          key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+      - name: Restore Playwright cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+      - name: Create auth directory
+        run: mkdir -p packages/web-app-vercel/playwright/.auth/
+      - name: Download build
+        uses: actions/download-artifact@v8
+        with:
+          name: next-build
+          path: packages/web-app-vercel/.next
+      - name: Run Playwright auth setup
+        run: npx playwright test --project=setup
+        working-directory: packages/web-app-vercel
+        env:
+          AUTH_ENV: test
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: http://localhost:3000
+          NODE_ENV: test
+      - name: Upload auth state
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-auth-state
+          # Upload the actual auth file to mirror e2e-test.yml and avoid empty directory uploads
+          path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/user.json
+          retention-days: 1
+          if-no-files-found: error
+      # Create auth directory (safety) is not needed here after upload — ensure it exists earlier
+
+  e2e-test:
+    name: E2E tests (sharded)
+    needs: e2e-auth
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Restore npm cache
+        uses: actions/cache@v5
+        with:
+          path: packages/web-app-vercel/node_modules
+          key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+
+      - name: Restore Playwright cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
+
+      - name: Download auth state
+        uses: actions/download-artifact@v8
+        with:
+          name: playwright-auth-state
+          path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
+
+      - name: Download build
+        uses: actions/download-artifact@v8
+        with:
+          name: next-build
+          path: packages/web-app-vercel/.next
+
+      - name: Run e2e shard
+        run: npx playwright test --shard=${{ matrix.shard }}/3 --project=${{ matrix.browser }}
+        working-directory: packages/web-app-vercel
+        env:
+          AUTH_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Upload e2e test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ matrix.browser }}-${{ matrix.shard }}
+          path: packages/web-app-vercel/playwright-report/
+          retention-days: 7
