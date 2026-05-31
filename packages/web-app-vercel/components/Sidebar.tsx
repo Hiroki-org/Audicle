@@ -40,6 +40,7 @@ export default function Sidebar() {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
+          data-testid="mobile-sidebar-overlay"
           className="fixed inset-0 bg-black/80 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
