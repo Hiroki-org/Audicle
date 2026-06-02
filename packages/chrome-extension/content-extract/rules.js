@@ -225,7 +225,6 @@ class ExtractionRulesManager {
    * 抽出ルールに基づいて実際に抽出を実行
    */
   extractContent(rule) {
-    console.log(`[ExtractionRules] Applying rule: ${rule.name} (${rule.type})`);
 
     const startTime = performance.now();
     let result = null;
