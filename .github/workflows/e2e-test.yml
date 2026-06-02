@@ -6,6 +6,7 @@ on:
 env:
   TEST_USER_EMAIL: "test-user-${{ github.run_id }}@audicle.com"
   TEST_USER_PASSWORD: "password123"
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
 
 jobs:
   seed-test-db:
