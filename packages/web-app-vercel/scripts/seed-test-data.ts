@@ -46,6 +46,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Pr
                 if (i === retries - 1) throw error;
                 console.log(`   Network error (throw), retrying ${i + 1}/${retries} in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
+                continue;
             } else {
                 throw error;
             }
