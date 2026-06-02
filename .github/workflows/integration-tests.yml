@@ -21,9 +21,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
         working-directory: packages/web-app-vercel
+      - name: Setup IPv4 first
+        run: echo "NODE_OPTIONS=--dns-result-order=ipv4first" >> $GITHUB_ENV
       - name: Run integration tests
         run: npm run test:integration
         working-directory: packages/web-app-vercel
         env:
-  NODE_OPTIONS: "--dns-result-order=ipv4first"
           NODE_ENV: test

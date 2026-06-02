@@ -6,7 +6,6 @@ on:
 env:
   TEST_USER_EMAIL: "test-user-${{ github.run_id }}@audicle.com"
   TEST_USER_PASSWORD: "password123"
-  NODE_OPTIONS: "--dns-result-order=ipv4first"
 
 jobs:
   seed-test-db:
@@ -27,6 +26,8 @@ jobs:
           cache-dependency-path: "packages/web-app-vercel/package-lock.json"
       - name: Install dependencies
         run: npm ci
+      - name: Setup IPv4 first
+        run: echo "NODE_OPTIONS=--dns-result-order=ipv4first" >> $GITHUB_ENV
       - name: Seed test database
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -51,6 +52,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Create auth directory
         run: mkdir -p playwright/.auth
+      - name: Setup IPv4 first
+        run: echo "NODE_OPTIONS=--dns-result-order=ipv4first" >> $GITHUB_ENV
       - name: Run auth tests
         env:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
@@ -109,6 +112,8 @@ jobs:
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
+      - name: Setup IPv4 first
+        run: echo "NODE_OPTIONS=--dns-result-order=ipv4first" >> $GITHUB_ENV
       - name: Run playlist tests
         env:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
@@ -147,6 +152,8 @@ jobs:
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
+      - name: Setup IPv4 first
+        run: echo "NODE_OPTIONS=--dns-result-order=ipv4first" >> $GITHUB_ENV
       - name: Run popular articles tests
         env:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
@@ -185,6 +192,8 @@ jobs:
         with:
           name: playwright-auth-state
           path: ${{ github.workspace }}/packages/web-app-vercel/playwright/.auth/
+      - name: Setup IPv4 first
+        run: echo "NODE_OPTIONS=--dns-result-order=ipv4first" >> $GITHUB_ENV
       - name: Run article playback tests
         env:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
@@ -217,6 +226,8 @@ jobs:
           cache-dependency-path: "packages/web-app-vercel/package-lock.json"
       - run: npm ci
       - run: npx playwright install --with-deps
+      - name: Setup IPv4 first
+        run: echo "NODE_OPTIONS=--dns-result-order=ipv4first" >> $GITHUB_ENV
       - name: Run theme FOUC tests
         env:
           NEXTAUTH_URL: http://localhost:3000
