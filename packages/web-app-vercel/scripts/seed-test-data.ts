@@ -23,66 +23,91 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
-async function ensureTestUser() {
-    console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
-    // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
-    });
+async function ensureTestUser(retries = 3): Promise<string> {
+    console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}... (retries left: ${retries})`);
+    try {
+        // Try to create user
+        const { data, error } = await supabase.auth.admin.createUser({
+            email: TEST_USER_EMAIL,
+            password: TEST_USER_PASSWORD,
+            email_confirm: true
+        });
 
-    if (error) {
-        // If user already exists, we try to find their ID
-        const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
-        
-        if (isAlreadyRegistered) {
-            console.log("   User already exists. Fetching ID by listing users...");
-            
-            // Pagination handling to find user
-            let page = 1;
-            const perPage = 50;
-            let foundUser = null;
-            
-            while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
-                    page: page,
-                    perPage: perPage
-                });
-                
-                if (listError) {
-                    throw new Error(`Failed to list users to find existing one: ${listError.message}`);
+        if (error) {
+            const isTransientError = error.message?.includes("ENOTFOUND") || error.message?.includes("fetch failed") || (error as any).cause?.message?.includes("ENOTFOUND");
+            if (isTransientError) {
+                console.warn(`Transient error returned: ${error.message}. Retrying...`);
+                if (retries > 0) {
+                    await new Promise(res => setTimeout(res, 2000));
+                    return await ensureTestUser(retries - 1);
                 }
-                
-                if (!listData.users || listData.users.length === 0) {
-                    break; // No more users
-                }
-                
-                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
-                
-                if (foundUser) {
-                    console.log(`   Found existing user ID: ${foundUser.id}`);
-                    return foundUser.id;
-                }
-
-                // If we got fewer users than perPage, we're on the last page
-                if (listData.users.length < perPage) {
-                    break;
-                }
-                
-                // Safety break to prevent infinite loops if we have thousands of users (unlikely in test)
-                if (page > 20) {
-                    break; 
-                }
-                page++;
+                throw error;
             }
-            
-            throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
+
+            // If user already exists, we try to find their ID
+            const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
+
+            if (isAlreadyRegistered) {
+                console.log("   User already exists. Fetching ID by listing users...");
+                
+                // Pagination handling to find user
+                let page = 1;
+                const perPage = 50;
+                let foundUser = null;
+                
+                while (!foundUser) {
+                    const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                        page: page,
+                        perPage: perPage
+                    });
+
+                    if (listError) {
+                        const isListTransientError = listError.message?.includes("ENOTFOUND") || listError.message?.includes("fetch failed") || (listError as any).cause?.message?.includes("ENOTFOUND");
+                        if (isListTransientError && retries > 0) {
+                            console.warn(`Transient error listing users: ${listError.message}. Retrying...`);
+                            await new Promise(res => setTimeout(res, 2000));
+                            return await ensureTestUser(retries - 1);
+                        }
+                        throw new Error(`Failed to list users to find existing one: ${listError.message}`);
+                    }
+
+                    if (!listData.users || listData.users.length === 0) {
+                        break; // No more users
+                    }
+
+                    foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+
+                    if (foundUser) {
+                        console.log(`   Found existing user ID: ${foundUser.id}`);
+                        return foundUser.id;
+                    }
+
+                    // If we got fewer users than perPage, we're on the last page
+                    if (listData.users.length < perPage) {
+                        break;
+                    }
+                    page++;
+                }
+
+                throw new Error(`User was registered but could not be found in listUsers.`);
+            } else {
+                throw new Error(`Failed to create user: ${error.message}`);
+            }
         }
-        throw error;
+
+        console.log(`   Created new user ID: ${data.user.id}`);
+        return data.user.id;
+    } catch (err: any) {
+        const isTransientError = err.message?.includes("ENOTFOUND") || err.message?.includes("fetch failed") || err.cause?.message?.includes("ENOTFOUND");
+        if (isTransientError) {
+            console.warn(`Transient error caught: ${err.message}. Retrying...`);
+            if (retries > 0) {
+                await new Promise(res => setTimeout(res, 2000));
+                return await ensureTestUser(retries - 1);
+            }
+        }
+        throw err;
     }
-    console.log(`   Created new user ID: ${data.user.id}`);
-    return data.user.id;
 }
 
 async function runMigrations() {
