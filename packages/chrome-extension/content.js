@@ -31,9 +31,6 @@ let config = null;
 let isDebug = false;
 
 function debugLog(...args) {
-  if (isDebug) {
-    console.log(...args);
-  }
 }
 
 async function loadConfig() {
