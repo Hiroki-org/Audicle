@@ -26,7 +26,7 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
 
-    let retries = 3;
+    let retries = 5;
     while (retries > 0) {
         try {
             // Try to create user
@@ -38,7 +38,7 @@ async function ensureTestUser() {
 
             if (error) {
                 // Network error check from the error object itself
-                if (error.message && (error.message.includes('fetch failed') || error.message.includes('ENOTFOUND') || error.message.includes('network'))) {
+                if (error.message && (error.message.includes('fetch failed') || error.message.includes('ENOTFOUND') || error.message.includes('network') || String(error.status) === '0')) {
                     throw error;
                 }
                 
@@ -60,7 +60,7 @@ async function ensureTestUser() {
                         });
 
                         if (listError) {
-                            if (listError.message && (listError.message.includes('fetch failed') || listError.message.includes('ENOTFOUND') || listError.message.includes('network'))) {
+                            if (listError.message && (listError.message.includes('fetch failed') || listError.message.includes('ENOTFOUND') || listError.message.includes('network') || String(listError.status) === '0')) {
                                 throw listError;
                             }
                             console.error("   Failed to list users:", listError);
@@ -92,11 +92,12 @@ async function ensureTestUser() {
             return data.user.id;
         } catch (err: any) {
             retries--;
-            const isNetworkError = err?.message?.includes('fetch failed') || err?.message?.includes('ENOTFOUND') || err?.cause?.message?.includes('ENOTFOUND');
+            const isNetworkError = err?.message?.includes('fetch failed') || err?.message?.includes('ENOTFOUND') || err?.cause?.message?.includes('ENOTFOUND') || err?.status === 0 || err?.__isAuthError === true;
             
             if (isNetworkError && retries > 0) {
-                console.log(`[SEED] Network error encountered. Retrying... (${retries} attempts left)`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                const delay = (5 - retries) * 2000;
+                console.log(`[SEED] Network error encountered. Retrying in ${delay}ms... (${retries} attempts left)`);
+                await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
             throw err;
