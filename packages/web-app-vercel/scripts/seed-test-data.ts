@@ -83,13 +83,19 @@ async function ensureTestUser(retries = 3, delay = 1000) {
 
                     throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
                 }
+
+                // If it's a network error or ENOTFOUND, throw it to trigger retry
+                if (error.message?.includes("fetch failed") || error.message?.includes("ENOTFOUND")) {
+                    throw new Error(error.message);
+                }
+
                 throw error;
             }
             console.log(`   Created new user ID: ${data.user.id}`);
             return data.user.id;
         } catch (error) {
             lastError = error;
-            console.warn(`[SEED] attempt ${attempt} failed: ${error.message}`);
+            console.warn(`[SEED] attempt ${attempt} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
             if (attempt < retries) {
                 console.log(`[SEED] Waiting ${delay}ms before retrying...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
