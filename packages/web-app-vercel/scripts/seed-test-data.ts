@@ -23,66 +23,82 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
-async function ensureTestUser() {
+async function ensureTestUser(retries = 3, delay = 1000) {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
-    // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
-    });
 
-    if (error) {
-        // If user already exists, we try to find their ID
-        const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
-        
-        if (isAlreadyRegistered) {
-            console.log("   User already exists. Fetching ID by listing users...");
-            
-            // Pagination handling to find user
-            let page = 1;
-            const perPage = 50;
-            let foundUser = null;
-            
-            while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
-                    page: page,
-                    perPage: perPage
-                });
-                
-                if (listError) {
-                    throw new Error(`Failed to list users to find existing one: ${listError.message}`);
-                }
-                
-                if (!listData.users || listData.users.length === 0) {
-                    break; // No more users
-                }
-                
-                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
-                
-                if (foundUser) {
-                    console.log(`   Found existing user ID: ${foundUser.id}`);
-                    return foundUser.id;
-                }
+    let lastError = null;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            // Try to create user
+            const { data, error } = await supabase.auth.admin.createUser({
+                email: TEST_USER_EMAIL,
+                password: TEST_USER_PASSWORD,
+                email_confirm: true
+            });
 
-                // If we got fewer users than perPage, we're on the last page
-                if (listData.users.length < perPage) {
-                    break;
-                }
+            if (error) {
+                // If user already exists, we try to find their ID
+                const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
                 
-                // Safety break to prevent infinite loops if we have thousands of users (unlikely in test)
-                if (page > 20) {
-                    break; 
+                if (isAlreadyRegistered) {
+                    console.log("   User already exists. Fetching ID by listing users...");
+
+                    // Pagination handling to find user
+                    let page = 1;
+                    const perPage = 50;
+                    let foundUser = null;
+
+                    while (!foundUser) {
+                        const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                            page: page,
+                            perPage: perPage
+                        });
+
+                        if (listError) {
+                            throw new Error(`Failed to list users to find existing one: ${listError.message}`);
+                        }
+
+                        if (!listData.users || listData.users.length === 0) {
+                            break; // No more users
+                        }
+
+                        foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+
+                        if (foundUser) {
+                            console.log(`   Found existing user ID: ${foundUser.id}`);
+                            return foundUser.id;
+                        }
+
+                        // If we got fewer users than perPage, we're on the last page
+                        if (listData.users.length < perPage) {
+                            break;
+                        }
+
+                        // Safety break to prevent infinite loops if we have thousands of users (unlikely in test)
+                        if (page > 20) {
+                            break;
+                        }
+                        page++;
+                    }
+
+                    throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
                 }
-                page++;
+                throw error;
             }
-            
-            throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
+            console.log(`   Created new user ID: ${data.user.id}`);
+            return data.user.id;
+        } catch (error) {
+            lastError = error;
+            console.warn(`[SEED] attempt ${attempt} failed: ${error.message}`);
+            if (attempt < retries) {
+                console.log(`[SEED] Waiting ${delay}ms before retrying...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+            }
         }
-        throw error;
     }
-    console.log(`   Created new user ID: ${data.user.id}`);
-    return data.user.id;
+
+    throw lastError;
 }
 
 async function runMigrations() {
