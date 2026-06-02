@@ -29,9 +29,11 @@ async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3, delayMs
         try {
             return await operation();
         } catch (error) {
-            const isNetworkError = error instanceof Error && (error.message.includes('ENOTFOUND') || error.message.includes('fetch') || error.message.includes('ECONNRESET'));
+            const errorMessage = error instanceof Error ? error.message : String((error as any)?.message || error);
+            const causeMessage = (error as any)?.cause ? String((error as any).cause) : '';
+            const isNetworkError = errorMessage.includes('ENOTFOUND') || errorMessage.includes('fetch') || errorMessage.includes('ECONNRESET') || causeMessage.includes('ENOTFOUND') || causeMessage.includes('fetch');
             if (isNetworkError && attempt < maxRetries) {
-                console.warn(`[SEED] Network error on attempt ${attempt}, retrying in ${delayMs}ms... (${error.message})`);
+                console.warn(`[SEED] Network error on attempt ${attempt}, retrying in ${delayMs}ms... (${errorMessage} | ${causeMessage})`);
                 await new Promise(resolve => setTimeout(resolve, delayMs));
                 continue;
             }
