@@ -26,11 +26,44 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
-    });
+    let retryCount = 0;
+    const maxRetries = 5;
+    let data, error;
+
+    while (retryCount < maxRetries) {
+        try {
+            const res = await supabase.auth.admin.createUser({
+                email: TEST_USER_EMAIL,
+                password: TEST_USER_PASSWORD,
+                email_confirm: true
+            });
+            data = res.data;
+            error = res.error;
+
+            if (!error || error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists")) {
+                break;
+            }
+
+            if (error && (error.message?.includes('fetch failed') || error.message?.includes('ENOTFOUND'))) {
+                console.log(`[SEED] Retry ${retryCount + 1}/${maxRetries} due to connection error...`);
+                retryCount++;
+                await new Promise(r => setTimeout(r, 2000));
+            } else {
+                break;
+            }
+        } catch (e) {
+            const err = e;
+            if (err.message?.includes('fetch failed') || err.message?.includes('ENOTFOUND') || (err.cause && err.cause.code === 'ENOTFOUND')) {
+                console.log(`[SEED] Caught network error, retry ${retryCount + 1}/${maxRetries}...`);
+                error = err;
+                retryCount++;
+                await new Promise(r => setTimeout(r, 2000));
+            } else {
+                error = err;
+                break;
+            }
+        }
+    }
 
     if (error) {
         // If user already exists, we try to find their ID
@@ -533,5 +566,5 @@ async function seedTestData() {
 
 seedTestData().catch((error) => {
     console.error("エラーが発生しました:", error);
-    process.exit(1);
+    throw error;
 });
