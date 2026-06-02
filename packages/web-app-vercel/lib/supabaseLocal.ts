@@ -79,13 +79,20 @@ export async function createPlaylist(email: string | null, name: string, descrip
 
 export async function getPlaylistsForOwner(email: string | null) {
     const ownerEmail = normalizeOwnerEmail(email);
+
+    // O(1) lookup map for articles to prevent O(N^2) time complexity
+    const articleMap = new Map<string, Article>();
+    for (const article of inMemoryDB.articles) {
+        articleMap.set(article.id, article);
+    }
+
     return inMemoryDB.playlists
         .filter(p => p.owner_email === ownerEmail)
         .map(p => {
             const rawItems = inMemoryDB.playlist_items.filter(i => i.playlist_id === p.id);
             const itemsWithArticle: PlaylistItemWithArticle[] = rawItems.map(pi => ({
                 ...pi,
-                article: inMemoryDB.articles.find(a => a.id === pi.article_id) || undefined,
+                article: articleMap.get(pi.article_id) || undefined,
             }));
             return {
                 ...p,
@@ -180,13 +187,17 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
     if (!playlist) return null;
 
     // Collect items with article info
+    const articleMap = new Map<string, Article>();
+    for (const article of inMemoryDB.articles) {
+        articleMap.set(article.id, article);
+    }
+
     const items: PlaylistItemWithArticle[] = inMemoryDB.playlist_items
         .filter(pi => pi.playlist_id === playlist.id)
         .map(pi => {
-            const article = inMemoryDB.articles.find(a => a.id === pi.article_id);
             return {
                 ...pi,
-                article: article || undefined,
+                article: articleMap.get(pi.article_id) || undefined,
             };
         });
 
