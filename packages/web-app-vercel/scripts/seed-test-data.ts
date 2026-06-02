@@ -23,7 +23,26 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
+
+async function withRetry(fn, retries = 3, delay = 2000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            const isNetworkError = error.message && (error.message.includes('fetch failed') || error.message.includes('ENOTFOUND') || error.message.includes('ECONNRESET'));
+            if (isNetworkError && i < retries - 1) {
+                console.warn(`[SEED] Network error encountered (${error.message}). Retrying ${i + 1}/${retries} in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            throw error; // Rethrow if not network error or max retries reached
+        }
+    }
+}
+
 async function ensureTestUser() {
+    return withRetry(async () => {
+
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
     const { data, error } = await supabase.auth.admin.createUser({
