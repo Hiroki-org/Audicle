@@ -23,14 +23,30 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
+let userCreationFailure = false;
+
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
+    if (userCreationFailure) throw new Error("Network failure previously detected");
+
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
-    });
+    let data, error;
+    try {
+        const result = await supabase.auth.admin.createUser({
+            email: TEST_USER_EMAIL,
+            password: TEST_USER_PASSWORD,
+            email_confirm: true
+        });
+        data = result.data;
+        error = result.error;
+    } catch (e: any) {
+        if (e.message?.includes('ENOTFOUND') || e.message?.includes('fetch failed') || e.name === 'AuthRetryableFetchError') {
+            console.error("Database connection failure detected:", e.message);
+            userCreationFailure = true;
+            throw e;
+        }
+        error = e;
+    }
 
     if (error) {
         // If user already exists, we try to find their ID
@@ -81,8 +97,8 @@ async function ensureTestUser() {
         }
         throw error;
     }
-    console.log(`   Created new user ID: ${data.user.id}`);
-    return data.user.id;
+    console.log(`   Created new user ID: ${data!.user!.id}`);
+    return data!.user!.id;
 }
 
 async function runMigrations() {
