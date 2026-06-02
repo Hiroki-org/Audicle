@@ -23,14 +23,41 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
+
+async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3, delayMs = 1000): Promise<T> {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const result = await operation();
+            // Supabase network errors might be returned in result.error
+            if ((result as any)?.error?.message?.includes("fetch failed") || (result as any)?.error?.message?.includes("ENOTFOUND")) {
+                if (i < maxRetries - 1) {
+                    console.warn(`[SEED] Network error detected in response. Retrying ${i + 1}/${maxRetries} in ${delayMs}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                    continue;
+                }
+            }
+            return result;
+        } catch (error: any) {
+            const isNetworkError = error?.message?.includes("ENOTFOUND") || error?.message?.includes("fetch failed") || error?.cause?.message?.includes("ENOTFOUND");
+            if (isNetworkError && i < maxRetries - 1) {
+                console.warn(`[SEED] Network error detected (${error.message}). Retrying ${i + 1}/${maxRetries} in ${delayMs}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error("Unreachable");
+}
+
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
+    const { data, error } = await withRetry(() => supabase.auth.admin.createUser({
         email: TEST_USER_EMAIL,
         password: TEST_USER_PASSWORD,
         email_confirm: true
-    });
+    }));
 
     if (error) {
         // If user already exists, we try to find their ID
