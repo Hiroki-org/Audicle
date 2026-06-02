@@ -149,12 +149,10 @@ class ExtractionRulesManager {
    * 指定されたホスト名とURLに最適なルールを見つける
    */
   findBestRule(hostname, url = null) {
-    console.log(`[ExtractionRules] Finding best rule for: ${hostname}`);
 
     // 1. サイト固有ルールを優先検索
     if (this.siteRules[hostname]) {
       const rule = this.siteRules[hostname];
-      console.log(`[ExtractionRules] Found site-specific rule: ${rule.id}`);
       return rule;
     }
 
@@ -164,7 +162,6 @@ class ExtractionRulesManager {
       // 優先度が最も高い汎用ルールを選択
       const ruleKey = generalRuleKeys[0]; // 現在は'fallback'のみ
       const rule = this.generalRules[ruleKey];
-      console.log(`[ExtractionRules] Using general rule: ${rule.id}`);
       return rule;
     }
 
@@ -225,7 +222,6 @@ class ExtractionRulesManager {
    * 抽出ルールに基づいて実際に抽出を実行
    */
   extractContent(rule) {
-    console.log(`[ExtractionRules] Applying rule: ${rule.name} (${rule.type})`);
 
     const startTime = performance.now();
     let result = null;
@@ -264,7 +260,6 @@ class ExtractionRulesManager {
     for (const selector of strategy.containerSelectors || ["body"]) {
       container = document.querySelector(selector);
       if (container) {
-        console.log(`[ExtractionRules] Found container: ${selector}`);
         break;
       }
     }
@@ -280,9 +275,6 @@ class ExtractionRulesManager {
     const combinedSelector = contentSelectors.join(", ");
     const elements = Array.from(container.querySelectorAll(combinedSelector));
 
-    console.log(
-      `[ExtractionRules] Found ${elements.length} elements with selector: ${combinedSelector}`
-    );
 
     // 結果を処理
     const blocks = [];
@@ -368,7 +360,6 @@ class ExtractionRulesManager {
       this.extractionHistory.splice(100);
     }
 
-    console.log(`[ExtractionRules] Extraction completed:`, record);
   }
 
   /**
@@ -416,4 +407,3 @@ class ExtractionRulesManager {
 // グローバルに配置してcontent.jsから利用可能にする
 window.ExtractionRulesManager = ExtractionRulesManager;
 
-console.log("[ExtractionRules] Rules manager loaded");
