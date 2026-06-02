@@ -18,43 +18,47 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+
+const originalFetch = global.fetch;
+global.fetch = async (input, init) => {
+    let retries = 5;
+    while (retries > 0) {
+        try {
+            const res = await originalFetch(input, init);
+            return res;
+        } catch (err: any) {
+            const isTransient = err.message?.includes("ENOTFOUND") || err.message?.includes("fetch failed") || err.cause?.message?.includes("ENOTFOUND");
+            if (isTransient && retries > 1) {
+                console.warn(`[Global Fetch] Transient error encountered: ${err.message}. Retrying in 2s... (${retries - 1} left)`);
+                await new Promise(r => setTimeout(r, 2000));
+                retries--;
+            } else {
+                throw err;
+            }
+        }
+    }
+    throw new Error("Unreachable");
+};
+
+
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
-async function ensureTestUser(retries = 3): Promise<string> {
-    console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}... (retries left: ${retries})`);
+async function ensureTestUser(): Promise<string> {
+    console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
 
-    let resultData = null;
-    let resultError = null;
+    // Try to create user
+    const { data, error } = await supabase.auth.admin.createUser({
+        email: TEST_USER_EMAIL,
+        password: TEST_USER_PASSWORD,
+        email_confirm: true
+    });
 
-    try {
-        // Try to create user
-        const { data, error } = await supabase.auth.admin.createUser({
-            email: TEST_USER_EMAIL,
-            password: TEST_USER_PASSWORD,
-            email_confirm: true
-        });
-        resultData = data;
-        resultError = error;
-    } catch (err: any) {
-        resultError = err;
-    }
-
-    if (resultError) {
-        const isTransientError = resultError.message?.includes("ENOTFOUND") || resultError.message?.includes("fetch failed") || (resultError as any).cause?.message?.includes("ENOTFOUND");
-        if (isTransientError) {
-            console.warn(`Transient error encountered: ${resultError.message}. Retrying...`);
-            if (retries > 0) {
-                await new Promise(res => setTimeout(res, 2000));
-                return await ensureTestUser(retries - 1);
-            }
-            throw resultError;
-        }
-
+    if (error) {
         // If user already exists, we try to find their ID
-        const isAlreadyRegistered = resultError.status === 422 || resultError.message?.includes("already registered") || resultError.code?.includes("email_exists");
+        const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
 
         if (isAlreadyRegistered) {
             console.log("   User already exists. Fetching ID by listing users...");
@@ -65,34 +69,20 @@ async function ensureTestUser(retries = 3): Promise<string> {
             let foundUser = null;
 
             while (!foundUser) {
-                let listData = null;
-                let listError = null;
-                try {
-                    const res = await supabase.auth.admin.listUsers({
-                        page: page,
-                        perPage: perPage
-                    });
-                    listData = res.data;
-                    listError = res.error;
-                } catch (err: any) {
-                    listError = err;
+                const res = await supabase.auth.admin.listUsers({
+                    page: page,
+                    perPage: perPage
+                });
+
+                if (res.error) {
+                    throw new Error(`Failed to list users to find existing one: ${res.error.message}`);
                 }
 
-                if (listError) {
-                    const isListTransientError = listError.message?.includes("ENOTFOUND") || listError.message?.includes("fetch failed") || (listError as any).cause?.message?.includes("ENOTFOUND");
-                    if (isListTransientError && retries > 0) {
-                        console.warn(`Transient error listing users: ${listError.message}. Retrying...`);
-                        await new Promise(res => setTimeout(res, 2000));
-                        return await ensureTestUser(retries - 1);
-                    }
-                    throw new Error(`Failed to list users to find existing one: ${listError.message}`);
-                }
-
-                if (!listData?.users || listData.users.length === 0) {
+                if (!res.data?.users || res.data.users.length === 0) {
                     break; // No more users
                 }
 
-                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+                foundUser = res.data.users.find(u => u.email === TEST_USER_EMAIL);
 
                 if (foundUser) {
                     console.log(`   Found existing user ID: ${foundUser.id}`);
@@ -100,7 +90,7 @@ async function ensureTestUser(retries = 3): Promise<string> {
                 }
 
                 // If we got fewer users than perPage, we're on the last page
-                if (listData.users.length < perPage) {
+                if (res.data.users.length < perPage) {
                     break;
                 }
                 page++;
@@ -108,12 +98,12 @@ async function ensureTestUser(retries = 3): Promise<string> {
 
             throw new Error(`User was registered but could not be found in listUsers.`);
         } else {
-            throw new Error(`Failed to create user: ${resultError.message}`);
+            throw new Error(`Failed to create user: ${error.message}`);
         }
     }
 
-    console.log(`   Created new user ID: ${resultData.user.id}`);
-    return resultData.user.id;
+    console.log(`   Created new user ID: ${data.user.id}`);
+    return data.user.id;
 }
 
 async function runMigrations() {
