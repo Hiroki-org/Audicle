@@ -77,15 +77,20 @@ export async function createPlaylist(email: string | null, name: string, descrip
     return playlist;
 }
 
+
 export async function getPlaylistsForOwner(email: string | null) {
     const ownerEmail = normalizeOwnerEmail(email);
+
+    // Pre-calculate articles map for faster lookups
+    const articleMap = new Map(inMemoryDB.articles.map(a => [a.id, a]));
+
     return inMemoryDB.playlists
         .filter(p => p.owner_email === ownerEmail)
         .map(p => {
             const rawItems = inMemoryDB.playlist_items.filter(i => i.playlist_id === p.id);
             const itemsWithArticle: PlaylistItemWithArticle[] = rawItems.map(pi => ({
                 ...pi,
-                article: inMemoryDB.articles.find(a => a.id === pi.article_id) || undefined,
+                article: articleMap.get(pi.article_id) || undefined,
             }));
             return {
                 ...p,
@@ -174,21 +179,25 @@ export async function addPlaylistItem(playlistId: string, articleId: string) {
     return item;
 }
 
+
 export async function getPlaylistWithItems(ownerEmail: string | null, id: string, sort?: { field?: string; order?: 'asc' | 'desc' }) {
     const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
     const playlist = inMemoryDB.playlists.find(p => p.id === id && p.owner_email === normalizedOwnerEmail);
     if (!playlist) return null;
 
     // Collect items with article info
-    const items: PlaylistItemWithArticle[] = inMemoryDB.playlist_items
-        .filter(pi => pi.playlist_id === playlist.id)
-        .map(pi => {
-            const article = inMemoryDB.articles.find(a => a.id === pi.article_id);
-            return {
-                ...pi,
-                article: article || undefined,
-            };
-        });
+    const playlistItems = inMemoryDB.playlist_items.filter(pi => pi.playlist_id === playlist.id);
+    const articleIds = new Set(playlistItems.map(pi => pi.article_id));
+    const articles = inMemoryDB.articles.filter(a => articleIds.has(a.id));
+    const articleMap = new Map(articles.map(a => [a.id, a]));
+
+    const items: PlaylistItemWithArticle[] = playlistItems.map(pi => {
+        return {
+            ...pi,
+            article: articleMap.get(pi.article_id) || undefined,
+        };
+    });
+
 
     const sortField = sort?.field || 'position';
     const sortOrder = sort?.order || 'asc';
