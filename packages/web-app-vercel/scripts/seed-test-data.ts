@@ -16,7 +16,28 @@ if (!supabaseUrl || !supabaseServiceKey) {
     process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    global: {
+        fetch: async (url, options) => {
+            let retries = 5;
+            while (retries > 0) {
+                try {
+                    return await fetch(url, options);
+                } catch (e: any) {
+                    if (e.message.includes('fetch failed') || e.message.includes('ENOTFOUND') || e.code === 'ENOTFOUND') {
+                        console.warn(`Network error (${e.message}), retrying in 2 seconds...`);
+                        await new Promise(r => setTimeout(r, 2000));
+                        retries--;
+                        if (retries === 0) throw e;
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+            throw new Error("Unreachable");
+        }
+    }
+});
 
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
