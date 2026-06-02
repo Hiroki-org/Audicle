@@ -91,8 +91,6 @@ function Readability(doc, options) {
           return arg;
         });
         args.unshift("Reader: (Readability)");
-        // eslint-disable-next-line no-console
-        console.log(...args);
       } else if (typeof dump !== "undefined") {
         /* global dump */
         var msg = Array.prototype.map
