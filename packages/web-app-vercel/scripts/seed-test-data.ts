@@ -23,14 +23,40 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
+
+async function withRetry(fn: any, retries = 3, delay = 1000): Promise<any> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const res = await fn();
+            // check for res.error.message explicitly
+            if (res?.error?.message?.includes('fetch failed') || res?.error?.message?.includes('ENOTFOUND') || res?.error?.cause?.code === 'ENOTFOUND') {
+                if (i < retries - 1) {
+                    console.log(`Network error inside result caught, retrying in ${delay}ms (attempt ${i + 1}/${retries})...`);
+                    await new Promise(res => setTimeout(res, delay));
+                    continue;
+                }
+            }
+            return res;
+        } catch (error: any) {
+            const isNetworkError = error?.message?.includes('fetch failed') || error?.cause?.code === 'ENOTFOUND' || error?.message?.includes('ENOTFOUND');
+            if (isNetworkError && i < retries - 1) {
+                console.log(`Network exception caught, retrying in ${delay}ms (attempt ${i + 1}/${retries})...`);
+                await new Promise(res => setTimeout(res, delay));
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
+    const { data, error } = await withRetry(() => supabase.auth.admin.createUser({
         email: TEST_USER_EMAIL,
         password: TEST_USER_PASSWORD,
         email_confirm: true
-    });
+    }));
 
     if (error) {
         // If user already exists, we try to find their ID
@@ -45,10 +71,10 @@ async function ensureTestUser() {
             let foundUser = null;
             
             while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                const { data: listData, error: listError } = await withRetry(() => supabase.auth.admin.listUsers({
                     page: page,
                     perPage: perPage
-                });
+                }));
                 
                 if (listError) {
                     throw new Error(`Failed to list users to find existing one: ${listError.message}`);
