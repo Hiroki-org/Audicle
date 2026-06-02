@@ -25,12 +25,27 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
-    // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
-    });
+
+    let retries = 5;
+    let data, error;
+
+    while (retries > 0) {
+        try {
+            const res = await supabase.auth.admin.createUser({
+                email: TEST_USER_EMAIL,
+                password: TEST_USER_PASSWORD,
+                email_confirm: true
+            });
+            data = res.data;
+            error = res.error;
+            break;
+        } catch (err) {
+            console.error(`⚠️ Fetch error: ${err.message}. Retrying...`);
+            retries--;
+            if (retries === 0) throw err;
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    }
 
     if (error) {
         // If user already exists, we try to find their ID
