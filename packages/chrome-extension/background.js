@@ -85,9 +85,6 @@ class TestSynthesizer extends AudioSynthesizer {
   }
 
   async synthesize(text) {
-    console.log(
-      `[TestSynthesizer] Request for text: "${text}" - returning sample.mp3`
-    );
 
     const sampleUrl = chrome.runtime.getURL("sample.mp3");
     const response = await fetch(sampleUrl);
