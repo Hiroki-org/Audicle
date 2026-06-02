@@ -280,9 +280,6 @@ class ExtractionRulesManager {
     const combinedSelector = contentSelectors.join(", ");
     const elements = Array.from(container.querySelectorAll(combinedSelector));
 
-    console.log(
-      `[ExtractionRules] Found ${elements.length} elements with selector: ${combinedSelector}`
-    );
 
     // 結果を処理
     const blocks = [];
