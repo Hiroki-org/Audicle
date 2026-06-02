@@ -19,6 +19,9 @@ defaults:
   run:
     shell: "bash"
 
+env:
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
+
 jobs:
   debugger:
     if: |-

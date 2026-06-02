@@ -6,6 +6,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
+
 jobs:
   integration-tests:
     name: Integration Tests
