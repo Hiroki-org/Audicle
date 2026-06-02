@@ -368,6 +368,7 @@ class ExtractionRulesManager {
       this.extractionHistory.splice(100);
     }
 
+    console.log(`[ExtractionRules] Extraction completed:`, record);
   }
 
   /**
