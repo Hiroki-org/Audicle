@@ -416,4 +416,3 @@ class ExtractionRulesManager {
 // グローバルに配置してcontent.jsから利用可能にする
 window.ExtractionRulesManager = ExtractionRulesManager;
 
-console.log("[ExtractionRules] Rules manager loaded");
