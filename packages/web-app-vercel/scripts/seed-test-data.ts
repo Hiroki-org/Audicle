@@ -26,7 +26,7 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
 
-    let retries = 5;
+    let retries = 10;
     let data, error;
 
     while (retries > 0) {
@@ -36,11 +36,17 @@ async function ensureTestUser() {
                 password: TEST_USER_PASSWORD,
                 email_confirm: true
             });
+
+            // supabase-js might return a network error inside res.error rather than throwing it
+            if (res.error && (res.error.message.includes('fetch failed') || res.error.message.includes('ENOTFOUND'))) {
+                 throw new Error(res.error.message);
+            }
+
             data = res.data;
             error = res.error;
             break;
         } catch (err) {
-            console.error(`⚠️ Fetch error: ${err.message}. Retrying...`);
+            console.error(`⚠️ Fetch error: ${err.message || err.toString()}. Retries left: ${retries - 1}`);
             retries--;
             if (retries === 0) throw err;
             await new Promise(r => setTimeout(r, 2000));
