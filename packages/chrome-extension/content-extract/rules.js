@@ -164,7 +164,6 @@ class ExtractionRulesManager {
       // 優先度が最も高い汎用ルールを選択
       const ruleKey = generalRuleKeys[0]; // 現在は'fallback'のみ
       const rule = this.generalRules[ruleKey];
-      console.log(`[ExtractionRules] Using general rule: ${rule.id}`);
       return rule;
     }
 
