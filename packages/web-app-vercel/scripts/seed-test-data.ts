@@ -26,7 +26,7 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
 
-    let retries = 5;
+    let retries = 10;
     while (retries > 0) {
         try {
             // Try to create user
@@ -95,7 +95,7 @@ async function ensureTestUser() {
             const isNetworkError = err?.message?.includes('fetch failed') || err?.message?.includes('ENOTFOUND') || err?.cause?.message?.includes('ENOTFOUND') || err?.status === 0 || err?.__isAuthError === true;
             
             if (isNetworkError && retries > 0) {
-                const delay = (5 - retries) * 2000;
+                const delay = 5000;
                 console.log(`[SEED] Network error encountered. Retrying in ${delay}ms... (${retries} attempts left)`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
