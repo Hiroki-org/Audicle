@@ -2,6 +2,9 @@ import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 import { config } from "dotenv";
 import { resolve } from "path";
+import dns from "node:dns";
+
+dns.setDefaultResultOrder("ipv4first");
 
 // .env.test.local を読み込む
 config({ path: resolve(__dirname, "../.env.test.local") });
