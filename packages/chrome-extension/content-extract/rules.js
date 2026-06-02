@@ -264,7 +264,6 @@ class ExtractionRulesManager {
     for (const selector of strategy.containerSelectors || ["body"]) {
       container = document.querySelector(selector);
       if (container) {
-        console.log(`[ExtractionRules] Found container: ${selector}`);
         break;
       }
     }
