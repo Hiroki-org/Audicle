@@ -24,17 +24,18 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 
-async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3, delayMs = 2000): Promise<T> {
+async function withRetry<T>(operation: () => Promise<T>, maxRetries = 5, delayMs = 3000): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             return await operation();
         } catch (error: any) {
-            const isNetworkError = error?.code === 'ENOTFOUND' ||
-                                 error?.message?.includes('fetch failed') ||
-                                 error?.cause?.code === 'ENOTFOUND';
+            const errorString = String(error?.message || '') + String(error?.cause || '') + String(error);
+            const isNetworkError = errorString.includes('ENOTFOUND') ||
+                                 errorString.includes('fetch failed') ||
+                                 errorString.includes('ECONNRESET');
 
             if (isNetworkError && attempt < maxRetries) {
-                console.warn(`⚠️ Network error (attempt ${attempt}/${maxRetries}). Retrying in ${delayMs}ms...`, error.message);
+                console.warn(`⚠️ Network error (attempt ${attempt}/${maxRetries}). Retrying in ${delayMs}ms...`, error?.message || error);
                 await new Promise(resolve => setTimeout(resolve, delayMs));
                 continue;
             }
