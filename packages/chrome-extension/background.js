@@ -334,12 +334,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // 再生開始通知
   if (message.command === "playbackStarted") {
     setActiveIcon();
-    console.log("Playback started - icon set to active");
   }
 
   // 再生停止通知
   if (message.command === "playbackStopped") {
     setDefaultIcon();
-    console.log("Playback stopped - icon set to default");
   }
 });
