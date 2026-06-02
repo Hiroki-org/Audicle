@@ -11,6 +11,9 @@ on:
       - ".github/workflows/gemini-scheduled-triage.yml"
   workflow_dispatch:
 
+env:
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
+
 concurrency:
   group: "${{ github.workflow }}"
   cancel-in-progress: true

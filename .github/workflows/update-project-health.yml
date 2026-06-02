@@ -5,6 +5,9 @@ on:
     - cron: '0 0 * * 5'  # 毎週金曜日 9時（JST）
   workflow_dispatch:
 
+env:
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
+
 jobs:
   update-health:
     runs-on: ubuntu-latest

@@ -16,6 +16,9 @@ on:
       GEMINI_API_KEY:
         required: true
 
+env:
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
+
 concurrency:
   group: "${{ github.workflow }}-invoke-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}"
   cancel-in-progress: false

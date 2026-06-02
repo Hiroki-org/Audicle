@@ -6,6 +6,9 @@ on:
       - "opened"
       - "synchronize"
 
+env:
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
+
 concurrency:
   group: "${{ github.workflow }}-pr-review-${{ github.event.pull_request.number }}"
   cancel-in-progress: true
