@@ -24,7 +24,7 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, retries = 5, delay = 2000): Promise<T> {
     for (let i = 0; i < retries; i++) {
         try {
             const result = await fn();
