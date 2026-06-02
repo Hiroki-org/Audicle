@@ -34,6 +34,8 @@ async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3, delayMs
                     console.warn(`[SEED] Network error detected in response. Retrying ${i + 1}/${maxRetries} in ${delayMs}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                     continue;
+                } else {
+                    throw (result as any).error;
                 }
             }
             return result;
@@ -72,10 +74,10 @@ async function ensureTestUser() {
             let foundUser = null;
             
             while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                const { data: listData, error: listError } = await withRetry(() => supabase.auth.admin.listUsers({
                     page: page,
                     perPage: perPage
-                });
+                }));
                 
                 if (listError) {
                     throw new Error(`Failed to list users to find existing one: ${listError.message}`);
