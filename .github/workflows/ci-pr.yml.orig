@@ -9,7 +9,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_OPTIONS: "--dns-result-order=ipv4first"
   CI_WEB_SERVER_COMMAND: "AUTH_ENV=test npm run start"
 
 jobs:
