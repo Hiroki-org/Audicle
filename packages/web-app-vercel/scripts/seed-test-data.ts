@@ -61,20 +61,32 @@ async function ensureTestUser() {
             let foundUser = null;
             
             while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
-                    page: page,
-                    perPage: perPage
-                });
+                let listData, listError;
+                try {
+                    const result = await supabase.auth.admin.listUsers({
+                        page: page,
+                        perPage: perPage
+                    });
+                    listData = result.data;
+                    listError = result.error;
+                } catch (e: any) {
+                    if (e.message?.includes('ENOTFOUND') || e.message?.includes('fetch failed') || e.name === 'AuthRetryableFetchError') {
+                        console.error("Database connection failure detected during listUsers:", e.message);
+                        userCreationFailure = true;
+                        throw e;
+                    }
+                    listError = e;
+                }
                 
                 if (listError) {
                     throw new Error(`Failed to list users to find existing one: ${listError.message}`);
                 }
                 
-                if (!listData.users || listData.users.length === 0) {
+                if (!listData || !listData.users || listData.users.length === 0) {
                     break; // No more users
                 }
                 
-                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+                foundUser = listData.users.find((u: any) => u.email === TEST_USER_EMAIL);
                 
                 if (foundUser) {
                     console.log(`   Found existing user ID: ${foundUser.id}`);
