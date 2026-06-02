@@ -23,13 +23,42 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
+
+async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3, delayMs = 2000): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error: any) {
+            const isNetworkError = error?.code === 'ENOTFOUND' ||
+                                 error?.message?.includes('fetch failed') ||
+                                 error?.cause?.code === 'ENOTFOUND';
+
+            if (isNetworkError && attempt < maxRetries) {
+                console.warn(`⚠️ Network error (attempt ${attempt}/${maxRetries}). Retrying in ${delayMs}ms...`, error.message);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error('Max retries reached');
+}
+
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
+    const { data, error } = await withRetry(async () => {
+        const res = await supabase.auth.admin.createUser({
+            email: TEST_USER_EMAIL,
+            password: TEST_USER_PASSWORD,
+            email_confirm: true
+        });
+
+        // Throw network errors explicitly so withRetry can catch them
+        if (res.error && (res.error.message.includes('fetch failed') || res.error.message.includes('ENOTFOUND'))) {
+            throw res.error;
+        }
+        return res;
     });
 
     if (error) {
@@ -45,9 +74,15 @@ async function ensureTestUser() {
             let foundUser = null;
             
             while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
-                    page: page,
-                    perPage: perPage
+                const { data: listData, error: listError } = await withRetry(async () => {
+                    const res = await supabase.auth.admin.listUsers({
+                        page: page,
+                        perPage: perPage
+                    });
+                    if (res.error && (res.error.message.includes('fetch failed') || res.error.message.includes('ENOTFOUND'))) {
+                        throw res.error;
+                    }
+                    return res;
                 });
                 
                 if (listError) {
