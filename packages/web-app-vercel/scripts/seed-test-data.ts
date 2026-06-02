@@ -38,7 +38,7 @@ async function withRetry(fn: any, retries = 3, delay = 1000): Promise<any> {
             }
             return res;
         } catch (error: any) {
-            const isNetworkError = error?.message?.includes('fetch failed') || error?.cause?.code === 'ENOTFOUND' || error?.message?.includes('ENOTFOUND');
+            const isNetworkError = error?.message?.includes('fetch failed') || String(error).includes('fetch failed') || error?.cause?.code === 'ENOTFOUND' || String(error?.cause).includes('ENOTFOUND') || error?.message?.includes('ENOTFOUND') || String(error).includes('ENOTFOUND');
             if (isNetworkError && i < retries - 1) {
                 console.log(`Network exception caught, retrying in ${delay}ms (attempt ${i + 1}/${retries})...`);
                 await new Promise(res => setTimeout(res, delay));
