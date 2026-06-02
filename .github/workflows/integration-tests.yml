@@ -25,4 +25,5 @@ jobs:
         run: npm run test:integration
         working-directory: packages/web-app-vercel
         env:
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
           NODE_ENV: test
