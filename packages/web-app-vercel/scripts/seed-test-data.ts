@@ -23,14 +23,32 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
+
+async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3, delayMs = 1000): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            const isNetworkError = error instanceof Error && (error.message.includes('ENOTFOUND') || error.message.includes('fetch') || error.message.includes('ECONNRESET'));
+            if (isNetworkError && attempt < maxRetries) {
+                console.warn(`[SEED] Network error on attempt ${attempt}, retrying in ${delayMs}ms... (${error.message})`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error('Unreachable');
+}
+
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
+    const { data, error } = await withRetry(() => supabase.auth.admin.createUser({
         email: TEST_USER_EMAIL,
         password: TEST_USER_PASSWORD,
         email_confirm: true
-    });
+    }));
 
     if (error) {
         // If user already exists, we try to find their ID
@@ -45,10 +63,10 @@ async function ensureTestUser() {
             let foundUser = null;
             
             while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                const { data: listData, error: listError } = await withRetry(() => supabase.auth.admin.listUsers({
                     page: page,
                     perPage: perPage
-                });
+                }));
                 
                 if (listError) {
                     throw new Error(`Failed to list users to find existing one: ${listError.message}`);
