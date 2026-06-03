@@ -23,14 +23,49 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
+
+// ==========================================
+// Utils for Network Resiliency
+// ==========================================
+const withRetry = async <T extends { error?: any }>(operation: () => Promise<T>, maxRetries = 3, delayMs = 1000): Promise<T> => {
+    let lastError: any;
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const res = await operation();
+
+            // Check if error is returned inside res.error
+            if (res && res.error) {
+                const isTransientError = res.error?.message?.includes("fetch failed") || res.error?.message?.includes("getaddrinfo ENOTFOUND") || res.error?.cause?.message?.includes("getaddrinfo ENOTFOUND") || res.error?.code === "ENOTFOUND" || res.error?.cause?.code === "ENOTFOUND";
+
+                if (isTransientError && i < maxRetries - 1) {
+                    console.log(`[SEED] Transient network error in res.error (${res.error?.message || res.error?.cause?.message}). Retrying (${i + 1}/${maxRetries}) in ${delayMs}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                    continue;
+                }
+            }
+            return res;
+        } catch (error: any) {
+            lastError = error;
+            const isTransientError = error?.message?.includes("fetch failed") || error?.message?.includes("getaddrinfo ENOTFOUND") || error?.cause?.message?.includes("getaddrinfo ENOTFOUND") || error?.code === "ENOTFOUND" || error?.cause?.code === "ENOTFOUND";
+
+            if (!isTransientError || i === maxRetries - 1) {
+                throw error;
+            }
+            console.log(`[SEED] Transient network error caught (${error?.message || error?.cause?.message}). Retrying (${i + 1}/${maxRetries}) in ${delayMs}ms...`);
+            await new Promise(res => setTimeout(res, delayMs));
+        }
+    }
+    throw lastError;
+};
+
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
+    const { data, error } = await withRetry<any>(async () => await supabase.auth.admin.createUser({
         email: TEST_USER_EMAIL,
         password: TEST_USER_PASSWORD,
         email_confirm: true
-    });
+    }));
 
     if (error) {
         // If user already exists, we try to find their ID
@@ -45,10 +80,10 @@ async function ensureTestUser() {
             let foundUser = null;
             
             while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                const { data: listData, error: listError } = await withRetry<any>(async () => await supabase.auth.admin.listUsers({
                     page: page,
                     perPage: perPage
-                });
+                }));
                 
                 if (listError) {
                     throw new Error(`Failed to list users to find existing one: ${listError.message}`);
@@ -58,7 +93,7 @@ async function ensureTestUser() {
                     break; // No more users
                 }
                 
-                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+                foundUser = listData.users.find((u: any) => u.email === TEST_USER_EMAIL);
                 
                 if (foundUser) {
                     console.log(`   Found existing user ID: ${foundUser.id}`);
