@@ -31,76 +31,81 @@ function isIpSafe(ip) {
   }
 }
 
-// Custom lookup function compatible with dns.lookup signature
-function safeLookup(hostname, options, callback) {
-    // Standardize arguments
-    if (typeof options === 'function') {
-        callback = options;
-        options = {};
-    }
 
-    // Call the original dns.lookup
-    dns.lookup(hostname, options, (err, address, family) => {
-        if (err) {
-            return callback(err, address, family);
+
+async function safeFetch(url) {
+    let currentUrl = url;
+    let response;
+    let redirectCount = 0;
+    const maxRedirects = 10;
+
+    while (redirectCount < maxRedirects) {
+        const parsedUrl = new URL(currentUrl);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+             throw new Error("Invalid protocol. Only http and https are allowed.");
         }
 
-        // Handle both single string and array of objects (if { all: true } was passed)
-        if (Array.isArray(address)) {
-             for (const addrObj of address) {
-                 if (!isIpSafe(addrObj.address)) {
-                     const error = new Error(`SSRF Blocked: Access to ${addrObj.address} is restricted`);
-                     error.code = 'ENOTFOUND';
-                     return callback(error);
-                 }
-             }
+        let addressToUse = parsedUrl.hostname;
+        let familyToUse = null;
+
+        let hostnameWithoutBrackets = parsedUrl.hostname;
+        if (hostnameWithoutBrackets.startsWith('[') && hostnameWithoutBrackets.endsWith(']')) {
+             hostnameWithoutBrackets = hostnameWithoutBrackets.slice(1, -1);
+        }
+
+        if (!ipaddr.isValid(hostnameWithoutBrackets)) {
+            const { address, family } = await dns.promises.lookup(hostnameWithoutBrackets);
+            addressToUse = address;
+            familyToUse = family;
         } else {
-             if (!isIpSafe(address)) {
-                const error = new Error(`SSRF Blocked: Access to ${address} is restricted`);
-                error.code = 'ENOTFOUND';
-                return callback(error);
+            try {
+               const parsed = ipaddr.parse(hostnameWithoutBrackets);
+               familyToUse = parsed.kind() === 'ipv6' ? 6 : 4;
+            } catch (e) {
+               familyToUse = 4;
             }
         }
 
-        callback(null, address, family);
-    });
-}
+        if (!isIpSafe(addressToUse)) {
+             throw new Error(`SSRF Blocked: Access to ${addressToUse} is restricted`);
+        }
 
-// Create agents with the safe lookup
-const httpAgent = new http.Agent({ lookup: safeLookup });
-const httpsAgent = new https.Agent({ lookup: safeLookup });
+        const originalHostname = parsedUrl.hostname;
+        parsedUrl.hostname = familyToUse === 6 ? `[${addressToUse}]` : addressToUse;
 
-function getAgent(parsedUrl) {
-    if (parsedUrl.protocol == 'http:') {
-        return httpAgent;
-    } else {
-        return httpsAgent;
+        const agent = parsedUrl.protocol === 'http:' ?
+            new http.Agent() :
+            new https.Agent({ servername: originalHostname });
+
+        response = await fetch(parsedUrl.toString(), {
+          agent,
+          headers: {
+            "Host": originalHostname,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+          },
+          redirect: 'manual'
+        });
+
+        if ([301, 302, 303, 307, 308].includes(response.status) && response.headers.has('location')) {
+            const location = response.headers.get('location');
+            currentUrl = new URL(location, currentUrl).toString();
+            redirectCount++;
+            continue;
+        }
+
+        break;
     }
+
+    if (redirectCount >= maxRedirects) {
+        throw new Error("Too many redirects");
+    }
+    return response;
 }
 
 async function extractContent(url) {
   try {
-    // Basic protocol check before fetching
-    const parsedUrl = new URL(url);
-    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-         throw new Error("Invalid protocol. Only http and https are allowed.");
-    }
-
-    // If the URL is an IP address, validate it immediately
-    if (ipaddr.isValid(parsedUrl.hostname)) {
-        if (!isIpSafe(parsedUrl.hostname)) {
-             throw new Error(`SSRF Blocked: Access to ${parsedUrl.hostname} is restricted`);
-        }
-    }
-
-    // URLからHTMLを取得
-    const response = await fetch(url, {
-      agent: getAgent,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-      },
-    });
+    // URLからHTMLを取得 (安全なフェッチを使用)
+    const response = await safeFetch(url);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
