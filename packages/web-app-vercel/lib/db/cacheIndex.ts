@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
 export type CacheIndex = {
     article_url: string;
@@ -9,24 +9,10 @@ export type CacheIndex = {
     last_accessed: string;
 };
 
-// サーバーサイド用のSupabaseクライアントを作成
-function getSupabaseClient() {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error('Missing Supabase environment variables');
-    }
-
-    return createClient(supabaseUrl, supabaseAnonKey);
-}
-
 export async function getCacheIndex(
     articleUrl: string,
     voice: string
 ): Promise<CacheIndex | null> {
-    const supabase = getSupabaseClient();
-
     const { data, error } = await supabase
         .from('audio_cache_index')
         .select('*')
@@ -47,8 +33,6 @@ export async function addCachedChunk(
     voice: string,
     textHash: string
 ): Promise<void> {
-    const supabase = getSupabaseClient();
-
     const { error } = await supabase.rpc('add_cached_chunk', {
         p_article_url: articleUrl,
         p_voice: voice,
@@ -66,8 +50,6 @@ export async function removeCachedChunk(
     voice: string,
     textHash: string
 ): Promise<void> {
-    const supabase = getSupabaseClient();
-
     const { error } = await supabase.rpc('remove_cached_chunk', {
         p_article_url: articleUrl,
         p_voice: voice,
@@ -85,8 +67,6 @@ export async function updateCompletedPlayback(
     voice: string,
     completed: boolean
 ): Promise<void> {
-    const supabase = getSupabaseClient();
-
     const { error } = await supabase.rpc('update_completed_playback', {
         p_article_url: articleUrl,
         p_voice: voice,
