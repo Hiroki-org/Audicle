@@ -469,15 +469,7 @@ async function seedTestData() {
         position: i,
     }));
 
-    if (defaultPlaylistItems.length > 0) {
-        const { error: itemError } = await supabase.from("playlist_items").insert(defaultPlaylistItems);
-
-        if (itemError) {
-            console.error("プレイリストアイテムの追加に失敗:", itemError);
-            process.exit(1);
-        }
-    }
-    console.log("✓ プレイリストアイテムを追加しました");
+    // 挿入は後でまとめて行います
 
     // 7. ソートテスト用プレイリストの作成
     console.log("7. ソートテスト用プレイリストを作成中...");
@@ -514,15 +506,16 @@ async function seedTestData() {
         position: i,
     }));
 
-    if (sortTestPlaylistItems.length > 0) {
-        const { error: itemError } = await supabase.from("playlist_items").insert(sortTestPlaylistItems);
+    const allPlaylistItems = [...defaultPlaylistItems, ...sortTestPlaylistItems];
+    if (allPlaylistItems.length > 0) {
+        const { error: itemError } = await supabase.from("playlist_items").insert(allPlaylistItems);
 
         if (itemError) {
-            console.error("ソートテスト用プレイリストアイテムの追加に失敗:", itemError);
+            console.error("プレイリストアイテムの追加に失敗:", itemError);
             process.exit(1);
         }
     }
-    console.log("✓ ソートテスト用プレイリストアイテムを追加しました");
+    console.log("✓ 全プレイリストアイテムを追加しました");
 
     console.log("\n✅ テストデータの投入が完了しました！");
     console.log(`   - ユーザー: ${TEST_USER_EMAIL} (ID: ${TEST_USER_ID})`);
