@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { formatDate } from "@/lib/formatters";
 
 function AuthErrorContent() {
   const searchParams = useSearchParams();
@@ -69,7 +70,7 @@ function AuthErrorContent() {
               <div>
                 <p className="text-gray-600">
                   <strong>タイムスタンプ:</strong>{" "}
-                  {new Date().toLocaleString("ja-JP")}
+                  {formatDate(Date.now())}
                 </p>
               </div>
             </div>

@@ -15,6 +15,7 @@ import type {
 import { RotateCcw } from "lucide-react";
 import { PlaylistSelectorModal } from "@/components/PlaylistSelectorModal";
 import toast from "react-hot-toast";
+import { formatDate } from "@/lib/formatters";
 
 const POPULAR_CACHE_KEY = "audicle_popular_articles_v2";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // limit fetches to once per day
@@ -156,7 +157,7 @@ export default function PopularPage() {
   }, []);
 
   const formattedLastFetchedAt =
-    lastFetchedAt !== null ? new Date(lastFetchedAt).toLocaleString() : null;
+    lastFetchedAt !== null ? formatDate(lastFetchedAt) : null;
 
   const isRateLimited = isFresh(lastFetchedAt);
 
