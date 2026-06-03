@@ -1,4 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import * as dns from "dns";
+
+// Workaround for Node.js 20+ DNS resolution issues in GitHub Actions
+dns.setDefaultResultOrder('ipv4first');
 import { createHash } from "crypto";
 import { config } from "dotenv";
 import { resolve } from "path";
