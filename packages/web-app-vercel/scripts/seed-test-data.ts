@@ -18,7 +18,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const withRetry = async <T>(operation: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> => {
+const withRetry = async <T>(operation: () => Promise<T>, maxRetries = 7, baseDelay = 2000): Promise<T> => {
     let lastError: any;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
