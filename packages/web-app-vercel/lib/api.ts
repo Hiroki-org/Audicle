@@ -46,9 +46,7 @@ function getPendingKey(
   voiceModel?: string,
   articleUrl?: string
 ): string {
-  const voiceParam = voice ?? voiceModel ?? "default";
-  const articleParam = articleUrl ? `_${articleUrl}` : "";
-  return `${text}_${voiceParam}${articleParam}`;
+  return JSON.stringify({ text, voice, voiceModel, articleUrl });
 }
 
 /**
