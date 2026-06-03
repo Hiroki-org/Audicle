@@ -72,43 +72,49 @@ function Readability(doc, options) {
     this.FLAG_CLEAN_CONDITIONALLY;
 
   // Control whether log messages are sent to the console
-  if (this._debug) {
-    let logNode = function (node) {
-      if (node.nodeType == node.TEXT_NODE) {
-        return `${node.nodeName} ("${node.textContent}")`;
-      }
-      let attrPairs = Array.from(node.attributes || [], function (attr) {
-        return `${attr.name}="${attr.value}"`;
-      }).join(" ");
-      return `<${node.localName} ${attrPairs}>`;
-    };
-    this.log = function () {
-      if (typeof console !== "undefined") {
-        let args = Array.from(arguments, arg => {
-          if (arg && arg.nodeType == this.ELEMENT_NODE) {
-            return logNode(arg);
-          }
-          return arg;
-        });
-        args.unshift("Reader: (Readability)");
-        // eslint-disable-next-line no-console
-        console.log(...args);
-      } else if (typeof dump !== "undefined") {
-        /* global dump */
-        var msg = Array.prototype.map
-          .call(arguments, function (x) {
-            return x && x.nodeName ? logNode(x) : x;
-          })
-          .join(" ");
-        dump("Reader: (Readability) " + msg + "\n");
-      }
-    };
-  } else {
-    this.log = function () {};
-  }
+  this._setupLogging();
 }
 
 Readability.prototype = {
+  /**
+   * Sets up logging based on the debug flag.
+   */
+  _setupLogging: function () {
+    if (this._debug) {
+      let logNode = function (node) {
+        if (node.nodeType == node.TEXT_NODE) {
+          return `${node.nodeName} ("${node.textContent}")`;
+        }
+        let attrPairs = Array.from(node.attributes || [], function (attr) {
+          return `${attr.name}="${attr.value}"`;
+        }).join(" ");
+        return `<${node.localName} ${attrPairs}>`;
+      };
+      this.log = function () {
+        if (typeof console !== "undefined") {
+          let args = Array.from(arguments, arg => {
+            if (arg && arg.nodeType == this.ELEMENT_NODE) {
+              return logNode(arg);
+            }
+            return arg;
+          });
+          args.unshift("Reader: (Readability)");
+          // eslint-disable-next-line no-console
+          console.log(...args);
+        } else if (typeof dump !== "undefined") {
+          /* global dump */
+          var msg = Array.prototype.map
+            .call(arguments, function (x) {
+              return x && x.nodeName ? logNode(x) : x;
+            })
+            .join(" ");
+          dump("Reader: (Readability) " + msg + "\n");
+        }
+      };
+    } else {
+      this.log = function () {};
+    }
+  },
   FLAG_STRIP_UNLIKELYS: 0x1,
   FLAG_WEIGHT_CLASSES: 0x2,
   FLAG_CLEAN_CONDITIONALLY: 0x4,
