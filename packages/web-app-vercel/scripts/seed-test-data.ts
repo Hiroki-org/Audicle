@@ -18,6 +18,39 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+const withRetry = async <T>(operation: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> => {
+    let lastError: any;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const res: any = await operation();
+            if (res && res.error) {
+                const msg = res.error.message || '';
+                const causeMsg = res.error.cause?.message || '';
+                const isNetworkError = msg.includes('ENOTFOUND') || msg.includes('fetch failed') || msg.includes('ECONNREFUSED') || msg.includes('ECONNRESET') ||
+                                       causeMsg.includes('ENOTFOUND') || causeMsg.includes('fetch failed') || causeMsg.includes('ECONNREFUSED') || causeMsg.includes('ECONNRESET');
+                if (isNetworkError) {
+                    throw res.error;
+                }
+            }
+            return res;
+        } catch (error: any) {
+            lastError = error;
+            const msg = error?.message || '';
+            const causeMsg = error?.cause?.message || '';
+            const isNetworkError = msg.includes('ENOTFOUND') || msg.includes('fetch failed') || msg.includes('ECONNREFUSED') || msg.includes('ECONNRESET') ||
+                                   causeMsg.includes('ENOTFOUND') || causeMsg.includes('fetch failed') || causeMsg.includes('ECONNREFUSED') || causeMsg.includes('ECONNRESET');
+
+            if (isNetworkError && attempt < maxRetries) {
+                console.warn(`[SEED] Network error on attempt ${attempt}, retrying in ${baseDelay * attempt}ms...`, msg || causeMsg);
+                await new Promise(resolve => setTimeout(resolve, baseDelay * attempt));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw lastError;
+};
+
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
@@ -26,11 +59,11 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
+    const { data, error } = await withRetry(async () => await supabase.auth.admin.createUser({
         email: TEST_USER_EMAIL,
         password: TEST_USER_PASSWORD,
         email_confirm: true
-    });
+    }));
 
     if (error) {
         // If user already exists, we try to find their ID
@@ -45,10 +78,10 @@ async function ensureTestUser() {
             let foundUser = null;
             
             while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                const { data: listData, error: listError } = await withRetry(async () => await supabase.auth.admin.listUsers({
                     page: page,
                     perPage: perPage
-                });
+                }));
                 
                 if (listError) {
                     throw new Error(`Failed to list users to find existing one: ${listError.message}`);
