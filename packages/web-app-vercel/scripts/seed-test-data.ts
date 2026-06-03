@@ -20,8 +20,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function withRetry<T>(
     operation: () => Promise<{ data: any; error: any } | null | any>,
-    maxRetries = 3,
-    delayMs = 1000
+    maxRetries = 5,
+    delayMs = 3000
 ): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
