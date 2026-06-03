@@ -900,8 +900,9 @@ function buildQueueWithNewRulesManager() {
     if (text && text.length > 0) {
       if (chunkSize > 0) {
         // チャンク分割を行う場合
-        for (let i = 0; i < text.length; i += chunkSize) {
-          const chunk = text.slice(i, i + chunkSize).trim();
+        const len = text.length;
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = text.substring(i, i + chunkSize).trim();
           if (chunk) {
             queue.push({
               text: chunk,
@@ -1150,8 +1151,9 @@ function convertBlocksToQueue(blocks) {
     const chunkSize = config.chunkSize || 200;
     const text = block.text;
 
-    for (let i = 0; i < text.length; i += chunkSize) {
-      const chunk = text.slice(i, i + chunkSize).trim();
+    const len = text.length;
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = text.substring(i, i + chunkSize).trim();
       if (chunk) {
         queue.push({
           text: chunk,
@@ -1218,8 +1220,9 @@ function buildQueueWithCustomRule(rule) {
       );
       // chunkSize文字ごとに分割
       const chunkSize = config.chunkSize || 200;
-      for (let i = 0; i < text.length; i += chunkSize) {
-        const chunk = text.slice(i, i + chunkSize);
+      const len = text.length;
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = text.substring(i, i + chunkSize);
         queue.push({ text: chunk, paragraphId });
       }
       paragraphId++;
@@ -1270,8 +1273,9 @@ function buildQueueWithReadability() {
     if (text) {
       // chunkSize文字ごとに分割
       const chunkSize = config.chunkSize || 200;
-      for (let i = 0; i < text.length; i += chunkSize) {
-        const chunk = text.slice(i, i + chunkSize);
+      const len = text.length;
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = text.substring(i, i + chunkSize);
         queue.push({ text: chunk, paragraphId: index });
       }
     }
@@ -1292,8 +1296,9 @@ function buildQueueWithFallback() {
       const paragraphId = parseInt(p.dataset.audicleId);
       // chunkSize文字ごとに分割
       const chunkSize = config.chunkSize || 200;
-      for (let i = 0; i < text.length; i += chunkSize) {
-        const chunk = text.slice(i, i + chunkSize);
+      const len = text.length;
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = text.substring(i, i + chunkSize);
         queue.push({ text: chunk, paragraphId });
       }
     }
