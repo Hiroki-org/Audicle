@@ -25,12 +25,37 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
-    // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
-    });
+
+    // Try to create user with retry logic for network errors
+    let data = null, error = null;
+    let retries = 3;
+    let delay = 1000;
+    while (retries > 0) {
+        try {
+            const res = await supabase.auth.admin.createUser({
+                email: TEST_USER_EMAIL,
+                password: TEST_USER_PASSWORD,
+                email_confirm: true
+            });
+            data = res.data;
+            error = res.error;
+
+            // Check if error is a network error (like ENOTFOUND or fetch failed)
+            if (error && (error.message?.includes('ENOTFOUND') || error.message?.includes('fetch') || error.cause?.toString().includes('ENOTFOUND'))) {
+                throw new Error(`Network error: ${error.message}`);
+            }
+            break; // Success or non-network error
+        } catch (e) {
+            retries--;
+            if (retries === 0) {
+                if (!error) error = { message: e.message || String(e) };
+                break;
+            }
+            console.warn(`[SEED] Network error during createUser, retrying in ${delay}ms (${retries} retries left)...`, e.message || e);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // Exponential backoff
+        }
+    }
 
     if (error) {
         // If user already exists, we try to find their ID
