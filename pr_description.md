@@ -1,20 +1,5 @@
 💡 **What:**
-Optimized text chunking logic across four key functions in `packages/chrome-extension/content.js`:
-- `buildQueueWithNewRulesManager`
-- `convertBlocksToQueue`
-- `buildQueueWithCustomRule`
-- `buildQueueWithReadability`
-- `buildQueueWithFallback`
-
-Specifically, the `for` loops that iterate over text chunks were updated to:
-1. Cache `text.length` before the loop.
-2. Replace `text.slice(i, i + chunkSize)` with `text.substring(i, i + chunkSize)`.
+Implemented network retry logic around `supabase.auth.admin.createUser` and `supabase.auth.admin.listUsers` in `packages/web-app-vercel/scripts/seed-test-data.ts`.
 
 🎯 **Why:**
-The original implementation repeatedly evaluated `text.length` in the loop condition and used `Array.prototype.slice` (via string coercion/delegation on older engines, though standard string `slice` is used, `substring` often compiles down to faster bytecode in V8 for simple index bounding). Caching the length and using `substring` reduces per-iteration overhead, especially for very large text bodies (e.g., long articles).
-
-📊 **Measured Improvement:**
-A quick benchmark using `Node.js` showed the following performance gains on randomly sized strings simulating heavy load:
-- **Baseline (`slice` + uncached length):** ~59.8ms
-- **Optimized (`substring` + cached length):** ~42.7ms
-- **Change over baseline:** ~28.6% faster processing for large batches of text chunks.
+The GitHub Actions CI test suite was failing during the "テストデータ投入" (`seed-test-data`) job due to transient DNS and network errors (e.g., `getaddrinfo ENOTFOUND ohoaxvgkwnrljmxqrggo.supabase.co` or `fetch failed`). Supabase `supabase-js` returns these errors inside the `error` response object or throws them. The new implementation caches these errors and adds a 3-second delay between 3 retry attempts, ensuring transient failures won't break the CI pipeline.

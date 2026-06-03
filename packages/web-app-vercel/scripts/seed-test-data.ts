@@ -18,6 +18,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || "test@example.com";
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
@@ -25,64 +27,114 @@ console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
-    // Try to create user
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: TEST_USER_EMAIL,
-        password: TEST_USER_PASSWORD,
-        email_confirm: true
-    });
 
-    if (error) {
-        // If user already exists, we try to find their ID
-        const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
-        
-        if (isAlreadyRegistered) {
-            console.log("   User already exists. Fetching ID by listing users...");
-            
-            // Pagination handling to find user
-            let page = 1;
-            const perPage = 50;
-            let foundUser = null;
-            
-            while (!foundUser) {
-                const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
-                    page: page,
-                    perPage: perPage
-                });
-                
-                if (listError) {
-                    throw new Error(`Failed to list users to find existing one: ${listError.message}`);
-                }
-                
-                if (!listData.users || listData.users.length === 0) {
-                    break; // No more users
-                }
-                
-                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
-                
-                if (foundUser) {
-                    console.log(`   Found existing user ID: ${foundUser.id}`);
-                    return foundUser.id;
+    let retries = 3;
+    while (retries > 0) {
+        try {
+            // Try to create user
+            const { data, error } = await supabase.auth.admin.createUser({
+                email: TEST_USER_EMAIL,
+                password: TEST_USER_PASSWORD,
+                email_confirm: true
+            });
+
+            if (error) {
+                // Check if it's a transient fetch or getaddrinfo network error
+                const isNetworkError = error.message?.includes('fetch failed') ||
+                                     error.message?.includes('ENOTFOUND') ||
+                                     error.cause?.message?.includes('ENOTFOUND');
+                if (isNetworkError && retries > 1) {
+                    console.warn(`   Network error during createUser (${error.message}), retrying... (${retries - 1} left)`);
+                    await wait(3000);
+                    retries--;
+                    continue;
                 }
 
-                // If we got fewer users than perPage, we're on the last page
-                if (listData.users.length < perPage) {
-                    break;
-                }
+                // If user already exists, we try to find their ID
+                const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
                 
-                // Safety break to prevent infinite loops if we have thousands of users (unlikely in test)
-                if (page > 20) {
-                    break; 
+                if (isAlreadyRegistered) {
+                    console.log("   User already exists. Fetching ID by listing users...");
+
+                    // Pagination handling to find user
+                    let page = 1;
+                    const perPage = 50;
+                    let foundUser = null;
+
+                    let listRetries = 3;
+                    while (!foundUser && listRetries > 0) {
+                        try {
+                            const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+                                page: page,
+                                perPage: perPage
+                            });
+
+                            if (listError) {
+                                const listNetError = listError.message?.includes('fetch failed') || listError.message?.includes('ENOTFOUND') || listError.cause?.message?.includes('ENOTFOUND');
+                                if (listNetError && listRetries > 1) {
+                                    console.warn(`   Network error during listUsers, retrying... (${listRetries - 1} left)`);
+                                    await wait(3000);
+                                    listRetries--;
+                                    continue;
+                                }
+                                throw new Error(`Failed to list users to find existing one: ${listError.message}`);
+                            }
+
+                            if (!listData.users || listData.users.length === 0) {
+                                break; // No more users
+                            }
+
+                            foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+
+                            if (foundUser) {
+                                console.log(`   Found existing user ID: ${foundUser.id}`);
+                                return foundUser.id;
+                            }
+
+                            // If we got fewer users than perPage, we're on the last page
+                            if (listData.users.length < perPage) {
+                                break;
+                            }
+
+                            // Safety break
+                            if (page > 20) {
+                                break;
+                            }
+                            page++;
+                            listRetries = 3; // Reset list retries for next page
+                        } catch (e) {
+                             if (e.message?.includes('fetch failed') || e.message?.includes('ENOTFOUND') || e.cause?.message?.includes('ENOTFOUND')) {
+                                if (listRetries > 1) {
+                                     console.warn(`   Network error during listUsers Exception, retrying... (${listRetries - 1} left)`);
+                                     await wait(3000);
+                                     listRetries--;
+                                     continue;
+                                 }
+                             }
+                             throw e;
+                        }
+                    }
+
+                    throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
                 }
-                page++;
+                throw error;
             }
-            
-            throw new Error(`User ${TEST_USER_EMAIL} reportedly exists but was not found in user list after checking ${page} pages`);
+            console.log(`   Created new user ID: ${data.user.id}`);
+            return data.user.id;
+
+        } catch (err) {
+            if (err.message?.includes('fetch failed') || err.message?.includes('ENOTFOUND') || err.cause?.message?.includes('ENOTFOUND')) {
+                if (retries > 1) {
+                    console.warn(`   Network Exception during createUser (${err.message}), retrying... (${retries - 1} left)`);
+                    await wait(3000);
+                    retries--;
+                    continue;
+                }
+            }
+            throw err;
         }
-        throw error;
     }
-    console.log(`   Created new user ID: ${data.user.id}`);
-    return data.user.id;
+    throw new Error('ensureTestUser failed after retries');
 }
 
 async function runMigrations() {
