@@ -6,6 +6,16 @@ export interface UserInitializationResult {
     error?: string
 }
 
+function shouldUseLocalUserInitialization(): boolean {
+    const isTestAuthRuntime =
+        process.env.AUTH_ENV === 'test' || process.env.NEXT_PUBLIC_AUTH_ENV === 'test'
+    const hasSupabaseConfig = Boolean(
+        process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    )
+
+    return isTestAuthRuntime && !hasSupabaseConfig
+}
+
 /**
  * 新規ユーザー登録時の初期化処理
  * - user_settings を作成（既に存在する場合はスキップする）
@@ -17,6 +27,17 @@ export interface UserInitializationResult {
  */
 export async function initializeNewUser(userId: string, userEmail: string): Promise<UserInitializationResult> {
     try {
+        if (shouldUseLocalUserInitialization()) {
+            if (userEmail) {
+                const playlistResult = await getOrCreateDefaultPlaylist(userEmail);
+                if (playlistResult.error) {
+                    console.error('Failed to create default playlist:', playlistResult.error);
+                }
+            }
+
+            return { success: true }
+        }
+
         // user_settings が既に存在するか確認
         const { data: existingSettings, error: checkError } = await supabase
             .from('user_settings')

@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test npm run start"
+  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test NEXT_PUBLIC_AUTH_ENV=test npm run start"
 
 jobs:
   seed-test-db:
@@ -181,6 +181,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+      NEXT_PUBLIC_AUTH_ENV: test
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -227,6 +228,7 @@ jobs:
         working-directory: packages/web-app-vercel
         env:
           AUTH_ENV: test
+          NEXT_PUBLIC_AUTH_ENV: test
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
@@ -243,6 +245,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+      NEXT_PUBLIC_AUTH_ENV: test
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
@@ -281,6 +284,7 @@ jobs:
         env:
           NODE_ENV: test
           AUTH_ENV: test
+          NEXT_PUBLIC_AUTH_ENV: test
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
@@ -300,6 +304,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+      NEXT_PUBLIC_AUTH_ENV: test
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
@@ -337,6 +342,7 @@ jobs:
         working-directory: packages/web-app-vercel
         env:
           AUTH_ENV: test
+          NEXT_PUBLIC_AUTH_ENV: test
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
