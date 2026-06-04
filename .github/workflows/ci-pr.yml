@@ -16,18 +16,25 @@ jobs:
     name: テストデータ投入
     runs-on: ubuntu-latest
     steps:
+      - name: Use local fallback
+        if: ${{ vars.CI_USE_REMOTE_SUPABASE != 'true' }}
+        run: echo "PR CI is using the in-memory Supabase fallback; remote test database seed is disabled."
       - name: Checkout code
+        if: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' }}
         uses: actions/checkout@v6.0.2
       - name: Setup Node.js
+        if: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' }}
         uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: packages/web-app-vercel/package-lock.json
       - name: Install dependencies
+        if: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' }}
         run: npm ci
         working-directory: packages/web-app-vercel
       - name: Seed test database
+        if: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' }}
         run: npm run seed-test-data
         working-directory: packages/web-app-vercel
         env:
@@ -131,7 +138,7 @@ jobs:
 
   build:
     name: Build
-    needs: [setup, seed-test-db]
+    needs: setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.2
@@ -153,8 +160,8 @@ jobs:
         working-directory: packages/web-app-vercel
         env:
           NODE_ENV: production
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXT_PUBLIC_AUTH_ENV: test
       - name: Upload build artifact
@@ -167,11 +174,11 @@ jobs:
 
   e2e-pr:
     name: E2E (PR-small)
-    needs: [setup, build, e2e-auth, seed-test-db]
+    needs: [setup, build, e2e-auth]
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
@@ -222,18 +229,18 @@ jobs:
           AUTH_ENV: test
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
 
   e2e-theme-fouc:
     name: E2E Theme FOUC
-    needs: [setup, build, seed-test-db]
+    needs: [setup, build]
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
     steps:
@@ -276,8 +283,8 @@ jobs:
           AUTH_ENV: test
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -289,8 +296,8 @@ jobs:
     needs: [setup, build]
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
     steps:
@@ -332,8 +339,8 @@ jobs:
           AUTH_ENV: test
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
       - name: Debug - Check auth files
