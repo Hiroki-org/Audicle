@@ -4,6 +4,13 @@ import * as supabaseLocal from '@/lib/supabaseLocal'
 import { requireAuth } from '@/lib/api-auth'
 import { Article, PlaylistItem } from '@/types/playlist'
 
+type LocalPlaylist = Awaited<ReturnType<typeof supabaseLocal.getPlaylistsForOwner>>[number]
+
+async function findOwnedLocalPlaylist(id: string, userEmail: string): Promise<LocalPlaylist | null> {
+    const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
+    return playlists.find((candidate) => candidate.id === id) ?? null
+}
+
 export async function POST(
     request: Request,
     context: { params: Promise<{ id: string }> }
@@ -14,11 +21,25 @@ export async function POST(
         if (response) return response
 
         // プレイリストの所有権を確認
-        const { data: playlist, error: playlistError } = await supabase
-            .from('playlists')
-            .select('owner_email')
-            .eq('id', id)
-            .single()
+        let playlist: { owner_email: string } | null = null
+        let playlistError: { message?: string } | null = null
+
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+            const found = await findOwnedLocalPlaylist(id, userEmail)
+            if (found) {
+                playlist = { owner_email: found.owner_email }
+            } else {
+                playlistError = { message: 'Playlist not found' }
+            }
+        } else {
+            const resp = await supabase
+                .from('playlists')
+                .select('owner_email')
+                .eq('id', id)
+                .single()
+            playlist = resp.data
+            playlistError = resp.error
+        }
 
         if (playlistError || !playlist) {
             return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
@@ -176,11 +197,26 @@ export async function GET(
         if (response) return response
 
         // プレイリストの所有権を確認
-        const { data: playlist, error: playlistError } = await supabase
-            .from('playlists')
-            .select('owner_email')
-            .eq('id', id)
-            .single()
+        let playlist: { owner_email: string } | null = null
+        let playlistError: { message?: string } | null = null
+        let localPlaylist: LocalPlaylist | null = null
+
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+            localPlaylist = await findOwnedLocalPlaylist(id, userEmail)
+            if (localPlaylist) {
+                playlist = { owner_email: localPlaylist.owner_email }
+            } else {
+                playlistError = { message: 'Playlist not found' }
+            }
+        } else {
+            const resp = await supabase
+                .from('playlists')
+                .select('owner_email')
+                .eq('id', id)
+                .single()
+            playlist = resp.data
+            playlistError = resp.error
+        }
 
         if (playlistError || !playlist) {
             return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
@@ -188,6 +224,13 @@ export async function GET(
 
         if (playlist.owner_email !== userEmail) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+            const items = [...(localPlaylist?.items ?? [])].sort(
+                (a, b) => (a.position ?? 0) - (b.position ?? 0),
+            )
+            return NextResponse.json(items)
         }
 
         // プレイリストアイテム（関連する記事情報付き）を取得
