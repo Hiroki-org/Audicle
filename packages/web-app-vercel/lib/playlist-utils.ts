@@ -47,11 +47,10 @@ export async function getOrCreateDefaultPlaylist(userEmail: string): Promise<Def
         const defaultPlaylist = playlists.find(p => p.is_default)
         if (defaultPlaylist) {
             const {
-                playlist_items: rawPlaylistItems = [],
-                items: playlistItems = rawPlaylistItems,
+                playlist_items = [],
+                items = playlist_items,
                 ...playlistData
             } = defaultPlaylist
-            const items = playlistItems
             return { playlist: { ...playlistData, items, item_count: items.length } }
         }
         // create one
