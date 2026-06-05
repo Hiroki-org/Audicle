@@ -31,13 +31,32 @@ function isIpSafe(ip) {
   }
 }
 
+function stripIpv6Brackets(hostname) {
+    return hostname.replace(/^\[|\]$/g, '');
+}
 
+function getAgent(agentCache, protocol, servername) {
+    if (protocol === 'http:') {
+        if (!agentCache.has('http:')) {
+            agentCache.set('http:', new http.Agent());
+        }
+        return agentCache.get('http:');
+    }
+
+    const normalizedServername = stripIpv6Brackets(servername);
+    const cacheKey = `https:${normalizedServername}`;
+    if (!agentCache.has(cacheKey)) {
+        agentCache.set(cacheKey, new https.Agent({ servername: normalizedServername }));
+    }
+    return agentCache.get(cacheKey);
+}
 
 async function safeFetch(url) {
     let currentUrl = url;
     let response;
     let redirectCount = 0;
     const maxRedirects = 10;
+    const agentCache = new Map();
 
     while (redirectCount < maxRedirects) {
         const parsedUrl = new URL(currentUrl);
@@ -45,13 +64,13 @@ async function safeFetch(url) {
              throw new Error("Invalid protocol. Only http and https are allowed.");
         }
 
-        let addressToUse = parsedUrl.hostname;
-        let familyToUse = null;
-
         let hostnameWithoutBrackets = parsedUrl.hostname;
         if (hostnameWithoutBrackets.startsWith('[') && hostnameWithoutBrackets.endsWith(']')) {
              hostnameWithoutBrackets = hostnameWithoutBrackets.slice(1, -1);
         }
+
+        let addressToUse = hostnameWithoutBrackets;
+        let familyToUse = null;
 
         if (!ipaddr.isValid(hostnameWithoutBrackets)) {
             const { address, family } = await dns.promises.lookup(hostnameWithoutBrackets);
@@ -71,16 +90,14 @@ async function safeFetch(url) {
         }
 
         const originalHostname = parsedUrl.hostname;
+        const originalHostHeader = parsedUrl.host;
         parsedUrl.hostname = familyToUse === 6 ? `[${addressToUse}]` : addressToUse;
-
-        const agent = parsedUrl.protocol === 'http:' ?
-            new http.Agent() :
-            new https.Agent({ servername: originalHostname });
+        const agent = getAgent(agentCache, parsedUrl.protocol, originalHostname);
 
         response = await fetch(parsedUrl.toString(), {
           agent,
           headers: {
-            "Host": originalHostname,
+            "Host": originalHostHeader,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
           },
           redirect: 'manual'
@@ -90,6 +107,7 @@ async function safeFetch(url) {
             const location = response.headers.get('location');
             currentUrl = new URL(location, currentUrl).toString();
             redirectCount++;
+            response.body?.resume();
             continue;
         }
 
