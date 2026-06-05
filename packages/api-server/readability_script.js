@@ -38,6 +38,20 @@ async function safeFetch(url) {
     let response;
     let redirectCount = 0;
     const maxRedirects = 10;
+    const httpAgent = new http.Agent();
+    const httpsAgents = new Map();
+
+    const getAgent = (protocol, servername) => {
+        if (protocol === 'http:') {
+            return httpAgent;
+        }
+
+        if (!httpsAgents.has(servername)) {
+            httpsAgents.set(servername, new https.Agent({ servername }));
+        }
+
+        return httpsAgents.get(servername);
+    };
 
     while (redirectCount < maxRedirects) {
         const parsedUrl = new URL(currentUrl);
@@ -45,13 +59,13 @@ async function safeFetch(url) {
              throw new Error("Invalid protocol. Only http and https are allowed.");
         }
 
-        let addressToUse = parsedUrl.hostname;
-        let familyToUse = null;
-
         let hostnameWithoutBrackets = parsedUrl.hostname;
         if (hostnameWithoutBrackets.startsWith('[') && hostnameWithoutBrackets.endsWith(']')) {
              hostnameWithoutBrackets = hostnameWithoutBrackets.slice(1, -1);
         }
+
+        let addressToUse = hostnameWithoutBrackets;
+        let familyToUse = null;
 
         if (!ipaddr.isValid(hostnameWithoutBrackets)) {
             const { address, family } = await dns.promises.lookup(hostnameWithoutBrackets);
@@ -70,17 +84,14 @@ async function safeFetch(url) {
              throw new Error(`SSRF Blocked: Access to ${addressToUse} is restricted`);
         }
 
-        const originalHostname = parsedUrl.hostname;
+        const originalHostHeader = parsedUrl.host;
+        const originalHostname = hostnameWithoutBrackets;
         parsedUrl.hostname = familyToUse === 6 ? `[${addressToUse}]` : addressToUse;
 
-        const agent = parsedUrl.protocol === 'http:' ?
-            new http.Agent() :
-            new https.Agent({ servername: originalHostname });
-
         response = await fetch(parsedUrl.toString(), {
-          agent,
+          agent: getAgent(parsedUrl.protocol, originalHostname),
           headers: {
-            "Host": originalHostname,
+            "Host": originalHostHeader,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
           },
           redirect: 'manual'
@@ -88,6 +99,7 @@ async function safeFetch(url) {
 
         if ([301, 302, 303, 307, 308].includes(response.status) && response.headers.has('location')) {
             const location = response.headers.get('location');
+            response.body?.resume();
             currentUrl = new URL(location, currentUrl).toString();
             redirectCount++;
             continue;

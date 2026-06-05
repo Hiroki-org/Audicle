@@ -6,6 +6,15 @@ import { createHash } from "crypto";
 import { config } from "dotenv";
 import { resolve } from "path";
 
+type RetryableResult = {
+    error?: {
+        message?: string;
+        cause?: {
+            message?: string;
+        };
+    };
+};
+
 // .env.test.local を読み込む
 config({ path: resolve(__dirname, "../.env.test.local") });
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -19,16 +28,21 @@ if (!supabaseUrl || !supabaseServiceKey) {
     process.exit(1);
 }
 
-async function withRetry<T>(operation: () => Promise<any>, retries = 5, delayMs = 2000): Promise<any> {
+async function withRetry<T>(operation: () => Promise<T>, retries = 5, delayMs = 2000): Promise<T> {
+    if (retries <= 0) {
+        throw new Error("retries must be greater than 0");
+    }
+
     let attempt = 0;
-    while (attempt < retries) {
+    while (true) {
         try {
             const res = await operation();
+            const resultError = (res as RetryableResult).error;
 
             // supabase-js returns error in res.error without throwing
-            if (res.error) {
-                const msg = res.error.message || '';
-                const causeMsg = (res.error as any).cause?.message || '';
+            if (resultError) {
+                const msg = resultError.message || '';
+                const causeMsg = resultError.cause?.message || '';
                 const isNetworkError = msg.includes('fetch failed') || msg.includes('ENOTFOUND') || causeMsg.includes('ENOTFOUND') || causeMsg.includes('fetch failed');
 
                 if (isNetworkError && attempt < retries - 1) {
@@ -53,7 +67,6 @@ async function withRetry<T>(operation: () => Promise<any>, retries = 5, delayMs 
             }
         }
     }
-    throw new Error("Maximum retries reached");
 }
 
 
