@@ -1,9 +1,14 @@
 import { supabase } from './supabase'
 import { getOrCreateDefaultPlaylist } from './playlist-utils'
+import { hasSupabaseRuntimeConfig, isTestAuthRuntime } from './auth-env'
 
 export interface UserInitializationResult {
     success: boolean
     error?: string
+}
+
+function shouldUseLocalUserInitialization(): boolean {
+    return isTestAuthRuntime() && !hasSupabaseRuntimeConfig()
 }
 
 /**
@@ -17,6 +22,17 @@ export interface UserInitializationResult {
  */
 export async function initializeNewUser(userId: string, userEmail: string): Promise<UserInitializationResult> {
     try {
+        if (shouldUseLocalUserInitialization()) {
+            if (userEmail) {
+                const playlistResult = await getOrCreateDefaultPlaylist(userEmail);
+                if (playlistResult.error) {
+                    console.error('Failed to create default playlist:', playlistResult.error);
+                }
+            }
+
+            return { success: true }
+        }
+
         // user_settings が既に存在するか確認
         const { data: existingSettings, error: checkError } = await supabase
             .from('user_settings')

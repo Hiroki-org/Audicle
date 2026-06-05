@@ -144,4 +144,75 @@ describe('/api/playlists route', () => {
         // because our supabase mock returns playlist_items in the parent route mock,
         // here we assume the items array is returned (mock stub may vary)
     })
+
+    it('POST /items uses the local playlist fallback when Supabase is not configured', async () => {
+        delete process.env.NEXT_PUBLIC_SUPABASE_URL
+
+        const supabaseLocal = require('@/lib/supabaseLocal')
+        supabaseLocal.resetInMemorySupabase()
+        const playlist = await supabaseLocal.createPlaylist('test@example.com', 'Local Playlist')
+
+        const mockRequest = new Request(`http://localhost:3000/api/playlists/${playlist.id}/items`, {
+            method: 'POST',
+            body: JSON.stringify({
+                article_url: 'https://example.com/?id=apple',
+                article_title: 'Apple',
+                thumbnail_url: null,
+                last_read_position: 0,
+            }),
+            headers: { 'Content-Type': 'application/json' },
+        })
+
+        const itemsModule = require('../[id]/items/route')
+        const res = await itemsModule.POST(mockRequest, {
+            params: Promise.resolve({ id: playlist.id }),
+        })
+
+        expect(res.status).toBe(200)
+        const data = await res.json()
+        expect(data.article).toMatchObject({
+            owner_email: 'test@example.com',
+            title: 'Apple',
+            url: 'https://example.com/?id=apple',
+        })
+        expect(data.item).toMatchObject({
+            playlist_id: playlist.id,
+            article_id: data.article.id,
+        })
+    })
+
+    it('GET /items uses the local playlist fallback when Supabase is not configured', async () => {
+        delete process.env.NEXT_PUBLIC_SUPABASE_URL
+
+        const supabaseLocal = require('@/lib/supabaseLocal')
+        supabaseLocal.resetInMemorySupabase()
+        const playlist = await supabaseLocal.createPlaylist('test@example.com', 'Local Playlist')
+        const article = await supabaseLocal.upsertArticle(
+            'test@example.com',
+            'https://example.com/?id=banana',
+            'Banana',
+            null,
+            0,
+        )
+        const item = await supabaseLocal.addPlaylistItem(playlist.id, article.id)
+
+        const mockRequest = new Request(`http://localhost:3000/api/playlists/${playlist.id}/items`)
+        const itemsModule = require('../[id]/items/route')
+        const res = await itemsModule.GET(mockRequest, {
+            params: Promise.resolve({ id: playlist.id }),
+        })
+
+        expect(res.status).toBe(200)
+        const data = await res.json()
+        expect(data).toHaveLength(1)
+        expect(data[0]).toMatchObject({
+            id: item.id,
+            playlist_id: playlist.id,
+            article_id: article.id,
+            article: {
+                title: 'Banana',
+                url: 'https://example.com/?id=banana',
+            },
+        })
+    })
 })

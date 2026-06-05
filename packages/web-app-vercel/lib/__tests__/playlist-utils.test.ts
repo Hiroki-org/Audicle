@@ -53,8 +53,28 @@ describe('getOrCreateDefaultPlaylist', () => {
       const existingPlaylist = {
         id: '1',
         is_default: true,
-        playlist_items: [],
-        items: [],
+        playlist_items: [{
+          id: 'raw-item-1',
+          playlist_id: '1',
+          article_id: 'article-1',
+          position: 1,
+          added_at: new Date().toISOString(),
+        }],
+        items: [{
+          id: 'item-1',
+          playlist_id: '1',
+          article_id: 'article-1',
+          position: 1,
+          added_at: new Date().toISOString(),
+          article: {
+            id: 'article-1',
+            owner_email: userEmail,
+            url: 'https://example.com/?id=apple',
+            title: 'Apple',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        }],
         owner_email: userEmail,
         name: 'Default Playlist',
         description: 'Default playlist description',
@@ -71,6 +91,8 @@ describe('getOrCreateDefaultPlaylist', () => {
       expect(playlist).toBeDefined();
       expect(playlist?.id).toBe('1');
       expect(playlist?.is_default).toBe(true);
+      expect(playlist?.items).toHaveLength(1);
+      expect(playlist?.items[0].article?.title).toBe('Apple');
       expect(mockedSupabaseLocal.getPlaylistsForOwner).toHaveBeenCalledWith(userEmail);
       expect(mockedSupabaseLocal.createPlaylist).not.toHaveBeenCalled();
       expect(mockedSupabaseLocal.setDefaultPlaylist).not.toHaveBeenCalled();
