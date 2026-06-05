@@ -64,11 +64,6 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "password";
 
 console.log(`[SEED] Using TEST_USER_EMAIL: ${TEST_USER_EMAIL}`);
 
-type ListedAuthUser = {
-    id: string;
-    email?: string;
-};
-
 async function ensureTestUser() {
     console.log(`[SEED] Ensuring auth user for ${TEST_USER_EMAIL}...`);
     // Try to create user
@@ -88,7 +83,7 @@ async function ensureTestUser() {
             // Pagination handling to find user
             let page = 1;
             const perPage = 50;
-            let foundUser: ListedAuthUser | null = null;
+            let foundUser = null;
             
             while (!foundUser) {
                 const { data: listData, error: listError } = await withRetry(async () => await supabase.auth.admin.listUsers({
@@ -104,7 +99,7 @@ async function ensureTestUser() {
                     break; // No more users
                 }
                 
-                foundUser = listData.users.find((u: ListedAuthUser) => u.email === TEST_USER_EMAIL) ?? null;
+                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
                 
                 if (foundUser) {
                     console.log(`   Found existing user ID: ${foundUser.id}`);
