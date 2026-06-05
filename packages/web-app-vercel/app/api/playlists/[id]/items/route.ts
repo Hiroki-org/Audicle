@@ -14,11 +14,26 @@ export async function POST(
         if (response) return response
 
         // プレイリストの所有権を確認
-        const { data: playlist, error: playlistError } = await supabase
-            .from('playlists')
-            .select('owner_email')
-            .eq('id', id)
-            .single()
+        let playlist: { owner_email: string } | null = null
+        let playlistError: { message?: string } | null = null
+
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+            const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
+            const found = playlists.find((candidate) => candidate.id === id)
+            if (found) {
+                playlist = { owner_email: found.owner_email }
+            } else {
+                playlistError = { message: 'Playlist not found' }
+            }
+        } else {
+            const resp = await supabase
+                .from('playlists')
+                .select('owner_email')
+                .eq('id', id)
+                .single()
+            playlist = resp.data
+            playlistError = resp.error
+        }
 
         if (playlistError || !playlist) {
             return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
@@ -176,11 +191,26 @@ export async function GET(
         if (response) return response
 
         // プレイリストの所有権を確認
-        const { data: playlist, error: playlistError } = await supabase
-            .from('playlists')
-            .select('owner_email')
-            .eq('id', id)
-            .single()
+        let playlist: { owner_email: string } | null = null
+        let playlistError: { message?: string } | null = null
+
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+            const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
+            const found = playlists.find((candidate) => candidate.id === id)
+            if (found) {
+                playlist = { owner_email: found.owner_email }
+            } else {
+                playlistError = { message: 'Playlist not found' }
+            }
+        } else {
+            const resp = await supabase
+                .from('playlists')
+                .select('owner_email')
+                .eq('id', id)
+                .single()
+            playlist = resp.data
+            playlistError = resp.error
+        }
 
         if (playlistError || !playlist) {
             return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })

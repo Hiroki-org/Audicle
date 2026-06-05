@@ -26,6 +26,8 @@ import { STORAGE_KEYS } from "@/lib/constants";
 import type { PlaylistItemWithArticle } from "@/types/playlist";
 import { getArticlesCache } from "@/lib/local-cache";
 import { ArticleListSkeleton } from "@/components/ArticleListSkeleton";
+import { usePlaylistPlayback } from "@/contexts/PlaylistPlaybackContext";
+import { createReaderUrl } from "@/lib/urlBuilder";
 
 const ARTICLE_SORT_BY_OPTIONS = [
   "newest",
@@ -50,6 +52,7 @@ export default function Home() {
   const { data: fetchedPlaylistData, isLoading, error } = useDefaultPlaylistItems();
   const playlistData = fetchedPlaylistData || cachedPlaylist;
   const removeFromPlaylistMutation = useRemoveFromPlaylistMutation();
+  const { startPlaylistPlayback } = usePlaylistPlayback();
 
   const [sortBy, setSortBy] = useState<ArticleSortBy>(() => {
     if (typeof window === "undefined") return "newest";
@@ -137,11 +140,21 @@ export default function Home() {
 
   const handleArticleClick = useCallback(
     (item: PlaylistItemWithArticle) => {
-      if (item.article?.url) {
-        router.push(`/reader?url=${encodeURIComponent(item.article.url)}`);
+      const index = sortedItems.findIndex((sortedItem) => sortedItem.id === item.id);
+      const selectedItem = index >= 0 ? sortedItems[index] : item;
+
+      if (!selectedItem.article?.url) {
+        return;
       }
+
+      if (playlistId && playlistName && index >= 0) {
+        startPlaylistPlayback(playlistId, playlistName, sortedItems, index, sortBy);
+        return;
+      }
+
+      router.push(createReaderUrl({ articleUrl: selectedItem.article.url }));
     },
-    [router]
+    [playlistId, playlistName, router, sortBy, sortedItems, startPlaylistPlayback]
   );
 
   const handlePlaylistAdd = useCallback((id: string) => {
@@ -252,11 +265,21 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8">
-              {sortedItems.map((item) => (
+              {sortedItems.map((item, index) => (
                 <ArticleCard
                   key={item.id}
                   item={item}
                   onArticleClick={handleArticleClick}
+                  href={
+                    item.article?.url
+                      ? createReaderUrl({
+                        articleUrl: item.article.url,
+                        playlistId,
+                        playlistIndex: index,
+                        autoplay: false,
+                      })
+                      : undefined
+                  }
                   onPlaylistAdd={handlePlaylistAdd}
                   onRemove={handleRemoveFromHome}
                 />

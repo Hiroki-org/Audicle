@@ -174,7 +174,7 @@ jobs:
 
   e2e-pr:
     name: E2E (PR-small)
-    needs: [setup, build, e2e-auth]
+    needs: [setup, build, e2e-auth, seed-test-db]
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
@@ -238,7 +238,7 @@ jobs:
 
   e2e-theme-fouc:
     name: E2E Theme FOUC
-    needs: [setup, build]
+    needs: [setup, build, seed-test-db]
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}

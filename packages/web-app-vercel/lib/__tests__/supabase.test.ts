@@ -4,13 +4,20 @@ jest.mock('@supabase/supabase-js', () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
 }));
 
-const ORIGINAL_ENV = process.env;
+const ORIGINAL_ENV = { ...process.env };
+
+function restoreEnv() {
+  for (const key of Object.keys(process.env)) {
+    delete process.env[key];
+  }
+  Object.assign(process.env, ORIGINAL_ENV);
+}
 
 describe('supabase client environment guard', () => {
   beforeEach(() => {
     jest.resetModules();
     createClientMock.mockClear();
-    process.env = { ...ORIGINAL_ENV };
+    restoreEnv();
     delete process.env.NEXT_PHASE;
     delete process.env.AUTH_ENV;
     delete process.env.NEXT_PUBLIC_AUTH_ENV;
@@ -19,7 +26,7 @@ describe('supabase client environment guard', () => {
   });
 
   afterAll(() => {
-    process.env = ORIGINAL_ENV;
+    restoreEnv();
   });
 
   it('requires Supabase configuration in normal production runtime', () => {
