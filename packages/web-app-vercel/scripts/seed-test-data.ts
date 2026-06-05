@@ -6,20 +6,6 @@ import { createHash } from "crypto";
 import { config } from "dotenv";
 import { resolve } from "path";
 
-type RetryableResult = {
-    error?: {
-        message?: string;
-        cause?: {
-            message?: string;
-        };
-    };
-};
-
-type ListedAuthUser = {
-    id: string;
-    email?: string;
-};
-
 // .env.test.local を読み込む
 config({ path: resolve(__dirname, "../.env.test.local") });
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -33,21 +19,16 @@ if (!supabaseUrl || !supabaseServiceKey) {
     process.exit(1);
 }
 
-async function withRetry<T>(operation: () => Promise<T>, retries = 5, delayMs = 2000): Promise<T> {
-    if (retries <= 0) {
-        throw new Error("retries must be greater than 0");
-    }
-
+async function withRetry<T>(operation: () => Promise<any>, retries = 5, delayMs = 2000): Promise<any> {
     let attempt = 0;
-    while (true) {
+    while (attempt < retries) {
         try {
             const res = await operation();
-            const resultError = (res as RetryableResult).error;
 
             // supabase-js returns error in res.error without throwing
-            if (resultError) {
-                const msg = resultError.message || '';
-                const causeMsg = resultError.cause?.message || '';
+            if (res.error) {
+                const msg = res.error.message || '';
+                const causeMsg = (res.error as any).cause?.message || '';
                 const isNetworkError = msg.includes('fetch failed') || msg.includes('ENOTFOUND') || causeMsg.includes('ENOTFOUND') || causeMsg.includes('fetch failed');
 
                 if (isNetworkError && attempt < retries - 1) {
@@ -72,6 +53,7 @@ async function withRetry<T>(operation: () => Promise<T>, retries = 5, delayMs = 
             }
         }
     }
+    throw new Error("Maximum retries reached");
 }
 
 
@@ -101,7 +83,7 @@ async function ensureTestUser() {
             // Pagination handling to find user
             let page = 1;
             const perPage = 50;
-            let foundUser: ListedAuthUser | null = null;
+            let foundUser = null;
             
             while (!foundUser) {
                 const { data: listData, error: listError } = await withRetry(async () => await supabase.auth.admin.listUsers({
@@ -117,7 +99,7 @@ async function ensureTestUser() {
                     break; // No more users
                 }
                 
-                foundUser = listData.users.find((u: ListedAuthUser) => u.email === TEST_USER_EMAIL) ?? null;
+                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
                 
                 if (foundUser) {
                     console.log(`   Found existing user ID: ${foundUser.id}`);
