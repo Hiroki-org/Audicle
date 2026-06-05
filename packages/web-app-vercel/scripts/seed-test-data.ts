@@ -1,3 +1,6 @@
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 import { config } from "dotenv";
@@ -16,17 +19,20 @@ if (!supabaseUrl || !supabaseServiceKey) {
     process.exit(1);
 }
 
-async function withRetry<T>(operation: () => Promise<any>, retries = 3, delayMs = 2000): Promise<any> {
+async function withRetry<T>(operation: () => Promise<any>, retries = 5, delayMs = 2000): Promise<any> {
     let attempt = 0;
     while (attempt < retries) {
         try {
             const res = await operation();
+
+            // supabase-js returns error in res.error without throwing
             if (res.error) {
                 const msg = res.error.message || '';
                 const causeMsg = (res.error as any).cause?.message || '';
                 const isNetworkError = msg.includes('fetch failed') || msg.includes('ENOTFOUND') || causeMsg.includes('ENOTFOUND') || causeMsg.includes('fetch failed');
+
                 if (isNetworkError && attempt < retries - 1) {
-                    console.log(`[Retry] Network error detected in response, retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
+                    console.log(`[Retry] Network error detected in response (${msg}), retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
                     attempt++;
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                     continue;
@@ -34,13 +40,13 @@ async function withRetry<T>(operation: () => Promise<any>, retries = 3, delayMs 
             }
             return res;
         } catch (error: any) {
-            attempt++;
             const msg = error?.message || '';
             const causeMsg = error?.cause?.message || '';
             const isNetworkError = msg.includes('fetch failed') || msg.includes('ENOTFOUND') || causeMsg.includes('ENOTFOUND') || causeMsg.includes('fetch failed');
 
-            if (isNetworkError && attempt < retries) {
-                console.log(`[Retry] Network exception detected, retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
+            if (isNetworkError && attempt < retries - 1) {
+                console.log(`[Retry] Network exception detected (${msg}), retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
+                attempt++;
                 await new Promise(resolve => setTimeout(resolve, delayMs));
             } else {
                 throw error;
@@ -49,6 +55,7 @@ async function withRetry<T>(operation: () => Promise<any>, retries = 3, delayMs 
     }
     throw new Error("Maximum retries reached");
 }
+
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
