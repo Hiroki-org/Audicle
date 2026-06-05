@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
-import { hasSupabaseRuntimeConfig, isTestAuthRuntime } from './auth-env'
 
 const isProductionBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
 const isProductionRuntime = process.env.NODE_ENV === 'production' && !isProductionBuildPhase
-const hasSupabaseConfig = hasSupabaseRuntimeConfig()
+const hasSupabaseConfig = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+)
 
-if (isProductionRuntime && !isTestAuthRuntime() && !hasSupabaseConfig) {
+if (isProductionRuntime && !hasSupabaseConfig) {
     throw new Error('Missing required Supabase environment variables in production')
 }
 

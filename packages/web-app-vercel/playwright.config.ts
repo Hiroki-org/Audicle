@@ -78,7 +78,6 @@ export default defineConfig({
             NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || '',
             NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
             AUTH_ENV: process.env.AUTH_ENV || '',
-            NEXT_PUBLIC_AUTH_ENV: process.env.NEXT_PUBLIC_AUTH_ENV || (process.env.AUTH_ENV === 'test' ? 'test' : ''),
             // Ensure TEST_USER_EMAIL has a fallback to match auth.setup.ts and lib/auth.ts
             TEST_USER_EMAIL: process.env.TEST_USER_EMAIL || 'test@example.com',
             TEST_USER_PASSWORD: process.env.TEST_USER_PASSWORD || 'password',

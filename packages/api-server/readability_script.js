@@ -31,26 +31,6 @@ function isIpSafe(ip) {
   }
 }
 
-function stripIpv6Brackets(hostname) {
-    return hostname.replace(/^\[|\]$/g, '');
-}
-
-function getAgent(agentCache, protocol, servername) {
-    if (protocol === 'http:') {
-        if (!agentCache.has('http:')) {
-            agentCache.set('http:', new http.Agent());
-        }
-        return agentCache.get('http:');
-    }
-
-    const normalizedServername = stripIpv6Brackets(servername);
-    const cacheKey = `https:${normalizedServername}`;
-    if (!agentCache.has(cacheKey)) {
-        agentCache.set(cacheKey, new https.Agent({ servername: normalizedServername }));
-    }
-    return agentCache.get(cacheKey);
-}
-
 
 
 async function safeFetch(url) {
@@ -58,7 +38,6 @@ async function safeFetch(url) {
     let response;
     let redirectCount = 0;
     const maxRedirects = 10;
-    const agentCache = new Map();
 
     while (redirectCount < maxRedirects) {
         const parsedUrl = new URL(currentUrl);
@@ -92,14 +71,16 @@ async function safeFetch(url) {
         }
 
         const originalHostname = parsedUrl.hostname;
-        const originalHostHeader = parsedUrl.host;
         parsedUrl.hostname = familyToUse === 6 ? `[${addressToUse}]` : addressToUse;
-        const agent = getAgent(agentCache, parsedUrl.protocol, originalHostname);
+
+        const agent = parsedUrl.protocol === 'http:' ?
+            new http.Agent() :
+            new https.Agent({ servername: originalHostname });
 
         response = await fetch(parsedUrl.toString(), {
           agent,
           headers: {
-            "Host": originalHostHeader,
+            "Host": originalHostname,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
           },
           redirect: 'manual'
