@@ -19,7 +19,17 @@ export async function PUT(request: NextRequest) {
         const userId = session.user.id
 
         // Parse request body
-        const body: UpdateSettingsRequest = await request.json()
+        let body: UpdateSettingsRequest
+        try {
+            body = await request.json()
+        } catch (error) {
+            console.error('Error parsing request body:', error)
+            return NextResponse.json(
+                { error: 'Invalid JSON body', success: false },
+                { status: 400 }
+            )
+        }
+
 
         // Validate input
         const { playback_speed, voice_model, language, color_theme } = body

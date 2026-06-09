@@ -250,6 +250,22 @@ describe('PUT /api/settings/update', () => {
         );
     });
 
+    it('returns 400 if JSON parsing fails', async () => {
+        (auth as jest.Mock).mockResolvedValue({ user: { id: 'test-user-id' } });
+
+        const request = new NextRequest('http://localhost:3000/api/settings/update', {
+            method: 'PUT',
+            body: 'invalid-json',
+        });
+
+        const response = await PUT(request);
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data).toEqual({ error: 'Invalid JSON body', success: false });
+        expect(consoleErrorMock).toHaveBeenCalledWith('Error parsing request body:', expect.any(Error));
+    });
+
     it('returns 500 if an unexpected exception occurs', async () => {
         (auth as jest.Mock).mockRejectedValue(new Error('Unexpected Error'));
 
