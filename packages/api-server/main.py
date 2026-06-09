@@ -6,6 +6,7 @@ import asyncio
 import subprocess
 import json
 import os
+import urllib.parse
 import logging
 import re
 from typing import List, Pattern
@@ -17,15 +18,35 @@ from google.cloud import texttospeech
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+
+def _is_valid_origin(origin: str) -> bool:
+    try:
+        parsed = urllib.parse.urlparse(origin)
+        if parsed.scheme not in ["http", "https", "chrome-extension"]:
+            return False
+        if not parsed.netloc or "*" in parsed.netloc:
+            return False
+        if parsed.path and parsed.path != "/":
+            return False
+        if parsed.query or parsed.fragment:
+            return False
+        if "@" in parsed.netloc:
+            return False
+        return True
+    except Exception:
+        return False
+
+
 app = FastAPI(title="Audicle API Server", version="1.0.0")
 
 # CORS設定
 cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS")
 allow_origins = []
 if cors_origins_env:
-    allow_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
-    if "*" in allow_origins:
+    raw_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    if "*" in raw_origins:
         raise ValueError("CORS_ALLOWED_ORIGINS に '*' は使用できません。allow_credentials=True と組み合わせると起動に失敗します。")
+    allow_origins = [origin for origin in raw_origins if _is_valid_origin(origin)]
 
 if not allow_origins:
     raise ValueError("CORS_ALLOWED_ORIGINS 環境変数が設定されていないか、有効なオリジンがありません。フロントエンドからのアクセスを許可するために、有効なオリジンを指定してください。")
