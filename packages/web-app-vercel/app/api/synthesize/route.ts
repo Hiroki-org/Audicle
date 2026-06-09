@@ -133,7 +133,21 @@ function getTTSClient(): TextToSpeechClient | null {
     // file-path variants. This helps when people paste multi-line JSON into
     // env files; we prefer single-line JSON, but fall back to base64.
 
-    const tryParseJson = (s: string): unknown | null => {
+    interface GoogleAuthCredentials {
+    type?: string;
+    project_id?: string;
+    private_key_id?: string;
+    private_key?: string;
+    client_email?: string;
+    client_id?: string;
+    auth_uri?: string;
+    token_uri?: string;
+    auth_provider_x509_cert_url?: string;
+    client_x509_cert_url?: string;
+    universe_domain?: string;
+}
+
+    const tryParseJson = (s: string): GoogleAuthCredentials | null => {
         try {
             return JSON.parse(s);
         } catch (e) {
@@ -188,7 +202,7 @@ function getTTSClient(): TextToSpeechClient | null {
     // best-effort cast.
     ttsCLient = new TextToSpeechClient({
 
-        credentials: credentials as any,
+        credentials,
     });
     return ttsCLient;
 }
