@@ -2,14 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 
 const isProductionBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
 const isProductionRuntime = process.env.NODE_ENV === 'production' && !isProductionBuildPhase
-
-export function isSupabaseConfigured(): boolean {
-    return Boolean(
-        process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    )
-}
-
-const hasSupabaseConfig = isSupabaseConfigured()
+const hasSupabaseConfig = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+)
 
 if (isProductionRuntime && !hasSupabaseConfig) {
     throw new Error('Missing required Supabase environment variables in production')

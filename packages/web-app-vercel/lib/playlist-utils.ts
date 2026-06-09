@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from './supabase'
+import { supabase } from './supabase'
 import * as supabaseLocal from './supabaseLocal'
 import type { PlaylistWithItems } from '@/types/playlist'
 import { STORAGE_KEYS } from './constants'
@@ -41,16 +41,12 @@ export function setPlaylistSortKey(playlistId: string, sortKey: string): void {
  */
 export async function getOrCreateDefaultPlaylist(userEmail: string): Promise<DefaultPlaylistResult> {
     // デフォルトプレイリストを取得
-    if (!isSupabaseConfigured()) {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
         // Local fallback (tests)
         const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
         const defaultPlaylist = playlists.find(p => p.is_default)
         if (defaultPlaylist) {
-            const { playlist_items, items: localItems = [], ...playlistData } = defaultPlaylist as typeof defaultPlaylist & {
-                playlist_items?: PlaylistWithItems['items']
-                items?: PlaylistWithItems['items']
-            }
-            const items = playlist_items ?? localItems
+            const { playlist_items: items = [], ...playlistData } = defaultPlaylist
             return { playlist: { ...playlistData, items, item_count: items.length } }
         }
         // create one
