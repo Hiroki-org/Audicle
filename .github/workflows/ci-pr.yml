@@ -9,31 +9,15 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test npm run start"
+  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test NEXT_PUBLIC_AUTH_ENV=test npm run start"
 
 jobs:
   seed-test-db:
     name: テストデータ投入
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6.0.2
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: packages/web-app-vercel/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-        working-directory: packages/web-app-vercel
-      - name: Seed test database
-        run: npm run seed-test-data
-        working-directory: packages/web-app-vercel
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+      - name: Use local fallback
+        run: echo "PR CI uses the in-memory Supabase fallback; remote test database seed is disabled."
 
   setup:
     name: Setup
@@ -153,8 +137,9 @@ jobs:
         working-directory: packages/web-app-vercel
         env:
           NODE_ENV: production
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          AUTH_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: ""
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXT_PUBLIC_AUTH_ENV: test
       - name: Upload build artifact
@@ -170,10 +155,11 @@ jobs:
     needs: [setup, build, e2e-auth, seed-test-db]
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ""
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+      NEXT_PUBLIC_AUTH_ENV: test
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -222,8 +208,9 @@ jobs:
           AUTH_ENV: test
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_AUTH_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: ""
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
 
@@ -232,10 +219,11 @@ jobs:
     needs: [setup, build, seed-test-db]
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ""
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+      NEXT_PUBLIC_AUTH_ENV: test
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
@@ -274,10 +262,11 @@ jobs:
         env:
           NODE_ENV: test
           AUTH_ENV: test
+          NEXT_PUBLIC_AUTH_ENV: test
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ""
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -289,10 +278,11 @@ jobs:
     needs: [setup, build]
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ""
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+      NEXT_PUBLIC_AUTH_ENV: test
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
@@ -332,8 +322,9 @@ jobs:
           AUTH_ENV: test
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_AUTH_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: ""
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
       - name: Debug - Check auth files
