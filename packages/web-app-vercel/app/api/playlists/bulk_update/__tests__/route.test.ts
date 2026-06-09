@@ -101,6 +101,19 @@ describe('POST /api/playlists/bulk_update', () => {
         expect(data.error).toBe('addToPlaylistIds and removeFromPlaylistIds must be arrays')
     })
 
+    it('should return 404 with fallback message if article resolution fails with non-Error', async () => {
+        ;(resolveArticleId as jest.Mock).mockRejectedValue('String Error')
+        const request = createRequest({
+            articleId: mockArticleId,
+            addToPlaylistIds: ['playlist-1'],
+            removeFromPlaylistIds: ['playlist-2'],
+        })
+        const response = await POST(request)
+        expect(response.status).toBe(404)
+        const data = await response.json()
+        expect(data.error).toBe('Article resolution failed')
+    })
+
     it('should return 404 if article resolution fails', async () => {
         ;(resolveArticleId as jest.Mock).mockRejectedValue(new Error('Article not found'))
 
