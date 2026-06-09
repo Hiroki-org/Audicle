@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test NEXT_PUBLIC_AUTH_ENV=test npm run start"
+  CI_WEB_SERVER_COMMAND: "AUTH_ENV=test npm run start"
 
 jobs:
   seed-test-db:
@@ -28,7 +28,12 @@ jobs:
         run: npm ci
         working-directory: packages/web-app-vercel
       - name: Seed test database
-        run: echo "PR CI uses local test auth; skipping remote Supabase seed."
+        run: npm run seed-test-data
+        working-directory: packages/web-app-vercel
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
 
   setup:
     name: Setup
@@ -148,11 +153,10 @@ jobs:
         working-directory: packages/web-app-vercel
         env:
           NODE_ENV: production
-          AUTH_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXT_PUBLIC_AUTH_ENV: test
-          NEXT_PUBLIC_SUPABASE_URL: ""
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
-          NEXTAUTH_SECRET: test-secret
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
@@ -166,12 +170,10 @@ jobs:
     needs: [setup, build, e2e-auth, seed-test-db]
     runs-on: ubuntu-latest
     env:
-      AUTH_ENV: test
-      NEXT_PUBLIC_AUTH_ENV: test
-      NEXT_PUBLIC_SUPABASE_URL: ""
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
-      NEXTAUTH_SECRET: test-secret
-      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -218,25 +220,22 @@ jobs:
         working-directory: packages/web-app-vercel
         env:
           AUTH_ENV: test
-          NEXT_PUBLIC_AUTH_ENV: test
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          NEXT_PUBLIC_SUPABASE_URL: ""
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
-          NEXTAUTH_SECRET: test-secret
-          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
 
   e2e-theme-fouc:
     name: E2E Theme FOUC
     needs: [setup, build, seed-test-db]
     runs-on: ubuntu-latest
     env:
-      AUTH_ENV: test
-      NEXT_PUBLIC_AUTH_ENV: test
-      NEXT_PUBLIC_SUPABASE_URL: ""
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
-      NEXTAUTH_SECRET: test-secret
-      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
@@ -275,11 +274,10 @@ jobs:
         env:
           NODE_ENV: test
           AUTH_ENV: test
-          NEXT_PUBLIC_AUTH_ENV: test
-          NEXTAUTH_URL: http://localhost:3000
-          NEXTAUTH_SECRET: test-secret
-          NEXT_PUBLIC_SUPABASE_URL: ""
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -291,12 +289,10 @@ jobs:
     needs: [setup, build]
     runs-on: ubuntu-latest
     env:
-      AUTH_ENV: test
-      NEXT_PUBLIC_AUTH_ENV: test
-      NEXT_PUBLIC_SUPABASE_URL: ""
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
-      NEXTAUTH_SECRET: test-secret
-      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
@@ -334,13 +330,12 @@ jobs:
         working-directory: packages/web-app-vercel
         env:
           AUTH_ENV: test
-          NEXT_PUBLIC_AUTH_ENV: test
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          NEXT_PUBLIC_SUPABASE_URL: ""
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
-          NEXTAUTH_SECRET: test-secret
-          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
       - name: Debug - Check auth files
         run: |
           echo "=== Checking auth directory for CI-PR ==="
