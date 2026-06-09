@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 import * as supabaseLocal from '@/lib/supabaseLocal'
 import { requireAuth } from '@/lib/api-auth'
 import { Article, PlaylistItem } from '@/types/playlist'
@@ -12,13 +12,17 @@ export async function POST(
         const { id } = await context.params
         const { userEmail, response } = await requireAuth()
         if (response) return response
+        const useLocalStore = !isSupabaseConfigured()
 
         // プレイリストの所有権を確認
-        const { data: playlist, error: playlistError } = await supabase
-            .from('playlists')
-            .select('owner_email')
-            .eq('id', id)
-            .single()
+        const localPlaylist = useLocalStore ? await supabaseLocal.getPlaylistWithItems(userEmail, id) : null
+        const { data: playlist, error: playlistError } = useLocalStore
+            ? { data: localPlaylist, error: null }
+            : await supabase
+                .from('playlists')
+                .select('owner_email')
+                .eq('id', id)
+                .single()
 
         if (playlistError || !playlist) {
             return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
@@ -43,7 +47,7 @@ export async function POST(
         let article: Article | null = null
         let articleError: Error | null = null
 
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (useLocalStore) {
             try {
                 article = await supabaseLocal.upsertArticle(userEmail, article_url, article_title, thumbnail_url, last_read_position)
             } catch (e) {
@@ -101,7 +105,7 @@ export async function POST(
         let playlistItem: PlaylistItem | null = null
         let itemError: Error | null = null
 
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (useLocalStore) {
             try {
                 playlistItem = await supabaseLocal.addPlaylistItem(id, article!.id)
             } catch (e) {
@@ -174,13 +178,17 @@ export async function GET(
         const { id } = await context.params
         const { userEmail, response } = await requireAuth()
         if (response) return response
+        const useLocalStore = !isSupabaseConfigured()
 
         // プレイリストの所有権を確認
-        const { data: playlist, error: playlistError } = await supabase
-            .from('playlists')
-            .select('owner_email')
-            .eq('id', id)
-            .single()
+        const localPlaylist = useLocalStore ? await supabaseLocal.getPlaylistWithItems(userEmail, id) : null
+        const { data: playlist, error: playlistError } = useLocalStore
+            ? { data: localPlaylist, error: null }
+            : await supabase
+                .from('playlists')
+                .select('owner_email')
+                .eq('id', id)
+                .single()
 
         if (playlistError || !playlist) {
             return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
@@ -188,6 +196,10 @@ export async function GET(
 
         if (playlist.owner_email !== userEmail) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        if (useLocalStore) {
+            return NextResponse.json(localPlaylist?.items || [])
         }
 
         // プレイリストアイテム（関連する記事情報付き）を取得

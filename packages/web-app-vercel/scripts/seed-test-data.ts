@@ -11,6 +11,34 @@ config({ path: resolve(__dirname, "../.env.test.local") });
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
+type RetryableError = {
+    message?: string;
+    cause?: unknown;
+};
+
+type RetryableResult<T = unknown> = T & {
+    error?: RetryableError | null;
+};
+
+type ListedAuthUser = {
+    id: string;
+    email?: string | null;
+};
+
+function getErrorMessage(error: unknown): string {
+    if (error && typeof error === 'object' && 'message' in error) {
+        const message = (error as { message?: unknown }).message;
+        return typeof message === 'string' ? message : '';
+    }
+    return '';
+}
+
+function getRetryDelayMs(attempt: number, baseDelayMs: number): number {
+    const maxDelayMs = 30_000;
+    const jitterMs = Math.floor(Math.random() * 100);
+    return Math.min(baseDelayMs * 2 ** attempt + jitterMs, maxDelayMs);
+}
+
 if (!supabaseUrl || !supabaseServiceKey) {
     console.error("❌ 環境変数が設定されていません");
     console.error("📝 .env.test.local ファイルを作成して以下を設定してください：");
@@ -19,41 +47,51 @@ if (!supabaseUrl || !supabaseServiceKey) {
     process.exit(1);
 }
 
-async function withRetry<T>(operation: () => Promise<any>, retries = 5, delayMs = 2000): Promise<any> {
+async function withRetry<T>(operation: () => Promise<RetryableResult<T>>, retries = 5, delayMs = 2000): Promise<RetryableResult<T>> {
+    if (retries <= 0) {
+        throw new Error("retries must be greater than 0");
+    }
+
     let attempt = 0;
-    while (attempt < retries) {
+    while (true) {
         try {
             const res = await operation();
 
             // supabase-js returns error in res.error without throwing
             if (res.error) {
                 const msg = res.error.message || '';
-                const causeMsg = (res.error as any).cause?.message || '';
+                const causeMsg = getErrorMessage(res.error.cause);
                 const isNetworkError = msg.includes('fetch failed') || msg.includes('ENOTFOUND') || causeMsg.includes('ENOTFOUND') || causeMsg.includes('fetch failed');
 
-                if (isNetworkError && attempt < retries - 1) {
-                    console.log(`[Retry] Network error detected in response (${msg}), retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
-                    attempt++;
-                    await new Promise(resolve => setTimeout(resolve, delayMs));
-                    continue;
+                if (isNetworkError) {
+                    if (attempt < retries - 1) {
+                        const backoffMs = getRetryDelayMs(attempt, delayMs);
+                        console.log(`[Retry] Network error detected in response (${msg}), retrying attempt ${attempt + 1}/${retries} in ${backoffMs}ms...`);
+                        attempt++;
+                        await new Promise(resolve => setTimeout(resolve, backoffMs));
+                        continue;
+                    }
+
+                    throw new Error(`[Retry] Maximum retries reached. Network error persists: ${msg || causeMsg}`);
                 }
             }
             return res;
-        } catch (error: any) {
-            const msg = error?.message || '';
-            const causeMsg = error?.cause?.message || '';
+        } catch (error: unknown) {
+            const retryableError = error as RetryableError;
+            const msg = retryableError.message || '';
+            const causeMsg = getErrorMessage(retryableError.cause);
             const isNetworkError = msg.includes('fetch failed') || msg.includes('ENOTFOUND') || causeMsg.includes('ENOTFOUND') || causeMsg.includes('fetch failed');
 
             if (isNetworkError && attempt < retries - 1) {
-                console.log(`[Retry] Network exception detected (${msg}), retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
+                const backoffMs = getRetryDelayMs(attempt, delayMs);
+                console.log(`[Retry] Network exception detected (${msg}), retrying attempt ${attempt + 1}/${retries} in ${backoffMs}ms...`);
                 attempt++;
-                await new Promise(resolve => setTimeout(resolve, delayMs));
+                await new Promise(resolve => setTimeout(resolve, backoffMs));
             } else {
                 throw error;
             }
         }
     }
-    throw new Error("Maximum retries reached");
 }
 
 
@@ -83,7 +121,7 @@ async function ensureTestUser() {
             // Pagination handling to find user
             let page = 1;
             const perPage = 50;
-            let foundUser = null;
+            let foundUser: ListedAuthUser | null = null;
             
             while (!foundUser) {
                 const { data: listData, error: listError } = await withRetry(async () => await supabase.auth.admin.listUsers({
@@ -99,7 +137,7 @@ async function ensureTestUser() {
                     break; // No more users
                 }
                 
-                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
+                foundUser = listData.users.find((u: ListedAuthUser) => u.email === TEST_USER_EMAIL) ?? null;
                 
                 if (foundUser) {
                     console.log(`   Found existing user ID: ${foundUser.id}`);
