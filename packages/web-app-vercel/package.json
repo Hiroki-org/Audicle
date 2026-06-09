@@ -41,7 +41,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "glob": "^13.0.6",
-    "ipaddr.js": "^2.3.0",
+    "ipaddr.js": "^2.4.0",
     "jsonwebtoken": "^9.0.2",
     "linkedom": "^0.18.3",
     "lucide-react": "^1.14.0",
@@ -52,7 +52,7 @@
     "react-hot-toast": "^2.6.0",
     "serwist": "^10.0.0-preview.14",
     "tailwind-merge": "^3.5.0",
-    "undici": "^6.25.0",
+    "undici": "^6.26.0",
     "use-debounce": "^10.1.1"
   },
   "devDependencies": {

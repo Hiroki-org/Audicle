@@ -5,6 +5,8 @@ import { normalizeArticleText } from "@/lib/parseArticle";
 import { parseHTML } from "linkedom";
 import { ExtractResponse } from "@/types/api";
 import { isSafeUrl } from "@/lib/ssrf";
+import dns from "dns";
+import ipaddr from "ipaddr.js";
 
 // Node.js runtimeを明示的に指定（JSDOMはEdge Runtimeで動作しない）
 export const runtime = "nodejs";
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // HTMLを取得 (with secure redirect handling)
+    // HTMLを取得 (with secure redirect handling and SSRF dispatcher)
     const html = await fetchWithTimeout(url);
 
     // linkedomでパース
@@ -144,19 +146,69 @@ export async function POST(request: NextRequest) {
 }
 
 // Configure undici agent for custom fetch behavior
-// In test/CI environments, we might need to ignore SSL errors for internal services or proxies
-import { Agent, setGlobalDispatcher, getGlobalDispatcher } from "undici";
+import { Agent, setGlobalDispatcher } from "undici";
 
-// Initialize global dispatcher if needed (safe to call multiple times)
-// This ensures fetch uses our custom agent settings
-if (process.env.NODE_ENV === "test" || process.env.CI === "true") {
-  const agent = new Agent({
-    connect: {
-      rejectUnauthorized: false,
-    },
+// Custom DNS lookup function that checks each resolved IP to prevent DNS rebinding (TOCTOU)
+const customLookup = (
+  hostname: string,
+  options: dns.LookupOptions,
+  callback: (err: NodeJS.ErrnoException | null, address: any, family: number) => void
+) => {
+  dns.lookup(hostname, options, (err, address, family) => {
+    if (err) return callback(err, address, family);
+
+    let isSafe = true;
+
+    // Check if the resolved address is safe
+    if (Array.isArray(address)) {
+      for (const item of address) {
+        try {
+          const ip = ipaddr.parse(item.address);
+          if (ip.range() !== "unicast") {
+            isSafe = false;
+            break;
+          }
+        } catch {
+          isSafe = false;
+          break;
+        }
+      }
+    } else {
+      try {
+        const ip = ipaddr.parse(address as unknown as string);
+        if (ip.range() !== "unicast") {
+          isSafe = false;
+        }
+      } catch {
+        isSafe = false;
+      }
+    }
+
+    if (!isSafe) {
+      const blockError = new Error("SSRF blocked: Hostname resolved to unsafe IP during fetch");
+      blockError.name = "SSRFBlockedError";
+      return callback(blockError as NodeJS.ErrnoException, address, family);
+    }
+
+    callback(null, address, family);
   });
-  setGlobalDispatcher(agent);
+};
+
+const agentOptions: any = {
+  connect: {
+    lookup: customLookup,
+  },
+};
+
+// In test/CI environments, we might need to ignore SSL errors for internal services or proxies
+if (process.env.NODE_ENV === "test" || process.env.CI === "true") {
+  agentOptions.connect.rejectUnauthorized = false;
 }
+
+// Initialize global dispatcher using the agent with our custom lookup
+const agent = new Agent(agentOptions);
+setGlobalDispatcher(agent);
+
 
 /**
  * タイムアウト付きでURLをフェッチ
@@ -237,6 +289,10 @@ async function fetchWithTimeout(
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new TimeoutError("Fetch timeout");
+    }
+    // Convert fetch custom lookup error to SSRFBlockedError if applicable
+    if (error instanceof Error && (error.name === "SSRFBlockedError" || (error.cause && (error.cause as Error).name === "SSRFBlockedError"))) {
+       throw new SSRFBlockedError("Access to the redirect URL is restricted for security reasons");
     }
     throw error;
   } finally {
