@@ -28,7 +28,7 @@ describe("StorageManager", () => {
   const mockShowConfirm = jest.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     (useConfirmDialog as jest.Mock).mockReturnValue({
       showConfirm: mockShowConfirm,
       confirmDialog: <div data-testid="mock-confirm-dialog" />,
@@ -180,5 +180,42 @@ describe("StorageManager", () => {
 
     await waitFor(() => expect(clearAll).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByText("ダウンロード済みの記事がありません")).toBeInTheDocument());
+  });
+
+  it("does not clear all if not confirmed", async () => {
+    const mockArticles = [{ url: "https://example.com/1", totalChunks: 3, downloadedChunks: 3, totalSize: 5242880, timestamp: 1672531200000 }];
+    (getDownloadedArticles as jest.Mock).mockResolvedValue(mockArticles);
+    (getStorageUsage as jest.Mock).mockResolvedValue({ used: 5242880, available: 100000000 });
+    mockShowConfirm.mockResolvedValue(false);
+
+    render(<StorageManager />);
+
+    await waitFor(() => expect(screen.queryByText("読み込み中...")).not.toBeInTheDocument());
+
+    const clearAllButton = screen.getByRole("button", { name: "全て削除" });
+    fireEvent.click(clearAllButton);
+
+    await waitFor(() => expect(mockShowConfirm).toHaveBeenCalled());
+    expect(clearAll).not.toHaveBeenCalled();
+    expect(screen.getByText("https://example.com/1")).toBeInTheDocument();
+  });
+
+  it("handles clear all error", async () => {
+    const mockArticles = [{ url: "https://example.com/1", totalChunks: 3, downloadedChunks: 3, totalSize: 5242880, timestamp: 1672531200000 }];
+    const clearError = new Error("Clear failed");
+    (getDownloadedArticles as jest.Mock).mockResolvedValue(mockArticles);
+    (getStorageUsage as jest.Mock).mockResolvedValue({ used: 5242880, available: 100000000 });
+    (clearAll as jest.Mock).mockRejectedValue(clearError);
+    mockShowConfirm.mockResolvedValue(true);
+
+    render(<StorageManager />);
+
+    await waitFor(() => expect(screen.queryByText("読み込み中...")).not.toBeInTheDocument());
+
+    const clearAllButton = screen.getByRole("button", { name: "全て削除" });
+    fireEvent.click(clearAllButton);
+
+    await waitFor(() => expect(screen.getByText("削除に失敗しました")).toBeInTheDocument());
+    expect(logger.error).toHaveBeenCalledWith("全削除に失敗", clearError);
   });
 });
