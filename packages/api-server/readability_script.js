@@ -39,7 +39,7 @@ async function safeFetch(url) {
     let redirectCount = 0;
     const maxRedirects = 10;
 
-    while (redirectCount < maxRedirects) {
+    while (redirectCount <= maxRedirects) {
         const parsedUrl = new URL(currentUrl);
         if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
              throw new Error("Invalid protocol. Only http and https are allowed.");
@@ -101,7 +101,7 @@ async function safeFetch(url) {
         break;
     }
 
-    if (redirectCount >= maxRedirects) {
+    if (redirectCount > maxRedirects) {
         throw new Error("Too many redirects");
     }
     return response;

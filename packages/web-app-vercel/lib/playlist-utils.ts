@@ -46,7 +46,8 @@ export async function getOrCreateDefaultPlaylist(userEmail: string): Promise<Def
         const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
         const defaultPlaylist = playlists.find(p => p.is_default)
         if (defaultPlaylist) {
-            const { playlist_items: items = [], ...playlistData } = defaultPlaylist
+            const { items: enrichedItems, playlist_items: playlistItems = [], ...playlistData } = defaultPlaylist
+            const items = enrichedItems ?? playlistItems
             return { playlist: { ...playlistData, items, item_count: items.length } }
         }
         // create one
