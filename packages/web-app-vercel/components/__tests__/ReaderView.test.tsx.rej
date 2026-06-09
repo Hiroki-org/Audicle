@@ -1,0 +1,22 @@
+--- packages/web-app-vercel/components/__tests__/ReaderView.test.tsx
++++ packages/web-app-vercel/components/__tests__/ReaderView.test.tsx
+@@ -45,15 +45,15 @@
+ }));
+
+ // Mock components
+-jest.mock('../DownloadPanel', () => {
+-  return function MockDownloadPanel({ status }: { status: string }) {
++jest.mock('../DownloadPanel', () => {
++  return function MockDownloadPanel({ status }: { status: string }) {
+     if (status === 'idle') return null;
+     return <div data-testid="download-panel">Download Panel ({status})</div>;
+   };
+ });
+
+-jest.mock('../ReaderChunk', () => {
+-  return function MockReaderChunk({ chunk, onClick }: { chunk: Chunk, onClick: (id: string) => void }) {
++jest.mock('../ReaderChunk', () => {
++  return function MockReaderChunk({ chunk, onClick }: { chunk: Chunk, onClick: (id: string) => void }) {
+     return <div data-testid="reader-chunk" onClick={() => onClick(chunk.id)}>{chunk.text}</div>;
+   };
+ });

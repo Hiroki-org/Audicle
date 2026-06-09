@@ -45,14 +45,14 @@ jest.mock('@/hooks/useDownload', () => ({
 }));
 
 // Mock components
-jest.mock('../DownloadPanel', () => ({ status }: { status: string }) => {
+jest.mock('../DownloadPanel', () => function MockDownloadPanel({ status }: { status: string }) {
   if (status === 'idle') return null;
   return <div data-testid="download-panel">Download Panel ({status})</div>;
 });
 
-jest.mock('../ReaderChunk', () => ({ chunk, onClick }: { chunk: Chunk, onClick: (id: string) => void }) => (
+jest.mock('../ReaderChunk', () => function MockReaderChunk({ chunk, onClick }: { chunk: Chunk, onClick: (_id: string) => void }) { return (
   <div data-testid="reader-chunk" onClick={() => onClick(chunk.id)}>{chunk.text}</div>
-));
+);});
 
 const mockChunks: Chunk[] = [
   { id: '1', text: 'Title', type: 'h1' },

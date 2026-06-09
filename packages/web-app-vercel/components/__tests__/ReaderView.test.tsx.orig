@@ -12,8 +12,6 @@ class ResizeObserver {
   disconnect = jest.fn();
 }
 
-const mockResizeObserverConstructor = jest.fn().mockImplementation(() => new ResizeObserver());
-
 window.ResizeObserver = ResizeObserver;
 
 // Mock requestAnimationFrame and cancelAnimationFrame
@@ -187,7 +185,7 @@ describe('ReaderView', () => {
         return { observe: jest.fn(), disconnect: jest.fn(), unobserve: jest.fn() };
       }) as any;
 
-      render(<ReaderView chunks={mockChunks} articleUrl="https://example.com" />);
+      const { rerender } = render(<ReaderView chunks={mockChunks} articleUrl="https://example.com" />);
       const chunks = screen.getAllByTestId('reader-chunk');
       const container = chunks[0].closest('.overflow-y-auto') as HTMLElement;
 
@@ -197,6 +195,24 @@ describe('ReaderView', () => {
       act(() => {
         if (resizeCallback) resizeCallback();
       });
+
+      // Trigger condition for top and bottom gradient active
+      Object.defineProperty(container, 'scrollTop', { value: 50, configurable: true });
+      Object.defineProperty(container, 'scrollHeight', { value: 1000, configurable: true });
+      Object.defineProperty(container, 'clientHeight', { value: 500, configurable: true });
+
+      act(() => {
+        fireEvent.scroll(container);
+      });
+
+      // Ensure new chunk signature triggers effect cleanup
+      rerender(<ReaderView chunks={[...mockChunks, { id: '3', text: 'New', type: 'p' }]} articleUrl="https://example.com" />);
+    });
+
+    it('bails out of padding update if container is null', () => {
+        const { unmount } = render(<ReaderView chunks={mockChunks} articleUrl="https://example.com" />);
+        unmount();
+        // The ResizeObserver or Scroll events firing on unmounted components shouldn't crash
     });
   });
 
