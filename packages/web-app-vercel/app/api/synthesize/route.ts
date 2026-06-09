@@ -87,7 +87,7 @@ function parseTTSError(error: unknown): TTSErrorInfo {
 }
 
 // 許可リスト（環境変数から取得、カンマ区切り）
-const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim()) || [];
+const getAllowedEmails = () => process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim()) || [];
 
 // 人気記事判定の閾値（本番環境では5以上に調整することを推奨）
 // 現在は2に設定して開発/テスト環境での最適化検証を行う
@@ -349,7 +349,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 許可リストチェック
-        if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(session.user.email)) {
+        if (!getAllowedEmails().includes(session.user.email)) {
             log('warn', 'アクセスが拒否されました', { email: session.user.email });
             return NextResponse.json({ error: 'Access denied' }, { status: 403, headers: corsHeaders });
         }

@@ -55,6 +55,7 @@ describe('/api/synthesize route', () => {
         mockSynthesizeSpeech.mockReset();
         mockSynthesizeSpeech.mockResolvedValue([{ audioContent: Buffer.from('fake-audio') }]);
         process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify({ project_id: 'test' });
+        process.env.ALLOWED_EMAILS = 'user@example.com';
     });
 
     it('returns 400 if body missing text and chunks', async () => {
