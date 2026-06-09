@@ -1,0 +1,14 @@
+🎯 **What:** The testing gap addressed
+The `ReaderView` component was previously untested. Added full test coverage for the component, including tests for its empty state, chunk rendering, click handling, integration with the `useDownload` hook (including the `DownloadPanel`), and scroll/resize event handling for gradient overlays.
+
+📊 **Coverage:** What scenarios are now tested
+- Empty state rendering
+- Correct rendering of provided chunks
+- Chunk click interactions triggering the `onChunkClick` callback
+- Active chunk index passed correctly to `useAutoScroll`
+- `DownloadPanel` states correctly rendered based on the `useDownload` hook status
+- Scroll event handling to update gradient overlay states
+- Resize observer integration to adjust bottom padding dynamically
+
+✨ **Result:** The improvement in test coverage
+`ReaderView.tsx` test coverage improved from 0% to near 100% across statements, branches, and functions, ensuring robust future refactoring.
