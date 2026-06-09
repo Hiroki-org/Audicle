@@ -4,7 +4,6 @@ import * as supabaseLocal from '../supabaseLocal';
 import { supabase } from '../supabase';
 
 const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ORIGINAL_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // supabaseLocalモジュールのモック
 jest.mock('../supabaseLocal', () => ({
@@ -15,9 +14,6 @@ jest.mock('../supabaseLocal', () => ({
 
 // supabaseモジュールのモック
 jest.mock('../supabase', () => ({
-  isSupabaseConfigured: jest.fn(
-    () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-  ),
   supabase: {
     from: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
@@ -42,11 +38,6 @@ describe('getOrCreateDefaultPlaylist', () => {
     } else {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     }
-    if (typeof ORIGINAL_SUPABASE_ANON_KEY === "string") {
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = ORIGINAL_SUPABASE_ANON_KEY;
-    } else {
-      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    }
   });
 
   describe('local fallback (no SUPABASE_URL)', () => {
@@ -56,7 +47,6 @@ describe('getOrCreateDefaultPlaylist', () => {
       // Ensure we always test the local fallback path, even if the host
       // environment sets NEXT_PUBLIC_SUPABASE_URL.
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     });
 
     it('should return existing default playlist', async () => {
@@ -116,7 +106,6 @@ describe('getOrCreateDefaultPlaylist', () => {
     const userEmail = 'test@example.com';
     beforeEach(() => {
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://test-supabase-url';
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
     });
 
     it('should return existing default playlist from Supabase', async () => {
