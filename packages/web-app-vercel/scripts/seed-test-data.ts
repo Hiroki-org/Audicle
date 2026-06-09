@@ -83,7 +83,7 @@ async function ensureTestUser() {
             // Pagination handling to find user
             let page = 1;
             const perPage = 50;
-            let foundUser: { id: string; email?: string } | null = null;
+            let foundUser = null;
             
             while (!foundUser) {
                 const { data: listData, error: listError } = await withRetry(async () => await supabase.auth.admin.listUsers({
@@ -99,7 +99,7 @@ async function ensureTestUser() {
                     break; // No more users
                 }
                 
-                foundUser = listData.users.find((u: { id: string; email?: string }) => u.email === TEST_USER_EMAIL) ?? null;
+                foundUser = listData.users.find(u => u.email === TEST_USER_EMAIL);
                 
                 if (foundUser) {
                     console.log(`   Found existing user ID: ${foundUser.id}`);

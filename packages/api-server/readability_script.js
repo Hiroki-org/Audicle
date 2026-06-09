@@ -39,7 +39,7 @@ async function safeFetch(url) {
     let redirectCount = 0;
     const maxRedirects = 10;
 
-    while (redirectCount <= maxRedirects) {
+    while (redirectCount < maxRedirects) {
         const parsedUrl = new URL(currentUrl);
         if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
              throw new Error("Invalid protocol. Only http and https are allowed.");
@@ -60,7 +60,6 @@ async function safeFetch(url) {
         } else {
             try {
                const parsed = ipaddr.parse(hostnameWithoutBrackets);
-               addressToUse = hostnameWithoutBrackets;
                familyToUse = parsed.kind() === 'ipv6' ? 6 : 4;
             } catch (e) {
                familyToUse = 4;
@@ -71,20 +70,17 @@ async function safeFetch(url) {
              throw new Error(`SSRF Blocked: Access to ${addressToUse} is restricted`);
         }
 
-        const originalHost = parsedUrl.host;
-        const originalHostname = hostnameWithoutBrackets;
+        const originalHostname = parsedUrl.hostname;
         parsedUrl.hostname = familyToUse === 6 ? `[${addressToUse}]` : addressToUse;
 
         const agent = parsedUrl.protocol === 'http:' ?
             new http.Agent() :
-            new https.Agent({
-                servername: ipaddr.isValid(originalHostname) ? undefined : originalHostname
-            });
+            new https.Agent({ servername: originalHostname });
 
         response = await fetch(parsedUrl.toString(), {
           agent,
           headers: {
-            "Host": originalHost,
+            "Host": originalHostname,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
           },
           redirect: 'manual'
@@ -92,7 +88,6 @@ async function safeFetch(url) {
 
         if ([301, 302, 303, 307, 308].includes(response.status) && response.headers.has('location')) {
             const location = response.headers.get('location');
-            response.body?.resume?.();
             currentUrl = new URL(location, currentUrl).toString();
             redirectCount++;
             continue;
@@ -101,7 +96,7 @@ async function safeFetch(url) {
         break;
     }
 
-    if (redirectCount > maxRedirects) {
+    if (redirectCount >= maxRedirects) {
         throw new Error("Too many redirects");
     }
     return response;

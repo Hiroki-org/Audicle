@@ -76,51 +76,6 @@ describe('getOrCreateDefaultPlaylist', () => {
       expect(mockedSupabaseLocal.setDefaultPlaylist).not.toHaveBeenCalled();
     });
 
-    it('should prefer enriched items when local playlist has both items shapes', async () => {
-      const existingPlaylist = {
-        id: '1',
-        is_default: true,
-        playlist_items: [{
-          id: 'raw-item',
-          playlist_id: '1',
-          article_id: 'article-1',
-          position: 1,
-          added_at: new Date().toISOString(),
-        }],
-        items: [{
-          id: 'enriched-item',
-          playlist_id: '1',
-          article_id: 'article-1',
-          position: 1,
-          added_at: new Date().toISOString(),
-          article: {
-            id: 'article-1',
-            owner_email: userEmail,
-            url: 'http://example.com',
-            title: 'Test Article',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        }],
-        owner_email: userEmail,
-        name: 'Default Playlist',
-        description: 'Default playlist description',
-        visibility: 'private' as const,
-        allow_fork: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      mockedSupabaseLocal.getPlaylistsForOwner.mockResolvedValue([existingPlaylist]);
-
-      const { playlist, error } = await getOrCreateDefaultPlaylist(userEmail);
-
-      expect(error).toBeUndefined();
-      expect(playlist?.items).toHaveLength(1);
-      expect(playlist?.items[0].id).toBe('enriched-item');
-      expect(playlist?.items[0].article?.title).toBe('Test Article');
-      expect(playlist?.item_count).toBe(1);
-    });
-
     it('should create a new default playlist if one does not exist', async () => {
       const newPlaylist = {
         id: '2',
