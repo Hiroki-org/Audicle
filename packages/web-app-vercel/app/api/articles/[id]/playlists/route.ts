@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { requireAuth } from '@/lib/api-auth'
-import type { Playlist } from '@/types/playlist'
+import type { Playlist, PlaylistWithItems } from '@/types/playlist'
 import { resolveArticleId } from '@/lib/api-helpers'
 
 export async function GET(
@@ -41,7 +41,7 @@ export async function GET(
         }
 
         // Remove the nested playlist_items array before returning
-        const formattedPlaylists = playlists ? (playlists as any[]).map(p => {
+        const formattedPlaylists = playlists ? (playlists as PlaylistWithItems[]).map(p => {
             const { playlist_items, ...rest } = p;
             return rest;
         }) : []
