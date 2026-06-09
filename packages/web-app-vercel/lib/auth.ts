@@ -13,6 +13,8 @@ console.log('[AUTH DIAGNOSTIC] TEST_USER_EMAIL:', process.env.TEST_USER_EMAIL ? 
 console.log('[AUTH DIAGNOSTIC] TEST_USER_PASSWORD:', process.env.TEST_USER_PASSWORD ? 'SET' : 'NOT SET')
 
 const allowedUsers = process.env.ALLOWED_USERS?.split(',').map(email => email.trim()) || [];
+const isTestAuthUser = (userId: unknown): userId is string =>
+    process.env.AUTH_ENV === 'test' && userId === 'test-user-id-123'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
     providers: [
@@ -71,12 +73,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     callbacks: {
         async signIn({ user }) {
             // テスト用ユーザーはホワイトリストチェックをスキップ
-            if (process.env.AUTH_ENV === 'test' && user.id === 'test-user-id-123') {
+            if (isTestAuthUser(user.id)) {
                 if (IS_DEBUG) {
                     console.log('[AUTH DEBUG] Test user - skipping whitelist check')
                 }
-                // テスト用ユーザーの初期化処理
-                await initializeNewUser(user.id, user.email || '');
                 return true
             }
 
@@ -96,9 +96,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
             return true;
         },
-        async jwt({ token, account, profile }) {
+        async jwt({ token, account, profile, user }) {
             if (account) {
-                token.id = profile?.sub || account.providerAccountId;
+                token.id = profile?.sub || account.providerAccountId || user?.id;
+            } else if (!token.id && user?.id) {
+                token.id = user.id;
+            }
+
+            if (isTestAuthUser(token.id)) {
+                return token;
             }
 
             // 新規・既存問わず、常に初期化チェックを実行
