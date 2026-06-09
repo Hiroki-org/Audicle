@@ -71,44 +71,23 @@ export async function POST(
                 articleError = e as Error
             }
         } else {
-            // まず既存の記事を検索
-            const { data: existingArticle } = await supabase
+            // upsertを使って1回のクエリで更新・作成を行う
+            const { data: upserted, error: upsertError } = await supabase
                 .from('articles')
+                .upsert({
+                    owner_email: userEmail,
+                    url: article_url,
+                    title: article_title,
+                    thumbnail_url: thumbnail_url || null,
+                    last_read_position: last_read_position || 0,
+                }, {
+                    onConflict: 'owner_email,url',
+                    ignoreDuplicates: false
+                })
                 .select()
-                .eq('owner_email', userEmail)
-                .eq('url', article_url)
                 .single()
-
-            if (existingArticle) {
-                // 既存の記事があれば更新
-                const { data: updated, error: updateError } = await supabase
-                    .from('articles')
-                    .update({
-                        title: article_title,
-                        thumbnail_url: thumbnail_url || null,
-                        last_read_position: last_read_position || 0,
-                    })
-                    .eq('id', existingArticle.id)
-                    .select()
-                    .single()
-                article = updated
-                articleError = updateError
-            } else {
-                // 新規作成
-                const { data: created, error: createError } = await supabase
-                    .from('articles')
-                    .insert({
-                        owner_email: userEmail,
-                        url: article_url,
-                        title: article_title,
-                        thumbnail_url: thumbnail_url || null,
-                        last_read_position: last_read_position || 0,
-                    })
-                    .select()
-                    .single()
-                article = created
-                articleError = createError
-            }
+            article = upserted
+            articleError = upsertError
         }
 
         if (articleError) {
@@ -129,39 +108,36 @@ export async function POST(
                 itemError = e as Error
             }
         } else {
-            // まず既存のアイテムを検索
-            const { data: existingItem } = await supabase
+            // upsertで1回のクエリにまとめる（positionはDBトリガーで自動設定されるが、
+            // Supabase APIからのインサート用にダミー値を設定してもトリガーが上書きする）
+            // 制約playlist_items_playlist_id_article_id_keyに依存
+            const { data: upsertedItem, error: upsertItemError } = await supabase
                 .from('playlist_items')
+                .upsert({
+                    playlist_id: id,
+                    article_id: article!.id,
+                    position: 0, // トリガーが上書きするため、この値は実際には無視されます
+                }, {
+                    onConflict: 'playlist_id,article_id',
+                    ignoreDuplicates: true // 既存の場合は何もしない
+                })
                 .select()
-                .eq('playlist_id', id)
-                .eq('article_id', article!.id)
                 .single()
 
-            if (existingItem) {
-                playlistItem = existingItem
-            } else {
-                // 新規作成（positionを自動計算）
-                const { data: maxPos } = await supabase
+            // ignoreDuplicates: true で既存データがある場合、戻り値が空になる可能性があるため
+            if (upsertItemError && upsertItemError.code === 'PGRST116') {
+                // PGRST116は結果が1行でない（0行）場合のエラー。すでに存在していて無視された場合に発生
+                const { data: existingItem, error: fetchError } = await supabase
                     .from('playlist_items')
-                    .select('position')
-                    .eq('playlist_id', id)
-                    .order('position', { ascending: false })
-                    .limit(1)
-                    .single()
-
-                const nextPosition = (maxPos?.position ?? -1) + 1
-
-                const { data: created, error: createError } = await supabase
-                    .from('playlist_items')
-                    .insert({
-                        playlist_id: id,
-                        article_id: article!.id,
-                        position: nextPosition,
-                    })
                     .select()
+                    .eq('playlist_id', id)
+                    .eq('article_id', article!.id)
                     .single()
-                playlistItem = created
-                itemError = createError
+                playlistItem = existingItem
+                itemError = fetchError
+            } else {
+                playlistItem = upsertedItem
+                itemError = upsertItemError
             }
         }
 
