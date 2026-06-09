@@ -17,57 +17,22 @@ export async function GET(
         const { userEmail, response } = await requireAuth()
         if (response) return response
 
-        // article_urlでarticlesテーブルから記事IDを取得
-        const { data: article, error: articleError } = await supabase
-            .from('articles')
-            .select('id')
-            .eq('url', decodedArticleUrl)
-            .eq('owner_email', userEmail)
-            .single()
-        // PostgREST returns an error when .single() finds 0 rows. Handle that case
-        // explicitly: return empty list if not found, otherwise 500 for other errors.
-        if (articleError) {
-            // When there are no rows, supabase/postgrest uses PGRST116
-            if (articleError.code === 'PGRST116') {
-                return NextResponse.json([])
-            }
-            return NextResponse.json(
-                { error: 'Failed to fetch article' },
-                { status: 500 }
-            )
-        }
-        if (!article) {
-            return NextResponse.json([])
-        }
-
-        const articleId = article.id
-
-        // article_id を持つプレイリストアイテムを取得
-        const { data: playlistItems, error: playlistItemsError } = await supabase
-            .from('playlist_items')
-            .select('playlist_id')
-            .eq('article_id', articleId)
-
-        if (playlistItemsError) {
-            return NextResponse.json(
-                { error: 'Failed to fetch playlists' },
-                { status: 500 }
-            )
-        }
-
-        if (!playlistItems || playlistItems.length === 0) {
-            return NextResponse.json([])
-        }
-
-        // プレイリストIDのリストを取得
-        const playlistIds = playlistItems.map(item => item.playlist_id)
-
-        // プレイリストを取得（所有権フィルタリング付き、デフォルトプレイリスト優先）
+        // Optimization: Use a single JOIN query instead of multiple sequential queries
+        // This eliminates 2 network round-trips
         const { data: playlists, error: playlistsError } = await supabase
             .from('playlists')
-            .select('*')
+            .select(`
+                *,
+                playlist_items!inner(
+                    articles!inner(
+                        url,
+                        owner_email
+                    )
+                )
+            `)
             .eq('owner_email', userEmail)
-            .in('id', playlistIds)
+            .eq('playlist_items.articles.url', decodedArticleUrl)
+            .eq('playlist_items.articles.owner_email', userEmail)
             .order('is_default', { ascending: false })
             .order('created_at', { ascending: false })
 
@@ -78,7 +43,13 @@ export async function GET(
             )
         }
 
-        return NextResponse.json(playlists as Playlist[])
+        // Clean up the joined data to match the expected Playlist type
+        const formattedPlaylists = playlists?.map(playlist => {
+            const { playlist_items, ...rest } = playlist;
+            return rest;
+        }) || [];
+
+        return NextResponse.json(formattedPlaylists as Playlist[])
     } catch (_error) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
