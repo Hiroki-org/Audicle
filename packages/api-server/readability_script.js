@@ -54,9 +54,15 @@ async function safeFetch(url) {
         }
 
         if (!ipaddr.isValid(hostnameWithoutBrackets)) {
-            const { address, family } = await dns.promises.lookup(hostnameWithoutBrackets);
-            addressToUse = address;
-            familyToUse = family;
+            const resolvedAddresses = await dns.promises.lookup(hostnameWithoutBrackets, { all: true });
+            const safeAddress = resolvedAddresses.find(({ address }) => isIpSafe(address));
+
+            if (!safeAddress) {
+                throw new Error(`SSRF Blocked: Access to ${hostnameWithoutBrackets} resolved only to restricted addresses`);
+            }
+
+            addressToUse = safeAddress.address;
+            familyToUse = safeAddress.family;
         } else {
             try {
                const parsed = ipaddr.parse(hostnameWithoutBrackets);
