@@ -337,6 +337,98 @@ describe('Share Target Route Handlers', () => {
         })
     })
 
+
+    describe('URL validation during POST request', () => {
+        it('http:// スキームは許可される', async () => {
+            mockAuth.mockResolvedValue({
+                user: { id: 'test-user', email: 'test@example.com' },
+                expires: '2025-12-31',
+            })
+
+            mockGetOrCreateDefaultPlaylist.mockResolvedValue({
+                playlist: {
+                    id: 'playlist-1',
+                    owner_email: 'test@example.com',
+                    name: '読み込んだ記事',
+                    visibility: 'private',
+                    is_default: true,
+                    allow_fork: true,
+                    created_at: '2025-01-01T00:00:00Z',
+                    updated_at: '2025-01-01T00:00:00Z',
+                    items: [],
+                    item_count: 0,
+                },
+            })
+
+            const mockUpsertArticle = supabaseLocal.upsertArticle as jest.MockedFunction<
+                typeof supabaseLocal.upsertArticle
+            >
+            mockUpsertArticle.mockResolvedValue({
+                id: 'article-1',
+                owner_email: 'test@example.com',
+                url: 'http://example.com',
+                title: 'Test Article',
+                created_at: '2025-01-01T00:00:00Z',
+                updated_at: '2025-01-01T00:00:00Z',
+                last_read_position: 0,
+            })
+
+            const mockAddPlaylistItem = supabaseLocal.addPlaylistItem as jest.MockedFunction<
+                typeof supabaseLocal.addPlaylistItem
+            >
+            mockAddPlaylistItem.mockResolvedValue({
+                id: 'item-1',
+                playlist_id: 'playlist-1',
+                article_id: 'article-1',
+                position: 0,
+                added_at: '2025-01-01T00:00:00Z',
+            })
+
+            const formData = new FormData()
+            formData.append('url', 'http://example.com')
+
+            const request = new NextRequest('http://localhost:3000/share-target', {
+                method: 'POST',
+                body: formData
+            })
+
+            const response = await POST(request)
+
+            expect(response.status).toBe(307)
+            expect(response.headers.get('Location')).toContain('/share-target/success')
+        })
+
+        it('javascript: スキームは拒否される', async () => {
+            const formData = new FormData()
+            formData.append('url', 'javascript:alert(1)')
+
+            const request = new NextRequest('http://localhost:3000/share-target', {
+                method: 'POST',
+                body: formData
+            })
+
+            const response = await POST(request)
+
+            expect(response.status).toBe(307)
+            expect(response.headers.get('Location')).toContain('/share-target/error')
+        })
+
+        it('data: スキームは拒否される', async () => {
+            const formData = new FormData()
+            formData.append('url', 'data:text/html,<h1>test</h1>')
+
+            const request = new NextRequest('http://localhost:3000/share-target', {
+                method: 'POST',
+                body: formData
+            })
+
+            const response = await POST(request)
+
+            expect(response.status).toBe(307)
+            expect(response.headers.get('Location')).toContain('/share-target/error')
+        })
+    })
+
     describe('validateUrl function', () => {
         it('http URL は true を返す', () => {
             expect(validateUrl('http://example.com')).toBe(true)
