@@ -570,13 +570,12 @@ export async function POST(request: NextRequest) {
                 if (hitRecorded) {
                     // インデックスにはないが Blob に存在する場合：遅延インデックス作成
                     if (articleUrl && cacheIndex && !isCachedByIndex) {
-                        addCachedChunk(articleUrl, voiceToUse, textHash)
-                            .then(() => {
-                                log('info', '既存のキャッシュのインデックスをバックフィルしました', { textHash });
-                            })
-                            .catch((error) => {
-                                log('error', 'インデックスのバックフィルに失敗しました', { textHash, error });
-                            });
+                        try {
+                            await addCachedChunk(articleUrl, voiceToUse, textHash);
+                            log('info', '既存のキャッシュのインデックスをバックフィルしました', { textHash });
+                        } catch (error) {
+                            log('error', 'インデックスのバックフィルに失敗しました', { textHash, error });
+                        }
                     }
 
                     continue;
