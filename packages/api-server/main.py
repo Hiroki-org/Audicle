@@ -284,6 +284,17 @@ async def extract_content(request: ExtractRequest):
         )
 
 
+async def _synthesize_chunk(
+    chunk_text: str, voice_name: str, index: int, total: int,
+    semaphore: asyncio.Semaphore
+) -> bytes:
+    async with semaphore:
+        logger.info("Synthesizing chunk %d/%d", index + 1, total)
+        result = await _synthesize_to_bytes(chunk_text, voice_name)
+        logger.debug("Chunk %d/%d completed", index + 1, total)
+        return result
+
+
 @app.post("/synthesize")
 async def synthesize_speech(request: SynthesizeRequest):
     """テキストを音声化してMP3を返す"""
@@ -302,16 +313,8 @@ async def synthesize_speech(request: SynthesizeRequest):
         if _tts_semaphore is None:
             max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
             _tts_semaphore = asyncio.Semaphore(max_concurrency)
-
-        async def _synthesize_chunk(chunk_text: str, voice_name: str, index: int, total: int) -> bytes:
-            async with _tts_semaphore:
-                logger.info("Synthesizing chunk %d/%d", index + 1, total)
-                result = await _synthesize_to_bytes(chunk_text, voice_name)
-                logger.debug("Chunk %d/%d completed", index + 1, total)
-                return result
-
         tasks = [
-            _synthesize_chunk(chunk, request.voice, i, len(text_chunks))
+            _synthesize_chunk(chunk, request.voice, i, len(text_chunks), _tts_semaphore)
             for i, chunk in enumerate(text_chunks)
         ]
 
