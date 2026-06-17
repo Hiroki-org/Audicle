@@ -32,7 +32,7 @@ let isDebug = false;
 
 function debugLog(...args) {
   if (isDebug) {
-    console.log(...args);
+    // console.log(...args);
   }
 }
 
