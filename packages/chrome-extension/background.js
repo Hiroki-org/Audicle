@@ -23,8 +23,6 @@ class RemoteAudioSynthesizer extends AudioSynthesizer {
   }
 
   async synthesize(text) {
-    console.log(`[${this.name}] Synthesizing: "${text}"`);
-    console.log(`[${this.name}] Server URL: ${this.serverUrl}`);
 
     try {
       const cleanedText = cleanText(text);
