@@ -72,6 +72,7 @@ class TestExtractContent(unittest.TestCase):
 
     @patch('asyncio.create_subprocess_exec', new_callable=AsyncMock)
     def test_extract_json_decode_error(self, mock_exec):
+        """Mocking the asyncio.create_subprocess_exec to return invalid JSON in stdout makes this error path easy to test."""
         mock_proc = MagicMock()
         mock_proc.returncode = 0
         mock_proc.communicate = AsyncMock(return_value=(b'invalid json', b''))
