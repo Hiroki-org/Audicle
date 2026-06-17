@@ -10,6 +10,9 @@ import { articleStorage } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 import { Play, Pause } from "lucide-react";
 
+const DESKTOP_PLAY_BUTTON_CLASSES = "w-12 h-12 p-0 bg-green-600 text-white rounded-full hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-2xl";
+
+
 export default function ReaderPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -250,7 +253,7 @@ function DesktopAudioControls({
           <button
             onClick={isPlaying ? pause : play}
             disabled={isPlaybackLoading}
-            className="w-12 h-12 p-0 bg-green-600 text-white rounded-full hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-2xl"
+            className={DESKTOP_PLAY_BUTTON_CLASSES}
             title={
               isPlaybackLoading ? "処理中..." : isPlaying ? "一時停止" : "再生"
             }
