@@ -118,5 +118,16 @@ class TestExtractContent(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()["detail"], "Internal server error: node command not found")
 
+    @patch('asyncio.create_subprocess_exec', new_callable=AsyncMock)
+    def test_extract_unhandled_value_error(self, mock_exec):
+        mock_proc = MagicMock()
+        mock_proc.communicate = AsyncMock(side_effect=ValueError("Simulated ValueError during communication"))
+        mock_exec.return_value = mock_proc
+
+        response = self.client.post("/extract", json={"url": "http://example.com"})
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()["detail"], "Internal server error: Simulated ValueError during communication")
+
 if __name__ == '__main__':
     unittest.main()
