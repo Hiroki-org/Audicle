@@ -155,30 +155,28 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
 
     parts = _split_and_merge(text, sep_pattern)
 
-    chunks = []
+    final_chunks = []
     current_chunk = ""
     current_chunk_len = 0
 
-    for part in parts:
-        part_len = len(part.encode('utf-8'))
-        if current_chunk_len + part_len > limit:
-             if current_chunk:
-                 chunks.append((current_chunk, current_chunk_len))
-             current_chunk = part
-             current_chunk_len = part_len
-        else:
-             current_chunk += part
-             current_chunk_len += part_len
-
-    if current_chunk:
-        chunks.append((current_chunk, current_chunk_len))
-
-    final_chunks = []
-    for chunk_text, chunk_len in chunks:
+    def _add_chunk(chunk_text: str, chunk_len: int) -> None:
         if chunk_len > limit:
             final_chunks.extend(_chunk_text(chunk_text, limit, next_separators))
         else:
             final_chunks.append(chunk_text)
+
+    for part in parts:
+        part_len = len(part.encode('utf-8'))
+        if current_chunk_len + part_len > limit and current_chunk:
+            _add_chunk(current_chunk, current_chunk_len)
+            current_chunk = part
+            current_chunk_len = part_len
+        else:
+            current_chunk += part
+            current_chunk_len += part_len
+
+    if current_chunk:
+        _add_chunk(current_chunk, current_chunk_len)
 
     return final_chunks
 
