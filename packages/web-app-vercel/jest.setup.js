@@ -175,3 +175,18 @@ global.URL.revokeObjectURL = jest.fn();
 if (typeof global.MessagePort === 'undefined') {
   global.MessagePort = MessagePort;
 }
+
+const crypto = require('crypto');
+if (typeof global.crypto === 'undefined') {
+  global.crypto = crypto;
+} else if (!global.crypto.randomUUID) {
+  global.crypto.randomUUID = crypto.randomUUID;
+}
+
+if (typeof global.AbortSignal !== 'undefined' && !global.AbortSignal.timeout) {
+  global.AbortSignal.timeout = function timeout(ms) {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new DOMException('TimeoutError', 'TimeoutError')), ms);
+    return controller.signal;
+  };
+}
