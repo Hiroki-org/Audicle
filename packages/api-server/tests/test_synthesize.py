@@ -2,7 +2,7 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch, AsyncMock
 import os
-import io
+
 
 # ONLY mock external missing dependencies, DO NOT mock fastapi, pydantic
 sys.modules["google.api_core.exceptions"] = MagicMock()
@@ -57,16 +57,15 @@ class TestSynthesizeSpeech(unittest.TestCase):
     @patch('main._split_text')
     @patch('main._synthesize_to_bytes', new_callable=AsyncMock)
     @patch('main.os.path.exists')
-    @patch('aiofiles.open')
-    def test_partial_chunk_failure_fallback_file(self, mock_aiofiles_open, mock_exists, mock_synthesize, mock_split):
+    @patch('builtins.open')
+    def test_partial_chunk_failure_fallback_file(self, mock_open, mock_exists, mock_synthesize, mock_split):
         mock_split.return_value = ["Hello ", "world"]
         mock_synthesize.side_effect = [b"mocked_", Exception("Test error")]
         mock_exists.return_value = True
 
         mock_file_context = MagicMock()
-        mock_file_context.read = AsyncMock(return_value=b"fallback_audio")
-        mock_aiofiles_open.return_value.__aenter__ = AsyncMock(return_value=mock_file_context)
-        mock_aiofiles_open.return_value.__aexit__ = AsyncMock()
+        mock_file_context.read.return_value = b"fallback_audio"
+        mock_open.return_value.__enter__.return_value = mock_file_context
 
         response = self.client.post("/synthesize", json={"text": "Hello world", "voice": "test-voice"})
 
@@ -118,23 +117,22 @@ class TestSynthesizeSpeech(unittest.TestCase):
     @patch('main._split_text')
     @patch('main._synthesize_to_bytes', new_callable=AsyncMock)
     @patch('main.os.path.exists')
-    @patch('aiofiles.open')
-    def test_synthesis_exception_fallback(self, mock_aiofiles_open, mock_exists, mock_synthesize, mock_split):
+    @patch('builtins.open')
+    def test_synthesis_exception_fallback(self, mock_open, mock_exists, mock_synthesize, mock_split):
         mock_split.return_value = ["Hello world"]
         mock_synthesize.side_effect = Exception("Complete synthesis failure")
         mock_exists.return_value = True
 
         mock_file_context = MagicMock()
-        mock_file_context.read = AsyncMock(return_value=b"fallback_audio_complete")
-        mock_aiofiles_open.return_value.__aenter__ = AsyncMock(return_value=mock_file_context)
-        mock_aiofiles_open.return_value.__aexit__ = AsyncMock()
+        mock_file_context.read.return_value = b"fallback_audio_complete"
+        mock_open.return_value.__enter__.return_value = mock_file_context
 
         response = self.client.post("/synthesize", json={"text": "Hello world", "voice": "test-voice"})
 
         mock_split.assert_called_once_with("Hello world")
         mock_synthesize.assert_called_once_with("Hello world", "test-voice")
         mock_exists.assert_any_call(main.FALLBACK_PATH)
-        mock_aiofiles_open.assert_called_once_with(main.FALLBACK_PATH, "rb")
+        mock_open.assert_called_once_with(main.FALLBACK_PATH, "rb")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"fallback_audio_complete")
