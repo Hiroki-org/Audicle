@@ -9,6 +9,7 @@ import { usePlayback } from "@/hooks/usePlayback";
 import { articleStorage } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 import { Play, Pause } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function ReaderPageClient() {
   const router = useRouter();
@@ -250,7 +251,13 @@ function DesktopAudioControls({
           <button
             onClick={isPlaying ? pause : play}
             disabled={isPlaybackLoading}
-            className="w-12 h-12 p-0 bg-green-600 text-white rounded-full hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-2xl"
+            className={cn(
+              "w-12 h-12 p-0 rounded-full flex items-center justify-center text-2xl transition-colors",
+              "bg-green-600 text-white",
+              "hover:bg-green-700",
+              "disabled:bg-gray-400 disabled:cursor-not-allowed",
+              isPlaybackLoading && "opacity-50"
+            )}
             title={
               isPlaybackLoading ? "処理中..." : isPlaying ? "一時停止" : "再生"
             }
