@@ -12,6 +12,7 @@ async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: numbe
             }
             return response.json() as Promise<T>;
         } catch (error) {
+            // 最終試行なら即座にエラーを投げる
             if (attempt === maxRetries) {
                 throw error;
             }
@@ -24,6 +25,8 @@ async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: numbe
             }
         }
     }
+    /* istanbul ignore next */
+    throw new Error('Max retries exceeded');
 }
 
 /**
