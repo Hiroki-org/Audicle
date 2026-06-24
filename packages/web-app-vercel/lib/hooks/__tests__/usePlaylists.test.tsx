@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   usePlaylists,
+  retryFetch,
   usePlaylistDetail,
   useCreatePlaylistMutation,
   useDeletePlaylistMutation,
@@ -95,7 +96,7 @@ describe("usePlaylists hooks", () => {
       const { result } = renderHook(() => usePlaylists(), { wrapper });
 
       await waitFor(() => expect(result.current.isError).toBe(true));
-      expect(result.current.error).toBeDefined();
+      expect(result.current.error?.message).toBe("Some other error");
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
@@ -124,7 +125,15 @@ describe("usePlaylists hooks", () => {
         timeout: 4000,
       });
       expect(global.fetch).toHaveBeenCalledTimes(3);
-      expect(result.current.error).toBeDefined();
+      expect(result.current.error?.message).toBe("fetch failed with ECONNRESET");
+    });
+  });
+
+
+  describe("retryFetch", () => {
+    it("should throw Max retries exceeded if maxRetries < 1", async () => {
+      const mockFetch = jest.fn();
+      await expect(retryFetch(mockFetch, 0)).rejects.toThrow('Max retries exceeded');
     });
   });
 

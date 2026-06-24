@@ -3,7 +3,7 @@ import { useSession } from "next-auth/react";
 import type { PlaylistWithItems } from "@/types/playlist";
 
 // リトライヘルパー関数
-async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: number = 3, delay: number = 1000): Promise<T> {
+export async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: number = 3, delay: number = 1000): Promise<T> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const response = await fetchFn();
