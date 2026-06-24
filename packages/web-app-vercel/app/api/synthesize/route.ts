@@ -387,7 +387,7 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            const totalLength = body.chunks.reduce((acc, chunk) => acc + (chunk.text ? chunk.text.length : 0), 0);
+            const totalLength = body.chunks.reduce((acc: number, chunk: any) => acc + (chunk.text ? chunk.text.length : 0), 0);
             if (totalLength > MAX_TOTAL_LENGTH) {
                 log('warn', 'Total text length exceeds maximum', { length: totalLength });
                 return NextResponse.json(
