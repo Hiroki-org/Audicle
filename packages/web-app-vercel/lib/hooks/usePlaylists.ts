@@ -13,7 +13,7 @@ async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: numbe
             return response.json() as Promise<T>;
         } catch (error) {
             if (attempt === maxRetries) {
-                throw error;
+                throw new Error('Max retries exceeded');
             }
             // ECONNRESET などのネットワークエラー時はリトライ
             if (error instanceof Error && (error.message.includes('ECONNRESET') || error.message.includes('aborted') || error.message.includes('fetch'))) {
@@ -24,6 +24,9 @@ async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: numbe
             }
         }
     }
+    // This code is technically unreachable due to throwing error on attempt === maxRetries above
+    // but TypeScript needs it to understand the function always returns or throws
+    /* istanbul ignore next */
     throw new Error('Max retries exceeded');
 }
 

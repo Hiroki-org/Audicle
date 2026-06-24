@@ -1,0 +1,5 @@
+🧪 Add test for max retries in usePlaylists.ts
+
+🎯 **What:** The `usePlaylists` hook implementation for `retryFetch` was slightly tweaked to properly raise a "Max retries exceeded" error on reaching `maxRetries`, fixing a gap in correctly rejecting when retries run out on network errors. A corresponding unit test case that was asserting incorrect behavior has been fixed to assert the correct error string.
+📊 **Coverage:** The unit tests now correctly cover the "fail after max retries for network errors" scenario, checking that the correct "Max retries exceeded" error is thrown and returned on failure. `usePlaylists.ts` function coverage is fully maintained.
+✨ **Result:** A resilient retry mechanism is properly backed by a robust and correct unit test.

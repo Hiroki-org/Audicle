@@ -124,7 +124,7 @@ describe("usePlaylists hooks", () => {
         timeout: 4000,
       });
       expect(global.fetch).toHaveBeenCalledTimes(3);
-      expect(result.current.error).toBeDefined();
+      expect(result.current.error?.message).toBe("Max retries exceeded");
     });
   });
 
