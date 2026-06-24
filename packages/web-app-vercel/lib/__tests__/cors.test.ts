@@ -71,12 +71,13 @@ describe("getCorsHeaders", () => {
     expect(headers["Access-Control-Allow-Origin"]).toBe("https://example.com");
   });
 
-  it("should log an error in production if ALLOWED_ORIGINS is empty", () => {
+  it("should log an error and throw in production if ALLOWED_ORIGINS is empty", () => {
     process.env.NODE_ENV = "production";
     process.env.ALLOWED_ORIGINS = "";
     const request = createMockRequest("http://localhost:3000");
 
-    getCorsHeaders(request);
+    expect(() => getCorsHeaders(request)).toThrow(CorsError);
+    expect(() => getCorsHeaders(request)).toThrow("Server configuration error: ALLOWED_ORIGINS is not set.");
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "ALLOWED_ORIGINS must be configured in production. Set it to a comma-separated list of allowed origins.",
