@@ -66,7 +66,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
         // Mock /api/extract to return deterministic content based on URL query
         await page.route('**/api/extract', async route => {
             const request = route.request();
-            let targetUrl = '';
+            let targetUrl;
             try {
                 const postData = request.postDataJSON();
                 targetUrl = postData?.url || '';
@@ -74,7 +74,7 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
                 targetUrl = '';
             }
 
-            let title = 'Example Domain';
+            let title;
             try {
                 const parsed = new URL(targetUrl);
                 const id = parsed.searchParams.get('id');

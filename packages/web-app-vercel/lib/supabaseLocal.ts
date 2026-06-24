@@ -193,7 +193,7 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
     const sortField = sort?.field || 'position';
     const sortOrder = sort?.order || 'asc';
 
-    let sorted = [...items];
+    let sorted;
 
     if (sortField === 'title') {
         sorted = [...items].sort((a, b) => {

@@ -7,15 +7,13 @@ import { parseArticleMetadata, serializeArticleMetadata } from '@/lib/kv-helpers
 import { CacheStats, SynthesizeChunk } from '@/types/api';
 import { getCacheIndex, addCachedChunk, isCachedInIndex } from '@/lib/db/cacheIndex';
 import { calculateTextHash } from '@/lib/textHash';
-import { getStorageProvider } from '@/lib/storage';
-import { removeSeparatorCharacters } from '@/lib/textCleaner';
 import { TTSError } from './helpers/ttsError';
 import { synthesizeToBuffer } from './helpers/ttsClient';
 import { calculateArticleHash } from './helpers/articleHash';
 
-import { TTSError } from './helpers/ttsError';
-import { synthesizeToBuffer } from './helpers/ttsClient';
-import { calculateArticleHash } from './helpers/articleHash';
+import { getStorageProvider } from '@/lib/storage';
+import { removeSeparatorCharacters } from '@/lib/textCleaner';
+
 
 
 // Node.js runtimeを明示的に指定（Google Cloud TTS SDKはEdge Runtimeで動作しない）

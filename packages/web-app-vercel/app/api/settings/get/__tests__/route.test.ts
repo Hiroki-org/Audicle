@@ -1,6 +1,5 @@
 import { GET } from '../route';
 import { auth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
 import { DEFAULT_SETTINGS } from '@/types/settings';
 
 // Mock auth

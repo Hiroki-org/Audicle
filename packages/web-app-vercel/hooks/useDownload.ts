@@ -82,7 +82,7 @@ export function useDownload({ articleUrl, chunks, voiceModel, speed, onSlowConne
                 return downloadChunk(chunk, index, retryCount + 1);
             }
 
-            throw new Error(`チャンク ${index + 1} のダウンロードに失敗しました: ${err}`);
+            throw new Error(`チャンク ${index + 1} のダウンロードに失敗しました: ${err}`, { cause: err });
         }
     }, [articleUrl, voiceModel, chunks]);
 

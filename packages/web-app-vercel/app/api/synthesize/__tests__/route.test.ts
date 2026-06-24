@@ -48,8 +48,6 @@ import { getStorageProvider } from '@/lib/storage';
 
 // Import the handler after mocks
 import * as routeModule from '../route';
-import * as ttsClientModule from '../helpers/ttsClient';
-import * as ttsClientModule from '../helpers/ttsClient';
 
 describe('/api/synthesize route', () => {
     beforeEach(() => {

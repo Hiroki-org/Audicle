@@ -150,7 +150,7 @@ export function PlaybackSpeedDial({
   }, [open, onOpenChange]);
 
   const handleTrackKeyDown = (e: React.KeyboardEvent) => {
-    let newIndex = selectedIndex;
+    let newIndex;
     if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
       newIndex = Math.max(0, selectedIndex - 1);
     } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {

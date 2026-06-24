@@ -183,16 +183,9 @@ export default function ReaderPageClient() {
     if (playlistState.isPlaylistMode) {
       // リピートoff時の完了判定
       if (playlistState.repeatMode === "off") {
-        let isAtEnd = false;
-        if (playlistState.shuffle) {
-          // シャッフルモード: シャッフルキューの最後かどうか確認
-          const shuffledIndices = playlistState.shuffledIndices;
-          const currentShufflePos =
-            shuffledIndices.indexOf(currentPlaylistIndex);
-          isAtEnd = currentShufflePos >= shuffledIndices.length - 1;
-        } else {
-          isAtEnd = currentPlaylistIndex >= playlistState.totalCount - 1;
-        }
+        const isAtEnd = playlistState.shuffle
+          ? playlistState.shuffledIndices.indexOf(currentPlaylistIndex) >= playlistState.shuffledIndices.length - 1
+          : currentPlaylistIndex >= playlistState.totalCount - 1;
 
         if (isAtEnd) {
           setShowCompletionScreen(true);
