@@ -53,17 +53,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch HTML and perform SSRF check concurrently
+    // We use Promise.allSettled so if fetch fails we can still check SSRF
+    const results = await Promise.allSettled([
+      isSafeUrl(url),
+      fetchWithTimeout(url)
+    ]);
+
+    const isSafeResult = results[0];
+    const htmlResult = results[1];
+
+    const isSafe = isSafeResult.status === "fulfilled" ? isSafeResult.value : false;
+
+    // If fetch failed but SSRF was the real issue (or isSafe is false), we should report SSRF.
+    // If fetch failed and SSRF is true, we should rethrow the fetch error.
+    if (isSafe && htmlResult.status === "rejected") {
+       throw htmlResult.reason;
+    }
+
+    const html = htmlResult.status === "fulfilled" ? htmlResult.value : "";
+
+
     // SSRFチェック (initial check)
-    if (!(await isSafeUrl(url))) {
+    if (!isSafe) {
       console.warn("[Extract API] SSRF attempt blocked:", url);
       return NextResponse.json(
         { error: "Access to this URL is restricted for security reasons" },
         { status: 403, headers: corsHeaders },
       );
     }
-
-    // HTMLを取得 (with secure redirect handling)
-    const html = await fetchWithTimeout(url);
 
     // linkedomでパース
     const { document } = parseHTML(html);
