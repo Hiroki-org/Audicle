@@ -24,7 +24,6 @@ async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: numbe
             }
         }
     }
-    throw new Error('Max retries exceeded');
 }
 
 /**
