@@ -1,0 +1,6 @@
+🧹 [code health] Remove Unused 'type Page'
+
+🎯 **What:** Removed the `type` keyword from `type Page` import in `packages/web-app-vercel/tests/e2e/reader-playlist.spec.ts`.
+💡 **Why:** Fixes code health issue reported for unused `type Page` type alias keyword by importing `Page` directly.
+✅ **Verification:** Verified that `tsc --noEmit` compiles successfully, linter succeeds, and e2e test suits pass.
+✨ **Result:** Cleaned up unused types logic improving maintainability.
