@@ -28,24 +28,10 @@ import { selectVoiceModel } from "@/lib/voiceSelector";
 import { UserSettings, DEFAULT_SETTINGS } from "@/types/settings";
 import { createReaderUrl } from "@/lib/urlBuilder";
 import { getPlaylistSortKey } from "@/lib/playlist-utils";
+import { useArticleLoader, convertParagraphsToChunks } from "./hooks/useArticleLoader";
+import { useReaderSettings } from "./hooks/useReaderSettings";
+import { useReaderState } from "./hooks/useReaderState";
 
-function convertParagraphsToChunks(htmlContent: string): {
-  chunks: Chunk[];
-  detectedLanguage: DetectedLanguage;
-} {
-  // HTML構造を保持して段落を抽出
-  const { paragraphs, detectedLanguage } = parseHTMLToParagraphs(htmlContent);
-
-  // Chunk形式に変換
-  const chunks = paragraphs.map((para) => ({
-    id: para.id,
-    text: para.originalText,
-    cleanedText: para.cleanedText,
-    type: para.type,
-  }));
-
-  return { chunks, detectedLanguage };
-}
 
 export default function ReaderPageClient() {
   const router = useRouter();
@@ -71,66 +57,73 @@ export default function ReaderPageClient() {
     toggleShuffle,
   } = usePlaylistPlayback();
 
-  const [url, setUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [chunks, setChunks] = useState<Chunk[]>([]);
-  const [title, setTitle] = useState("");
-  const [error, setError] = useState("");
-  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
-  const [detectedLanguage, setDetectedLanguage] =
-    useState<DetectedLanguage>("unknown");
-  const [effectiveVoiceModel, setEffectiveVoiceModel] = useState<string>(
-    DEFAULT_SETTINGS.voice_model,
+  // プレイリスト再生コンテキスト
+  const {
+    state: playlistState,
+    onArticleEnd,
+    initializeFromArticle,
+    initializeFromPlaylist,
+    canMovePrevious,
+    canMoveNext,
+    toggleRepeatMode,
+    toggleShuffle,
+  } = usePlaylistPlayback();
+
+  const {
+    currentPlaylistIndex,
+    setCurrentPlaylistIndex,
+    activePlaylistIndex,
+    isPlaylistMode,
+    showCompletionScreen,
+    setShowCompletionScreen,
+    isPlaylistContextReady,
+    isPlaylistModalOpen,
+    setIsPlaylistModalOpen,
+    isSpeedModalOpen,
+    setIsSpeedModalOpen,
+    hasLoadedFromQuery,
+    setHasLoadedFromQuery,
+    isClient,
+    hasInitiatedAutoplayRef,
+    prevArticleUrlRef,
+    navigateToPlaylistItem
+  } = useReaderState(playlistIdFromQuery, indexFromQuery, playlistState);
+
+  const {
+    url, setUrl,
+    isLoading, setIsLoading,
+    chunks, setChunks,
+    title, setTitle,
+    error, setError,
+    detectedLanguage, setDetectedLanguage,
+    articleId, setArticleId,
+    itemId, setItemId,
+    loadAndSaveArticle,
+    fetchArticleAndSetState
+  } = useArticleLoader(
+    userEmail,
+    playlists,
+    selectedPlaylistId,
+    playlistIdFromQuery,
+    indexFromQuery,
+    autoplayFromQuery,
+    hasInitiatedAutoplayRef
   );
-  const [articleId, setArticleId] = useState<string | null>(null);
-  const [itemId, setItemId] = useState<string | null>(null);
-  const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
-  const [arePlaylistsLoaded, setArePlaylistsLoaded] = useState(false);
-  // NOTE: Playlist selection should be deterministic via query params or default playlist.
-  const [hasLoadedFromQuery, setHasLoadedFromQuery] = useState(false);
-  const [isSpeedModalOpen, setIsSpeedModalOpen] = useState(false);
 
-  // Hydrationエラーを防ぐためのクライアントサイド判定
-  const [isClient, setIsClient] = useState(false);
+  const {
+    settings,
+    setSettings,
+    effectiveVoiceModel,
+    setEffectiveVoiceModel,
+    playlists,
+    setPlaylists,
+    selectedPlaylistId,
+    setSelectedPlaylistId,
+    arePlaylistsLoaded,
+  } = useReaderSettings(detectedLanguage);
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // プレイリスト再生のための追加状態
-  const [currentPlaylistIndex, setCurrentPlaylistIndex] = useState<number>(
-    indexFromQuery ? parseInt(indexFromQuery, 10) : 0,
-  );
-  const playlistIndexFromUrl =
-    indexFromQuery !== null ? parseInt(indexFromQuery, 10) : null;
-  const activePlaylistIndex =
-    playlistIndexFromUrl !== null && !Number.isNaN(playlistIndexFromUrl)
-      ? playlistIndexFromUrl
-      : currentPlaylistIndex;
-  const [isPlaylistMode] = useState<boolean>(!!playlistIdFromQuery);
-  const [showCompletionScreen, setShowCompletionScreen] = useState(false);
-
-  // プレイリストコンテキストの準備状態チェック（sortKey一致も確認）
-  const currentSortKey = playlistIdFromQuery
-    ? getPlaylistSortKey(playlistIdFromQuery)
-    : null;
-  const isPlaylistContextReady =
-    !!playlistIdFromQuery &&
-    playlistState.isPlaylistMode &&
-    playlistState.playlistId === playlistIdFromQuery &&
-    playlistState.items.length > 0 &&
-    playlistState.sortKey === currentSortKey; // 追加: sortKey一致チェック
-
-  // 自動再生の参照フラグ（useEffectの無限ループを防ぐため）
-  const hasInitiatedAutoplayRef = useRef(false);
-  // 直前に再生していた記事URLを追跡（記事切り替え時のみ停止するため）
-  const prevArticleUrlRef = useRef<string>("");
   const stopRef = useRef<() => void>(() => {});
-  const setPlaybackSourceRef =
-    useRef<((_next: AudioPlaybackSource | null) => void) | null>(null);
-
+  const setPlaybackSourceRef = useRef<((_next: AudioPlaybackSource | null) => void) | null>(null);
   const chunkCount = chunks.length;
 
   useEffect(() => {
@@ -285,52 +278,6 @@ export default function ReaderPageClient() {
     speed: playbackRate,
   });
 
-  // 記事を読み込んで保存する共通ロジック
-  const loadAndSaveArticle = useCallback(
-    async (articleUrl: string) => {
-      setIsLoading(true);
-      setError("");
-      try {
-        const response = await extractContent(articleUrl);
-        const { chunks: chunksWithId, detectedLanguage } =
-          convertParagraphsToChunks(response.content);
-        setChunks(chunksWithId);
-        setDetectedLanguage(detectedLanguage);
-        setUrl(articleUrl);
-        setTitle(response.title);
-
-        // 記事アクセス統計を記録（非同期、エラーは内部で処理される）
-        recordArticleStats({
-          url: articleUrl,
-          title: response.title,
-          content: response.content,
-          chunks: chunksWithId,
-        });
-
-        // プレイリストに記事を追加
-        let newArticleId: string | null = null;
-        try {
-          if (!selectedPlaylistId) {
-            throw new Error("追加先のプレイリストが選択されていません。");
-          }
-          const targetPlaylistId = selectedPlaylistId;
-
-          // プレイリストに直接追加
-          const itemResponse = await fetch(
-            `/api/playlists/${targetPlaylistId}/items`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                article_url: articleUrl,
-                article_title: response.title,
-                thumbnail_url: null,
-                last_read_position: 0,
-              }),
-            },
-          );
 
           if (itemResponse.ok) {
             const itemData = await itemResponse.json();
@@ -398,60 +345,6 @@ export default function ReaderPageClient() {
     [router, selectedPlaylistId, queryClient, userEmail, playlists],
   );
 
-  // サーバーから記事（IDまたはURLで指定）を取得してステートにセットし、localStorageに保存するヘルパー
-  const fetchArticleAndSetState = useCallback(
-    async ({
-      id,
-      url: maybeUrl,
-      titleFallback,
-      isPlaylistMode = false,
-    }: {
-      id?: string;
-      url?: string;
-      titleFallback?: string;
-      isPlaylistMode?: boolean;
-    }) => {
-      setIsLoading(true);
-      setError("");
-      try {
-        let resolvedUrl = maybeUrl;
-        let resolvedTitle = titleFallback || "";
-        const resolvedId = id || null;
-
-        // もしURLがなければ、IDからメタ情報を取得
-        if (!resolvedUrl && id) {
-          const res = await fetch(`/api/articles/${id}`);
-          if (!res.ok) {
-            logger.warn("記事取得APIに失敗しました", { status: res.status });
-            setError("記事が見つかりませんでした");
-            return;
-          }
-          const articleData = await res.json();
-          if (!articleData || !articleData.url) {
-            setError("記事情報が不完全です");
-            return;
-          }
-          resolvedUrl = articleData.url;
-          resolvedTitle = articleData.title || resolvedTitle;
-        }
-
-        if (!resolvedUrl) {
-          setError("記事のURLが不明です");
-          return;
-        }
-
-        // 抽出APIでチャンクを取得
-        const extractRes = await fetch("/api/extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: resolvedUrl }),
-        });
-        if (!extractRes.ok) {
-          const errorText = await extractRes.text();
-          const errorMessage = parseApiErrorMessage(
-            errorText,
-            "記事の読み込みに失敗しました",
-          );
           logger.error("抽出APIに失敗しました", { status: extractRes.status });
           setError(errorMessage);
           return;
@@ -494,64 +387,8 @@ export default function ReaderPageClient() {
     [],
   );
 
-  // ユーザー設定を読み込む
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const response = await fetch("/api/settings/get");
-        if (!response.ok) {
-          throw new Error(`設定の読み込みに失敗: ${response.status}`);
-        }
-        const data = await response.json();
-        if (
-          data &&
-          typeof data.voice_model === "string" &&
-          typeof data.playback_speed === "number"
-        ) {
-          setSettings(data);
-        } else {
-          throw new Error("Invalid settings format from API");
-        }
-      } catch (err) {
-        logger.error("設定の読み込みに失敗", err);
-        setSettings(DEFAULT_SETTINGS);
-      }
-    };
 
-    loadSettings();
-  }, []);
 
-  useEffect(() => {
-    setEffectiveVoiceModel(
-      selectVoiceModel(settings.voice_model, detectedLanguage),
-    );
-  }, [settings.voice_model, detectedLanguage]);
-
-  // プレイリスト一覧を取得
-  useEffect(() => {
-    const fetchPlaylists = async () => {
-      try {
-        const response = await fetch("/api/playlists");
-        if (response.ok) {
-          const data: Playlist[] = await response.json();
-          setPlaylists(data);
-
-          // APIレスポンスはデフォルトプレイリストが先頭に来るようにソートされているため，
-          // 最初のアイテムを選択すればよい
-          if (data.length > 0) {
-            setSelectedPlaylistId(data[0].id);
-          }
-        }
-      } catch (error) {
-        logger.error("プレイリストの読み込みに失敗", error);
-      } finally {
-        // プレイリスト読み込み完了をマーク
-        setArePlaylistsLoaded(true);
-      }
-    };
-
-    fetchPlaylists();
-  }, []);
 
   // 記事IDが指定されている場合は読み込み
   useEffect(() => {
@@ -848,55 +685,6 @@ export default function ReaderPageClient() {
     session,
   ]);
 
-  // プレイリスト内の特定の記事に遷移するヘルパー関数
-  const navigateToPlaylistItem = useCallback(
-    (index: number) => {
-      logger.info("Prev/Next navigation requested", {
-        playlistIdFromQuery,
-        playlistStatePlaylistId: playlistState.playlistId,
-        currentPlaylistIndex,
-        activePlaylistIndex,
-        playlistStateCurrentIndex: playlistState.currentIndex,
-        targetIndex: index,
-        itemsLength: playlistState.items.length,
-      });
-
-      // 同一URLへのpushを避ける（無反応に見えるのを防ぐ）
-      if (index === activePlaylistIndex) {
-        logger.info("Skip navigation: same index", {
-          index,
-          activePlaylistIndex,
-        });
-        return;
-      }
-
-      // クエリのplaylistIdと一致するまで items を参照しない
-      if (
-        playlistIdFromQuery &&
-        playlistState.playlistId !== playlistIdFromQuery
-      ) {
-        logger.info("Skip navigation: playlist context not ready", {
-          playlistIdFromQuery,
-          playlistStatePlaylistId: playlistState.playlistId,
-        });
-        return;
-      }
-
-      const item = playlistState.items[index];
-      const targetPlaylistId = playlistIdFromQuery || playlistState.playlistId;
-      if (item && item.article?.url && targetPlaylistId) {
-        const readerUrl = createReaderUrl({
-          articleUrl: item.article.url,
-          playlistId: targetPlaylistId,
-          playlistIndex: index,
-          autoplay: false,
-        });
-        setCurrentPlaylistIndex(index);
-        router.push(readerUrl);
-      }
-    },
-    [playlistIdFromQuery, playlistState, router, activePlaylistIndex, currentPlaylistIndex],
-  );
 
   const getPlaylistItemHref = useCallback(
     (index: number) => {
