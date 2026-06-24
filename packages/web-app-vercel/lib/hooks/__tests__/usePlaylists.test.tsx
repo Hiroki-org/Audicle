@@ -8,6 +8,7 @@ import {
   useUpdatePlaylistMutation,
   useRemoveFromPlaylistMutation,
   useSetDefaultPlaylistMutation,
+  retryFetch,
 } from "../usePlaylists";
 import React from "react";
 
@@ -125,6 +126,15 @@ describe("usePlaylists hooks", () => {
       });
       expect(global.fetch).toHaveBeenCalledTimes(3);
       expect(result.current.error).toBeDefined();
+    });
+  });
+
+
+  describe("retryFetch", () => {
+    it("should throw 'Max retries exceeded' when maxRetries is 0", async () => {
+      const mockFetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+      await expect(retryFetch(mockFetch, 0)).rejects.toThrow('Max retries exceeded');
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
