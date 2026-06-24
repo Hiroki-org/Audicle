@@ -114,8 +114,7 @@ export async function DELETE(
         if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             // check if any other playlist uses the article
             const playlistAll = await supabaseLocal.getPlaylistsForOwner(userEmail)
-            const allItems = playlistAll.flatMap(p => p.playlist_items || []) as PlaylistItemWithArticle[]
-            const usedElsewhere = allItems.some((i: PlaylistItemWithArticle) => i.article_id === itemToDelete.article_id)
+            const usedElsewhere = playlistAll.some(p => p.playlist_items && p.playlist_items.some((i: PlaylistItemWithArticle) => i.article_id === itemToDelete.article_id))
             if (!usedElsewhere) {
                 // Optionally remove article from local store. Not required for tests.
             }
