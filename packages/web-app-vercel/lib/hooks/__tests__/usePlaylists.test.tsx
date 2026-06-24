@@ -272,6 +272,22 @@ describe("usePlaylists hooks", () => {
       await waitFor(() => expect(result.current.isError).toBe(true));
       expect(result.current.error?.message).toBe("削除に失敗しました");
     });
+
+    it("should handle JSON parse errors gracefully", async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: async () => { throw new Error("Invalid JSON"); },
+      });
+
+      const { result } = renderHook(() => useDeletePlaylistMutation(), {
+        wrapper,
+      });
+
+      result.current.mutate("playlistToDelete");
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.error?.message).toBe("Invalid JSON");
+    });
   });
 
   describe("useUpdatePlaylistMutation", () => {
@@ -322,6 +338,22 @@ describe("usePlaylists hooks", () => {
       expect(result.current.error?.message).toBe(
         "プレイリストの更新に失敗しました",
       );
+    });
+
+    it("should fail when API returns ok: true but invalid JSON", async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => { throw new Error("Invalid JSON"); },
+      });
+
+      const { result } = renderHook(() => useUpdatePlaylistMutation(), {
+        wrapper,
+      });
+
+      result.current.mutate({ playlistId: "p1", name: "Updated" });
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.error?.message).toBe("Invalid JSON");
     });
   });
 
@@ -388,6 +420,22 @@ describe("usePlaylists hooks", () => {
         "アイテムの削除に失敗しました",
       );
     });
+
+    it("should handle JSON parse errors gracefully", async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: async () => { throw new Error("Invalid JSON"); },
+      });
+
+      const { result } = renderHook(() => useRemoveFromPlaylistMutation(), {
+        wrapper,
+      });
+
+      result.current.mutate({ playlistId: "p1", itemId: "i1" });
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.error?.message).toBe("Invalid JSON");
+    });
   });
 
   describe("useSetDefaultPlaylistMutation", () => {
@@ -453,6 +501,22 @@ describe("usePlaylists hooks", () => {
       expect(result.current.error?.message).toBe(
         "デフォルト設定に失敗しました",
       );
+    });
+
+    it("should handle JSON parse errors gracefully", async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: async () => { throw new Error("Invalid JSON"); },
+      });
+
+      const { result } = renderHook(() => useSetDefaultPlaylistMutation(), {
+        wrapper,
+      });
+
+      result.current.mutate("p1");
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.error?.message).toBe("Invalid JSON");
     });
   });
 });
