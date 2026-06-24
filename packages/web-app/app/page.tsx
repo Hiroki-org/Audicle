@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { articleStorage, type Article } from "@/lib/storage";
+import { articleStorage } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 
 export default function Home() {
   const router = useRouter();
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [articles, setArticles] = useState<ReturnType<typeof articleStorage.getAll>>([]);
 
   // 記事一覧を読み込み
   useEffect(() => {
