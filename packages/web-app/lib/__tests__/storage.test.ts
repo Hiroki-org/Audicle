@@ -25,7 +25,7 @@ describe('articleStorage', () => {
   });
 
   const mockChunks: Chunk[] = [
-    { text: 'Hello world', start: 0, end: 11 },
+    { id: 'mock-id', text: 'Hello world' },
   ];
 
   const mockArticleInput = {

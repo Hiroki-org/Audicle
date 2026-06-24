@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { articleStorage, type Article } from "@/lib/storage";
+import { articleStorage, Article } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 
 export default function Home() {
