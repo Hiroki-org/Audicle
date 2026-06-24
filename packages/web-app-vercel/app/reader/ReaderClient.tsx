@@ -23,16 +23,12 @@ import { useDownload } from "@/hooks/useDownload";
 import { PlaybackSpeedDial } from "@/components/PlaybackSpeedDial";
 import { recordArticleStats } from "@/lib/articleStats";
 import { parseHTMLToParagraphs } from "@/lib/paragraphParser";
-import { type DetectedLanguage } from "@/lib/languageDetector";
 import { selectVoiceModel } from "@/lib/voiceSelector";
 import { UserSettings, DEFAULT_SETTINGS } from "@/types/settings";
 import { createReaderUrl } from "@/lib/urlBuilder";
 import { getPlaylistSortKey } from "@/lib/playlist-utils";
 
-function convertParagraphsToChunks(htmlContent: string): {
-  chunks: Chunk[];
-  detectedLanguage: DetectedLanguage;
-} {
+function convertParagraphsToChunks(htmlContent: string) {
   // HTML構造を保持して段落を抽出
   const { paragraphs, detectedLanguage } = parseHTMLToParagraphs(htmlContent);
 
@@ -78,7 +74,7 @@ export default function ReaderPageClient() {
   const [error, setError] = useState("");
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [detectedLanguage, setDetectedLanguage] =
-    useState<DetectedLanguage>("unknown");
+    useState<"ja" | "en" | "unknown">("unknown");
   const [effectiveVoiceModel, setEffectiveVoiceModel] = useState<string>(
     DEFAULT_SETTINGS.voice_model,
   );
