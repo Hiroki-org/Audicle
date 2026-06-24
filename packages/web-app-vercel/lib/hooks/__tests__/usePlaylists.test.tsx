@@ -172,7 +172,6 @@ describe("usePlaylists hooks", () => {
 
   describe("useCreatePlaylistMutation", () => {
     it("should call create playlist API and invalidate queries", async () => {
-      const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ id: "newId" }),
@@ -216,6 +215,8 @@ describe("usePlaylists hooks", () => {
 
   describe("useDeletePlaylistMutation", () => {
     it("should call delete API and invalidate queries", async () => {
+      // @ts-ignore - invalidateQueriesSpy is unused but kept for parity with other tests
+
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
@@ -275,7 +276,34 @@ describe("usePlaylists hooks", () => {
   });
 
   describe("useUpdatePlaylistMutation", () => {
+    it("should pass description undefined correctly when updating", async () => {
+
+      const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      const { result } = renderHook(() => useUpdatePlaylistMutation(), {
+        wrapper,
+      });
+
+      result.current.mutate({
+        playlistId: "p2",
+        name: "Name Only",
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(global.fetch).toHaveBeenCalledWith("/api/playlists/p2", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Name Only" }), // description is implicitly undefined and JSON.stringify omits it
+      });
+    });
+
     it("should call update API and invalidate queries", async () => {
+
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
@@ -327,6 +355,7 @@ describe("usePlaylists hooks", () => {
 
   describe("useRemoveFromPlaylistMutation", () => {
     it("should call remove API and invalidate queries", async () => {
+
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
@@ -392,6 +421,7 @@ describe("usePlaylists hooks", () => {
 
   describe("useSetDefaultPlaylistMutation", () => {
     it("should call set default API and invalidate queries", async () => {
+
       const invalidateQueriesSpy = jest.spyOn(queryClient, "invalidateQueries");
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
