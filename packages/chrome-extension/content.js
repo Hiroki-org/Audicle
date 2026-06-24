@@ -810,9 +810,17 @@ function handleClick(event) {
   if (queue.length > 0) {
     playbackQueue = queue;
     unCachedIndices.clear();
-    for (let i = 0; i < queue.length; i++) {
-      if (!audioCache.has(i)) {
+    const qLen = queue.length;
+    const cSize = audioCache.size;
+    if (cSize === 0) {
+      for (let i = 0; i < qLen; i++) {
         unCachedIndices.add(i);
+      }
+    } else {
+      for (let i = 0; i < qLen; i++) {
+        if (!audioCache.has(i)) {
+          unCachedIndices.add(i);
+        }
       }
     }
     const clickedId = parseInt(target.dataset.audicleId);
