@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const navigationArticles = [
     { title: 'Apple', url: 'https://example.com/?id=apple' },
@@ -6,13 +6,13 @@ const navigationArticles = [
     { title: 'Cherry', url: 'https://example.com/?id=cherry' },
 ] as const;
 
-async function requireOk(response: Awaited<ReturnType<Page['request']['get']>>, action: string) {
+async function requireOk(response: Awaited<any>, action: string) {
     if (!response.ok()) {
         throw new Error(`${action} failed: ${response.status()} ${await response.text()}`);
     }
 }
 
-async function createNavigationPlaylist(page: Page) {
+async function createNavigationPlaylist(page: any) {
     const createResp = await page.request.post('/api/playlists', {
         data: {
             name: `E2E Navigation ${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -36,7 +36,7 @@ async function createNavigationPlaylist(page: Page) {
     return playlist as { id: string; name: string };
 }
 
-async function ensureDefaultPlaylistHasNavigationArticles(page: Page) {
+async function ensureDefaultPlaylistHasNavigationArticles(page: any) {
     const defaultResp = await page.request.get('/api/playlists/default');
     await requireOk(defaultResp, 'get default playlist');
     const defaultPlaylist = await defaultResp.json();
@@ -54,7 +54,7 @@ async function ensureDefaultPlaylistHasNavigationArticles(page: Page) {
     }
 }
 
-async function deletePlaylist(page: Page, playlistId: string) {
+async function deletePlaylist(page: any, playlistId: string) {
     const response = await page.request.delete(`/api/playlists/${playlistId}`);
     if (!response.ok() && response.status() !== 404) {
         throw new Error(`delete playlist failed: ${response.status()} ${await response.text()}`);
@@ -69,9 +69,11 @@ test.describe('Reader - プレイリスト関連のナビゲーション', () =>
             let targetUrl = '';
             try {
                 const postData = request.postDataJSON();
-                targetUrl = postData?.url || '';
+                if (postData?.url) {
+                    targetUrl = postData.url;
+                }
             } catch {
-                targetUrl = '';
+                // Parsing error, keep empty targetUrl
             }
 
             let title = 'Example Domain';
