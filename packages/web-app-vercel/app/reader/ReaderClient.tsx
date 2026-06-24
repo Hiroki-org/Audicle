@@ -24,11 +24,11 @@ import { PlaybackSpeedDial } from "@/components/PlaybackSpeedDial";
 import { recordArticleStats } from "@/lib/articleStats";
 import { parseHTMLToParagraphs } from "@/lib/paragraphParser";
 import { type DetectedLanguage } from "@/lib/languageDetector";
-import { selectVoiceModel } from "@/lib/voiceSelector";
 import { UserSettings, DEFAULT_SETTINGS } from "@/types/settings";
 import { createReaderUrl } from "@/lib/urlBuilder";
 import { getPlaylistSortKey } from "@/lib/playlist-utils";
 import { useArticleLoader, convertParagraphsToChunks } from "./hooks/useArticleLoader";
+import { selectVoiceModel } from "@/lib/voiceSelector";
 import { useReaderSettings } from "./hooks/useReaderSettings";
 import { useReaderState } from "./hooks/useReaderState";
 
@@ -44,18 +44,6 @@ export default function ReaderPageClient() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const userEmail = session?.user?.email;
-
-  // プレイリスト再生コンテキスト
-  const {
-    state: playlistState,
-    onArticleEnd,
-    initializeFromArticle,
-    initializeFromPlaylist,
-    canMovePrevious,
-    canMoveNext,
-    toggleRepeatMode,
-    toggleShuffle,
-  } = usePlaylistPlayback();
 
   // プレイリスト再生コンテキスト
   const {
@@ -90,6 +78,18 @@ export default function ReaderPageClient() {
   } = useReaderState(playlistIdFromQuery, indexFromQuery, playlistState);
 
   const {
+    settings,
+    setSettings,
+    effectiveVoiceModel,
+    setEffectiveVoiceModel,
+    playlists,
+    setPlaylists,
+    selectedPlaylistId,
+    setSelectedPlaylistId,
+    arePlaylistsLoaded,
+  } = useReaderSettings();
+
+  const {
     url, setUrl,
     isLoading, setIsLoading,
     chunks, setChunks,
@@ -110,17 +110,12 @@ export default function ReaderPageClient() {
     hasInitiatedAutoplayRef
   );
 
-  const {
-    settings,
-    setSettings,
-    effectiveVoiceModel,
-    setEffectiveVoiceModel,
-    playlists,
-    setPlaylists,
-    selectedPlaylistId,
-    setSelectedPlaylistId,
-    arePlaylistsLoaded,
-  } = useReaderSettings(detectedLanguage);
+
+  useEffect(() => {
+    setEffectiveVoiceModel(
+      selectVoiceModel(settings.voice_model, detectedLanguage),
+    );
+  }, [settings.voice_model, detectedLanguage, setEffectiveVoiceModel]);
 
   const stopRef = useRef<() => void>(() => {});
   const setPlaybackSourceRef = useRef<((_next: AudioPlaybackSource | null) => void) | null>(null);
@@ -277,118 +272,6 @@ export default function ReaderPageClient() {
     voiceModel: effectiveVoiceModel,
     speed: playbackRate,
   });
-
-
-          if (itemResponse.ok) {
-            const itemData = await itemResponse.json();
-            newArticleId = itemData.article.id;
-            setArticleId(newArticleId);
-            setItemId(itemData.item.id);
-            logger.success("記事をプレイリストに追加", {
-              id: newArticleId,
-              url: articleUrl,
-              title: response.title,
-              playlistId: targetPlaylistId,
-            });
-          } else {
-            logger.error("記事の追加に失敗", await itemResponse.text());
-          }
-        } catch (itemError) {
-          logger.error("記事の追加に失敗", itemError);
-        }
-
-        // ローカルストレージに保存（サーバーIDを優先）
-        const newArticle = articleStorage.add({
-          id: newArticleId || undefined, // サーバーIDがあれば使用
-
-          url: articleUrl,
-          title: response.title,
-          chunks: chunksWithId,
-        });
-
-        logger.success("記事を保存", {
-          id: newArticle.id,
-          title: newArticle.title,
-          chunkCount: chunksWithId.length,
-        });
-
-        // デフォルトプレイリストに追加した場合のみキャッシュ無効化
-        const modifiedPlaylist = playlists.find(
-          (p) => p.id === selectedPlaylistId,
-        );
-
-        if (userEmail && modifiedPlaylist?.is_default) {
-          queryClient.invalidateQueries({
-            queryKey: ["defaultPlaylist"],
-          });
-          logger.success("ホームのキャッシュを無効化しました");
-        }
-
-        // URLに記事IDを追加（サーバーIDがあればそれを優先）
-        // プレイリスト周りのクエリがある場合は維持しておく
-        const redirectUrl = createReaderUrl({
-          articleUrl: articleUrl,
-          playlistId: playlistIdFromQuery || selectedPlaylistId || undefined,
-          playlistIndex: indexFromQuery
-            ? parseInt(indexFromQuery, 10)
-            : undefined,
-          autoplay: autoplayFromQuery,
-        });
-        router.push(redirectUrl);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "エラーが発生しました");
-        logger.error("記事の抽出に失敗", err);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [router, selectedPlaylistId, queryClient, userEmail, playlists],
-  );
-
-          logger.error("抽出APIに失敗しました", { status: extractRes.status });
-          setError(errorMessage);
-          return;
-        }
-        const data = await extractRes.json();
-        const { chunks: chunksWithId, detectedLanguage } =
-          convertParagraphsToChunks(data.content);
-
-        setTitle(
-          isPlaylistMode ? resolvedTitle : data.title || resolvedTitle || "",
-        );
-        setChunks(chunksWithId);
-        setDetectedLanguage(detectedLanguage);
-        setUrl(resolvedUrl);
-        setArticleId(resolvedId);
-        hasInitiatedAutoplayRef.current = false;
-
-        // 保存
-        try {
-          articleStorage.upsert({
-            id: resolvedId ? resolvedId : undefined,
-            url: resolvedUrl,
-            title: data.title || resolvedTitle || "",
-            chunks: chunksWithId,
-          });
-        } catch (e) {
-          logger.error("localStorageへの保存に失敗しました", e);
-        }
-      } catch (err) {
-        logger.error("サーバーから記事取得に失敗", err);
-        setError("記事が見つかりませんでした");
-        setTitle("");
-        setChunks([]);
-        setUrl("");
-        setArticleId(null);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [],
-  );
-
-
-
 
   // 記事IDが指定されている場合は読み込み
   useEffect(() => {
@@ -684,7 +567,6 @@ export default function ReaderPageClient() {
     indexFromQuery,
     session,
   ]);
-
 
   const getPlaylistItemHref = useCallback(
     (index: number) => {

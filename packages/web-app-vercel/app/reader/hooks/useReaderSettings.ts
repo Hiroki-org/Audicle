@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { UserSettings, DEFAULT_SETTINGS } from "@/types/settings";
 import { Playlist } from "@/types/playlist";
-import { selectVoiceModel } from "@/lib/voiceSelector";
-import { type DetectedLanguage } from "@/lib/languageDetector";
+
 import { logger } from "@/lib/logger";
 
-export function useReaderSettings(detectedLanguage: DetectedLanguage) {
+export function useReaderSettings() {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [effectiveVoiceModel, setEffectiveVoiceModel] = useState<string>(
     DEFAULT_SETTINGS.voice_model,
@@ -40,11 +39,7 @@ export function useReaderSettings(detectedLanguage: DetectedLanguage) {
     loadSettings();
   }, []);
 
-  useEffect(() => {
-    setEffectiveVoiceModel(
-      selectVoiceModel(settings.voice_model, detectedLanguage),
-    );
-  }, [settings.voice_model, detectedLanguage]);
+
 
   useEffect(() => {
     const fetchPlaylists = async () => {
