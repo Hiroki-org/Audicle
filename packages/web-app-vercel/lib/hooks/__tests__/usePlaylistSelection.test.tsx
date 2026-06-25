@@ -54,6 +54,14 @@ describe("usePlaylistSelection hooks", () => {
             expect(global.fetch).toHaveBeenCalledWith("/api/playlist-items/item123/playlists");
         });
 
+        it("should not fetch when itemId is empty", () => {
+            const { result } = renderHook(() => usePlaylistItemPlaylists(""), { wrapper });
+
+            expect(result.current.isPending).toBe(true);
+            expect(result.current.fetchStatus).toBe("idle");
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
+
         it("should not fetch when userEmail is undefined", () => {
             const { useSession } = require("next-auth/react");
             useSession.mockReturnValue({ data: null, status: "unauthenticated" });
@@ -98,6 +106,14 @@ describe("usePlaylistSelection hooks", () => {
             await waitFor(() => expect(result.current.isSuccess).toBe(true));
             expect(result.current.data).toEqual(mockData);
             expect(global.fetch).toHaveBeenCalledWith("/api/articles/article123/playlists");
+        });
+
+        it("should not fetch when articleId is empty", () => {
+            const { result } = renderHook(() => useArticlePlaylists(""), { wrapper });
+
+            expect(result.current.isPending).toBe(true);
+            expect(result.current.fetchStatus).toBe("idle");
+            expect(global.fetch).not.toHaveBeenCalled();
         });
 
         it("should not fetch when userEmail is undefined", () => {
