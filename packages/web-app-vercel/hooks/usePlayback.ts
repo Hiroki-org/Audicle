@@ -5,6 +5,7 @@ import { Chunk } from "@/types/api";
 import { audioCache } from "@/lib/audioCache";
 import { getAudioChunk } from "@/lib/indexedDB";
 
+import { synthesizeSpeech } from "@/lib/api";
 import { logger } from "@/lib/logger";
 import { needsPauseBefore, needsPauseAfter, getPauseDuration } from "@/lib/paragraphParser";
 import { useMediaSession } from "./useMediaSession";
