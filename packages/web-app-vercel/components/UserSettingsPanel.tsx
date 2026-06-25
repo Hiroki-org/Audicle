@@ -120,7 +120,6 @@ export default function UserSettingsPanel() {
         }
         // Don't show toast for auto-save to avoid notification spam
       } catch (error) {
-        logger.error("Error saving theme:", error);
         toast.error(
           error instanceof Error ? error.message : "テーマの保存に失敗しました"
         );
