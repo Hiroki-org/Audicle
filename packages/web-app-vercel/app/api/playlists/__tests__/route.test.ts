@@ -160,6 +160,32 @@ describe('/api/playlists route', () => {
         expect(playlists[0].id).toBe(data.id)
     })
 
+    it('GET uses the local playlist fallback during public test auth and preserves item_count', async () => {
+        process.env.NEXT_PUBLIC_AUTH_ENV = 'test'
+
+        const supabaseLocal = require('@/lib/supabaseLocal')
+        supabaseLocal.resetInMemorySupabase()
+        const playlist = await supabaseLocal.createPlaylist('test@example.com', 'Local Count Playlist')
+        const article = await supabaseLocal.upsertArticle(
+            'test@example.com',
+            'https://example.com/count',
+            'Counted Article',
+        )
+        await supabaseLocal.addPlaylistItem(playlist.id, article.id)
+
+        const res = await routeModule.GET()
+
+        expect(res.status).toBe(200)
+        const data = await res.json()
+        expect(data).toHaveLength(1)
+        expect(data[0]).toMatchObject({
+            id: playlist.id,
+            name: 'Local Count Playlist',
+            item_count: 1,
+        })
+        expect(data[0]).not.toHaveProperty('playlist_items')
+    })
+
     it('GET /items returns playlist items', async () => {
         // Prepare a mock for select(). This relies on the earlier jest.mock / chain
         // The route expects `requireAuth` to return `test@example.com` as above.

@@ -9,5 +9,5 @@ export function hasSupabaseRuntimeConfig(): boolean {
 }
 
 export function shouldUseLocalSupabaseFallback(): boolean {
-    return isTestAuthRuntime() || !hasSupabaseRuntimeConfig()
+    return isTestAuthRuntime() || !process.env.NEXT_PUBLIC_SUPABASE_URL
 }

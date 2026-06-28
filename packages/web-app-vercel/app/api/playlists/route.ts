@@ -5,6 +5,31 @@ import { requireAuth } from '@/lib/api-auth'
 import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
 import type { Playlist } from '@/types/playlist'
 
+type PlaylistItemCountRow = { count?: number }
+type PlaylistWithItemCount = Playlist & {
+    playlist_items?: PlaylistItemCountRow[] | unknown[]
+}
+
+function getPlaylistItemCount(playlistItems?: PlaylistWithItemCount['playlist_items']): number {
+    if (!Array.isArray(playlistItems) || playlistItems.length === 0) {
+        return 0
+    }
+
+    const firstItem = playlistItems[0]
+    if (
+        typeof firstItem === 'object' &&
+        firstItem !== null &&
+        'count' in firstItem
+    ) {
+        const count = (firstItem as PlaylistItemCountRow).count
+        if (typeof count === 'number') {
+            return count
+        }
+    }
+
+    return playlistItems.length
+}
+
 // GET: ユーザーのプレイリスト一覧取得
 export async function GET() {
     try {
@@ -42,9 +67,9 @@ export async function GET() {
         }
 
         // カウントを含めて整形
-        const playlists = (data || []).map((playlist: Playlist & { playlist_items?: { count: number }[] }) => ({
+        const playlists = (data || []).map((playlist: PlaylistWithItemCount) => ({
             ...playlist,
-            item_count: playlist.playlist_items?.[0]?.count || 0,
+            item_count: getPlaylistItemCount(playlist.playlist_items),
             playlist_items: undefined,
         }))
 
