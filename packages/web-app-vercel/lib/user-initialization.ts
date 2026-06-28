@@ -8,7 +8,7 @@ export interface UserInitializationResult {
 }
 
 function shouldUseLocalUserInitialization(): boolean {
-    return isTestAuthRuntime() || !hasSupabaseRuntimeConfig()
+    return isTestAuthRuntime() && !hasSupabaseRuntimeConfig()
 }
 
 /**
