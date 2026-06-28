@@ -51,8 +51,21 @@ describe('initializeNewUser', () => {
     expect(mockedGetOrCreateDefaultPlaylist).not.toHaveBeenCalled();
   });
 
-  it('should use local initialization in test auth runtime without Supabase config', async () => {
+  it('should use local initialization in test auth runtime', async () => {
     process.env.AUTH_ENV = 'test';
+    mockedGetOrCreateDefaultPlaylist.mockResolvedValue({ playlist: undefined });
+
+    const result = await initializeNewUser(userId, userEmail);
+
+    expect(result).toEqual({ success: true });
+    expect(mockedSupabase.from).not.toHaveBeenCalled();
+    expect(mockedGetOrCreateDefaultPlaylist).toHaveBeenCalledWith(userEmail);
+  });
+
+  it('should keep test auth initialization local even when Supabase config is present', async () => {
+    process.env.AUTH_ENV = 'test';
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
     mockedGetOrCreateDefaultPlaylist.mockResolvedValue({ playlist: undefined });
 
     const result = await initializeNewUser(userId, userEmail);
