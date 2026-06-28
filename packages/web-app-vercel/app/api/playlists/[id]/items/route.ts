@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import * as supabaseLocal from '@/lib/supabaseLocal'
 import { requireAuth } from '@/lib/api-auth'
-import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
 import { Article, PlaylistItem } from '@/types/playlist'
 
 type LocalPlaylist = Awaited<ReturnType<typeof supabaseLocal.getPlaylistsForOwner>>[number]
@@ -25,7 +24,7 @@ export async function POST(
         let playlist: { owner_email: string } | null = null
         let playlistError: { message?: string } | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             const found = await findOwnedLocalPlaylist(id, userEmail)
             if (found) {
                 playlist = { owner_email: found.owner_email }
@@ -65,7 +64,7 @@ export async function POST(
         let article: Article | null = null
         let articleError: Error | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             try {
                 article = await supabaseLocal.upsertArticle(userEmail, article_url, article_title, thumbnail_url, last_read_position)
             } catch (e) {
@@ -123,7 +122,7 @@ export async function POST(
         let playlistItem: PlaylistItem | null = null
         let itemError: Error | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             try {
                 playlistItem = await supabaseLocal.addPlaylistItem(id, article!.id)
             } catch (e) {
@@ -202,7 +201,7 @@ export async function GET(
         let playlistError: { message?: string } | null = null
         let localPlaylist: LocalPlaylist | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             localPlaylist = await findOwnedLocalPlaylist(id, userEmail)
             if (localPlaylist) {
                 playlist = { owner_email: localPlaylist.owner_email }
@@ -227,7 +226,7 @@ export async function GET(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             const items = [...(localPlaylist?.items ?? [])].sort(
                 (a, b) => (a.position ?? 0) - (b.position ?? 0),
             )

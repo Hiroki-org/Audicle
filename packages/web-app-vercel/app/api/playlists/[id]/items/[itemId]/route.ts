@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import * as supabaseLocal from '@/lib/supabaseLocal'
 import { requireAuth } from '@/lib/api-auth'
-import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
 import { PlaylistItemWithArticle } from '@/types/playlist'
 
 // DELETE: プレイリストからアイテムを削除
@@ -20,7 +19,7 @@ export async function DELETE(
         let ownerEmailFromPlaylist: string | null = null
         let playlistError: { message: string } | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             const all = await supabaseLocal.getPlaylistsForOwner(userEmail)
             const found = all.find(p => p.id === playlistId)
             if (!found) playlistError = { message: 'Not found' }
@@ -54,7 +53,7 @@ export async function DELETE(
         let itemToDelete: { article_id: string } | null = null
         let fetchError: { message: string } | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             const items = (await supabaseLocal.getPlaylistWithItems(userEmail, playlistId))?.playlist_items || []
             const found = items.find((i: PlaylistItemWithArticle) => i.id === itemId)
             if (found) {
@@ -83,7 +82,7 @@ export async function DELETE(
         // playlist_itemsから削除
         let deleteError: { code?: string; message?: string } | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             const ok = await supabaseLocal.removePlaylistItem(playlistId, itemId)
             if (!ok) deleteError = { code: 'PGRST116', message: 'Item not found' }
         } else {
@@ -112,7 +111,7 @@ export async function DELETE(
         }
 
         // この記事が他のプレイリストに存在しないか確認
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             // check if any other playlist uses the article
             const playlistAll = await supabaseLocal.getPlaylistsForOwner(userEmail)
             const allItems = playlistAll.flatMap(p => p.playlist_items || []) as PlaylistItemWithArticle[]
