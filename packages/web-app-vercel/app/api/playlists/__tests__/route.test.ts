@@ -105,10 +105,14 @@ describe('/api/playlists route', () => {
         jest.clearAllMocks()
         // Set NEXT_PUBLIC_SUPABASE_URL to use the mocked supabase
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
     })
 
     afterEach(() => {
         delete process.env.NEXT_PUBLIC_SUPABASE_URL
+        delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        delete process.env.AUTH_ENV
+        delete process.env.NEXT_PUBLIC_AUTH_ENV
     })
 
     it('returns 200 on GET with playlists data', async () => {
@@ -128,6 +132,58 @@ describe('/api/playlists route', () => {
         })
         const res = await routeModule.POST(mockRequest)
         expect(res.status).toBe(400)
+    })
+
+    it('POST uses the local playlist fallback during test auth even when Supabase is configured', async () => {
+        process.env.AUTH_ENV = 'test'
+
+        const supabaseLocal = require('@/lib/supabaseLocal')
+        supabaseLocal.resetInMemorySupabase()
+
+        const mockRequest = new Request('http://localhost:3000/api/playlists', {
+            method: 'POST',
+            body: JSON.stringify({ name: 'Local Test Playlist' }),
+            headers: { 'Content-Type': 'application/json' },
+        })
+
+        const res = await routeModule.POST(mockRequest)
+
+        expect(res.status).toBe(201)
+        const data = await res.json()
+        expect(data).toMatchObject({
+            owner_email: 'test@example.com',
+            name: 'Local Test Playlist',
+        })
+
+        const playlists = await supabaseLocal.getPlaylistsForOwner('test@example.com')
+        expect(playlists).toHaveLength(1)
+        expect(playlists[0].id).toBe(data.id)
+    })
+
+    it('GET uses the local playlist fallback during public test auth and preserves item_count', async () => {
+        process.env.NEXT_PUBLIC_AUTH_ENV = 'test'
+
+        const supabaseLocal = require('@/lib/supabaseLocal')
+        supabaseLocal.resetInMemorySupabase()
+        const playlist = await supabaseLocal.createPlaylist('test@example.com', 'Local Count Playlist')
+        const article = await supabaseLocal.upsertArticle(
+            'test@example.com',
+            'https://example.com/count',
+            'Counted Article',
+        )
+        await supabaseLocal.addPlaylistItem(playlist.id, article.id)
+
+        const res = await routeModule.GET()
+
+        expect(res.status).toBe(200)
+        const data = await res.json()
+        expect(data).toHaveLength(1)
+        expect(data[0]).toMatchObject({
+            id: playlist.id,
+            name: 'Local Count Playlist',
+            item_count: 1,
+        })
+        expect(data[0]).not.toHaveProperty('playlist_items')
     })
 
     it('GET /items returns playlist items', async () => {
@@ -174,6 +230,42 @@ describe('/api/playlists route', () => {
             owner_email: 'test@example.com',
             title: 'Apple',
             url: 'https://example.com/?id=apple',
+        })
+        expect(data.item).toMatchObject({
+            playlist_id: playlist.id,
+            article_id: data.article.id,
+        })
+    })
+
+    it('POST /items uses the local playlist fallback during test auth even when Supabase is configured', async () => {
+        process.env.AUTH_ENV = 'test'
+
+        const supabaseLocal = require('@/lib/supabaseLocal')
+        supabaseLocal.resetInMemorySupabase()
+        const playlist = await supabaseLocal.createPlaylist('test@example.com', 'Local Playlist')
+
+        const mockRequest = new Request(`http://localhost:3000/api/playlists/${playlist.id}/items`, {
+            method: 'POST',
+            body: JSON.stringify({
+                article_url: 'https://example.com/?id=cherry',
+                article_title: 'Cherry',
+                thumbnail_url: null,
+                last_read_position: 0,
+            }),
+            headers: { 'Content-Type': 'application/json' },
+        })
+
+        const itemsModule = require('../[id]/items/route')
+        const res = await itemsModule.POST(mockRequest, {
+            params: Promise.resolve({ id: playlist.id }),
+        })
+
+        expect(res.status).toBe(200)
+        const data = await res.json()
+        expect(data.article).toMatchObject({
+            owner_email: 'test@example.com',
+            title: 'Cherry',
+            url: 'https://example.com/?id=cherry',
         })
         expect(data.item).toMatchObject({
             playlist_id: playlist.id,

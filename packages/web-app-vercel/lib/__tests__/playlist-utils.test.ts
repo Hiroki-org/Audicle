@@ -4,6 +4,7 @@ import * as supabaseLocal from '../supabaseLocal';
 import { supabase } from '../supabase';
 
 const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const ORIGINAL_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const ORIGINAL_AUTH_ENV = process.env.AUTH_ENV;
 const ORIGINAL_NEXT_PUBLIC_AUTH_ENV = process.env.NEXT_PUBLIC_AUTH_ENV;
 
@@ -44,6 +45,7 @@ describe('getOrCreateDefaultPlaylist', () => {
     restoreEnvVar("AUTH_ENV", ORIGINAL_AUTH_ENV);
     restoreEnvVar("NEXT_PUBLIC_AUTH_ENV", ORIGINAL_NEXT_PUBLIC_AUTH_ENV);
     restoreEnvVar("NEXT_PUBLIC_SUPABASE_URL", ORIGINAL_SUPABASE_URL);
+    restoreEnvVar("NEXT_PUBLIC_SUPABASE_ANON_KEY", ORIGINAL_SUPABASE_ANON_KEY);
   });
 
   describe('local fallback (no SUPABASE_URL)', () => {
@@ -132,6 +134,7 @@ describe('getOrCreateDefaultPlaylist', () => {
     it('should use local fallback in test auth runtime even when Supabase URL is set', async () => {
       process.env.AUTH_ENV = 'test';
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
       const newPlaylist = {
         id: 'local-test-1',
         owner_email: userEmail,
@@ -162,6 +165,7 @@ describe('getOrCreateDefaultPlaylist', () => {
       delete process.env.AUTH_ENV;
       delete process.env.NEXT_PUBLIC_AUTH_ENV;
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://test-supabase-url';
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
     });
 
     it('should return existing default playlist from Supabase', async () => {
