@@ -253,7 +253,7 @@ async function seedTestData() {
     }
 
     const toInsert: typeof articles = [];
-    const batchUpdateData: Article[] = [];
+    const batchUpdateData: { id: string; owner_email: string; title: string; thumbnail_url: string; url: string }[] = [];
 
     // 重複を避けるためのSet (owner_email + url)
     const processedKeys = new Set();
@@ -299,6 +299,7 @@ async function seedTestData() {
 
     // 既存記事を更新
     if (batchUpdateData.length > 0) {
+
         const { data: updatedItems, error: updateError } = await supabase
             .from("articles")
             .upsert(batchUpdateData, { onConflict: "id" })
