@@ -2,10 +2,12 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, Head
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { R2StorageProvider } from "../r2-provider";
 
+const mockSend = jest.fn();
+
 jest.mock("@aws-sdk/client-s3", () => {
     return {
         S3Client: jest.fn().mockImplementation(() => ({
-            send: jest.fn()
+            send: mockSend,
         })),
         PutObjectCommand: jest.fn(),
         GetObjectCommand: jest.fn(),
@@ -19,11 +21,19 @@ jest.mock("@aws-sdk/s3-request-presigner", () => ({
 }));
 
 describe("R2StorageProvider", () => {
-    const originalEnv = process.env;
+    const originalEnv = { ...process.env };
+    const restoreEnv = () => {
+        for (const key of Object.keys(process.env)) {
+            delete process.env[key];
+        }
+        Object.assign(process.env, originalEnv);
+    };
 
     beforeEach(() => {
         jest.clearAllMocks();
-        process.env = { ...originalEnv };
+        mockSend.mockReset();
+        mockSend.mockResolvedValue(undefined);
+        restoreEnv();
         process.env.R2_ACCOUNT_ID = "test-account";
         process.env.R2_ACCESS_KEY_ID = "test-access-key";
         process.env.R2_SECRET_ACCESS_KEY = "test-secret";
@@ -31,7 +41,7 @@ describe("R2StorageProvider", () => {
     });
 
     afterEach(() => {
-        process.env = originalEnv;
+        restoreEnv();
     });
 
     describe("Constructor", () => {
@@ -121,6 +131,9 @@ describe("R2StorageProvider", () => {
                 Body: expect.any(Uint8Array),
                 ContentType: "audio/mpeg",
             });
+            const putInput = (PutObjectCommand as jest.Mock).mock.calls[0][0];
+            expect(Array.from(putInput.Body)).toEqual([116, 101, 115, 116]);
+            expect(mockSend).toHaveBeenCalledWith(expect.any(PutObjectCommand));
             expect(url).toBe("https://example.com/get");
         });
 
@@ -128,7 +141,7 @@ describe("R2StorageProvider", () => {
             (getSignedUrl as jest.Mock).mockResolvedValueOnce("https://example.com/get");
             const provider = new R2StorageProvider();
 
-            const arrayBuffer = new ArrayBuffer(4);
+            const arrayBuffer = new Uint8Array([1, 2, 3, 4]).buffer;
             const url = await provider.uploadObject("test-key.mp3", arrayBuffer, "audio/mpeg", 3600);
 
             expect(PutObjectCommand).toHaveBeenCalledWith({
@@ -137,6 +150,9 @@ describe("R2StorageProvider", () => {
                 Body: expect.any(Uint8Array),
                 ContentType: "audio/mpeg",
             });
+            const putInput = (PutObjectCommand as jest.Mock).mock.calls[0][0];
+            expect(Array.from(putInput.Body)).toEqual([1, 2, 3, 4]);
+            expect(mockSend).toHaveBeenCalledWith(expect.any(PutObjectCommand));
             expect(url).toBe("https://example.com/get");
         });
     });
@@ -150,13 +166,13 @@ describe("R2StorageProvider", () => {
                 Bucket: "test-bucket",
                 Key: "test-key.mp3",
             });
+            expect(mockSend).toHaveBeenCalledWith(expect.any(DeleteObjectCommand));
         });
     });
 
     describe("headObject", () => {
         it("should return exists true and size if HeadObjectCommand succeeds", async () => {
-            const sendMock = jest.fn().mockResolvedValueOnce({ ContentLength: 1024 });
-            (S3Client as jest.Mock).mockImplementationOnce(() => ({ send: sendMock }));
+            mockSend.mockResolvedValueOnce({ ContentLength: 1024 });
 
             const provider = new R2StorageProvider();
             const result = await provider.headObject("test-key.mp3");
@@ -165,12 +181,12 @@ describe("R2StorageProvider", () => {
                 Bucket: "test-bucket",
                 Key: "test-key.mp3",
             });
+            expect(mockSend).toHaveBeenCalledWith(expect.any(HeadObjectCommand));
             expect(result).toEqual({ exists: true, size: 1024 });
         });
 
         it("should return exists false if NotFound error is thrown", async () => {
-            const sendMock = jest.fn().mockRejectedValueOnce({ name: "NotFound" });
-            (S3Client as jest.Mock).mockImplementationOnce(() => ({ send: sendMock }));
+            mockSend.mockRejectedValueOnce({ name: "NotFound" });
 
             const provider = new R2StorageProvider();
             const result = await provider.headObject("test-key.mp3");
@@ -179,8 +195,7 @@ describe("R2StorageProvider", () => {
         });
 
         it("should return exists false if 404 http status code error is thrown", async () => {
-            const sendMock = jest.fn().mockRejectedValueOnce({ $metadata: { httpStatusCode: 404 } });
-            (S3Client as jest.Mock).mockImplementationOnce(() => ({ send: sendMock }));
+            mockSend.mockRejectedValueOnce({ $metadata: { httpStatusCode: 404 } });
 
             const provider = new R2StorageProvider();
             const result = await provider.headObject("test-key.mp3");
@@ -189,8 +204,7 @@ describe("R2StorageProvider", () => {
         });
 
         it("should throw error for other errors", async () => {
-            const sendMock = jest.fn().mockRejectedValueOnce(new Error("Other error"));
-            (S3Client as jest.Mock).mockImplementationOnce(() => ({ send: sendMock }));
+            mockSend.mockRejectedValueOnce(new Error("Other error"));
 
             const provider = new R2StorageProvider();
             await expect(provider.headObject("test-key.mp3")).rejects.toThrow("Other error");
