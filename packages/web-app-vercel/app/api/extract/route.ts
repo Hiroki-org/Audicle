@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
 
 // Configure undici agent for custom fetch behavior
 // In test/CI environments, we might need to ignore SSL errors for internal services or proxies
-import { Agent, setGlobalDispatcher, getGlobalDispatcher } from "undici";
+import { Agent, setGlobalDispatcher } from "undici";
 
 // Initialize global dispatcher if needed (safe to call multiple times)
 // This ensures fetch uses our custom agent settings
