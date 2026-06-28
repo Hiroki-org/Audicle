@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
 
     // URL検証
     if (!validateUrl(sharedUrl)) {
-        console.error('Invalid URL scheme or format:', sharedUrl)
         return NextResponse.redirect(
             new URL(`/share-target/error?message=${encodeURIComponent('無効なURLです')}`, request.url)
         )
@@ -58,7 +57,6 @@ export async function POST(request: NextRequest) {
 
         // URL検証
         if (!validateUrl(sharedUrl)) {
-            console.error('Invalid URL scheme or format:', sharedUrl)
             return NextResponse.redirect(
                 new URL(`/share-target/error?message=${encodeURIComponent('無効なURLです')}`, request.url)
             )
