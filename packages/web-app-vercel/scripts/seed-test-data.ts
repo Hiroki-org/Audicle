@@ -253,7 +253,7 @@ async function seedTestData() {
     }
 
     const toInsert: typeof articles = [];
-    const toUpdate: typeof articles = [];
+    const batchUpdateData: Article[] = [];
 
     // 重複を避けるためのSet (owner_email + url)
     const processedKeys = new Set();
@@ -265,7 +265,13 @@ async function seedTestData() {
 
         const existing = existingMap.get(key);
         if (existing) {
-            toUpdate.push(article);
+            batchUpdateData.push({
+                id: existing.id,
+                owner_email: article.owner_email,
+                title: article.title,
+                thumbnail_url: article.thumbnail_url,
+                url: article.url, // required if we are mapping createdArticlesMap with url below
+            });
         } else {
             toInsert.push(article);
         }
@@ -292,25 +298,7 @@ async function seedTestData() {
     }
 
     // 既存記事を更新
-    if (toUpdate.length > 0) {
-        const batchUpdateData = toUpdate.map((article) => {
-            const key = article.owner_email + "||" + article.url;
-            const existing = existingMap.get(key);
-
-            if (!existing) {
-                // This shouldn't happen due to the logic above, but added for safety and TS
-                return null;
-            }
-
-            return {
-                id: existing.id,
-                owner_email: article.owner_email,
-                title: article.title,
-                thumbnail_url: article.thumbnail_url,
-                url: article.url, // required if we are mapping createdArticlesMap with url below
-            };
-        }).filter((item) => item !== null) as { id: string; owner_email: string; title: string; thumbnail_url: string; url: string }[];
-
+    if (batchUpdateData.length > 0) {
         const { data: updatedItems, error: updateError } = await supabase
             .from("articles")
             .upsert(batchUpdateData, { onConflict: "id" })
