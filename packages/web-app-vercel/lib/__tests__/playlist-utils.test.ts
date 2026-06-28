@@ -31,6 +31,8 @@ const mockedSupabase = supabase as jest.Mocked<any>;
 describe('getOrCreateDefaultPlaylist', () => {
   afterEach(() => {
     jest.clearAllMocks();
+    delete process.env.AUTH_ENV;
+    delete process.env.NEXT_PUBLIC_AUTH_ENV;
 
     // Restore env to avoid leaking state across tests/suites.
     if (typeof ORIGINAL_SUPABASE_URL === "string") {
@@ -121,6 +123,31 @@ describe('getOrCreateDefaultPlaylist', () => {
       expect(mockedSupabaseLocal.getPlaylistsForOwner).toHaveBeenCalledWith(userEmail);
       expect(mockedSupabaseLocal.createPlaylist).toHaveBeenCalledWith(userEmail, '読み込んだ記事', '読み込んだ記事が自動的に追加されます');
       expect(mockedSupabaseLocal.setDefaultPlaylist).toHaveBeenCalledWith(userEmail, '2');
+    });
+
+    it('should use local fallback in test auth runtime even when Supabase URL is set', async () => {
+      process.env.AUTH_ENV = 'test';
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+      const newPlaylist = {
+        id: 'local-test-1',
+        owner_email: userEmail,
+        name: '読み込んだ記事',
+        description: '読み込んだ記事が自動的に追加されます',
+        visibility: 'private' as const,
+        is_default: false,
+        allow_fork: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      mockedSupabaseLocal.getPlaylistsForOwner.mockResolvedValue([]);
+      mockedSupabaseLocal.createPlaylist.mockResolvedValue(newPlaylist);
+
+      const { playlist, error } = await getOrCreateDefaultPlaylist(userEmail);
+
+      expect(error).toBeUndefined();
+      expect(playlist?.id).toBe('local-test-1');
+      expect(mockedSupabase.from).not.toHaveBeenCalled();
+      expect(mockedSupabaseLocal.createPlaylist).toHaveBeenCalledWith(userEmail, '読み込んだ記事', '読み込んだ記事が自動的に追加されます');
     });
   });
 
