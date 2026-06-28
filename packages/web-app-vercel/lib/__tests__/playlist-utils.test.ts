@@ -4,6 +4,16 @@ import * as supabaseLocal from '../supabaseLocal';
 import { supabase } from '../supabase';
 
 const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const ORIGINAL_AUTH_ENV = process.env.AUTH_ENV;
+const ORIGINAL_NEXT_PUBLIC_AUTH_ENV = process.env.NEXT_PUBLIC_AUTH_ENV;
+
+function restoreEnvVar(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}
 
 // supabaseLocalモジュールのモック
 jest.mock('../supabaseLocal', () => ({
@@ -31,15 +41,9 @@ const mockedSupabase = supabase as jest.Mocked<any>;
 describe('getOrCreateDefaultPlaylist', () => {
   afterEach(() => {
     jest.clearAllMocks();
-    delete process.env.AUTH_ENV;
-    delete process.env.NEXT_PUBLIC_AUTH_ENV;
-
-    // Restore env to avoid leaking state across tests/suites.
-    if (typeof ORIGINAL_SUPABASE_URL === "string") {
-      process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGINAL_SUPABASE_URL;
-    } else {
-      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    }
+    restoreEnvVar("AUTH_ENV", ORIGINAL_AUTH_ENV);
+    restoreEnvVar("NEXT_PUBLIC_AUTH_ENV", ORIGINAL_NEXT_PUBLIC_AUTH_ENV);
+    restoreEnvVar("NEXT_PUBLIC_SUPABASE_URL", ORIGINAL_SUPABASE_URL);
   });
 
   describe('local fallback (no SUPABASE_URL)', () => {
@@ -148,12 +152,15 @@ describe('getOrCreateDefaultPlaylist', () => {
       expect(playlist?.id).toBe('local-test-1');
       expect(mockedSupabase.from).not.toHaveBeenCalled();
       expect(mockedSupabaseLocal.createPlaylist).toHaveBeenCalledWith(userEmail, '読み込んだ記事', '読み込んだ記事が自動的に追加されます');
+      expect(mockedSupabaseLocal.setDefaultPlaylist).toHaveBeenCalledWith(userEmail, 'local-test-1');
     });
   });
 
   describe('Supabase environment (SUPABASE_URL is set)', () => {
     const userEmail = 'test@example.com';
     beforeEach(() => {
+      delete process.env.AUTH_ENV;
+      delete process.env.NEXT_PUBLIC_AUTH_ENV;
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://test-supabase-url';
     });
 
