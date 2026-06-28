@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import * as supabaseLocal from '@/lib/supabaseLocal'
 import { requireAuth } from '@/lib/api-auth'
+import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
 import { Playlist } from '@/types/playlist'
 
 // PUT: デフォルトプレイリストを変更
@@ -25,7 +26,7 @@ export async function PUT(
         let targetPlaylist: Partial<Playlist> | null = null
         let fetchError: { code: string } | null = null
 
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (shouldUseLocalSupabaseFallback()) {
             const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
             const found = playlists.find(p => p.id === id)
             targetPlaylist = found || null
@@ -57,7 +58,7 @@ export async function PUT(
         }
 
         // Supabase RPC関数 set_default_playlist を呼び出し
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (shouldUseLocalSupabaseFallback()) {
             await supabaseLocal.setDefaultPlaylist(userEmail, id)
             return NextResponse.json({ success: true, message: 'デフォルトプレイリストを更新しました' })
         }
