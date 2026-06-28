@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   usePlaylists,
@@ -36,9 +36,19 @@ describe("usePlaylists hooks", () => {
         mutations: { retry: false },
       },
     });
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     mockUseSession.mockReturnValue(mockSession);
   });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const advanceRetryDelay = async () => {
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1000);
+    });
+  };
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -130,6 +140,7 @@ describe("usePlaylists hooks", () => {
 
   describe("usePlaylistDetail retry behavior", () => {
     it("should retry on network errors and eventually succeed", async () => {
+      jest.useFakeTimers();
       const playlistId = "playlist123";
       const mockData = { id: playlistId, name: "Retry Success Detail" };
       (global.fetch as jest.Mock)
@@ -141,12 +152,15 @@ describe("usePlaylists hooks", () => {
 
       const { result } = renderHook(() => usePlaylistDetail(playlistId), { wrapper });
 
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+      await advanceRetryDelay();
       await waitFor(() => expect(result.current.isSuccess).toBe(true), {
-        timeout: 3000,
+        timeout: 1000,
       });
       expect(result.current.data).toEqual(mockData);
       expect(global.fetch).toHaveBeenCalledTimes(2);
       expect(global.fetch).toHaveBeenCalledWith(`/api/playlists/${playlistId}`);
+      jest.useRealTimers();
     });
 
     it("should throw error immediately for non-network errors", async () => {
@@ -163,16 +177,23 @@ describe("usePlaylists hooks", () => {
     });
 
     it("should fail after max retries for network errors", async () => {
+      jest.useFakeTimers();
       const playlistId = "playlist123";
-      (global.fetch as jest.Mock).mockRejectedValue(
-        new Error("fetch failed with ECONNRESET"),
-      );
+      (global.fetch as jest.Mock)
+        .mockRejectedValueOnce(new Error("fetch failed with ECONNRESET"))
+        .mockRejectedValueOnce(new Error("fetch failed with ECONNRESET"))
+        .mockRejectedValueOnce(new Error("fetch failed with ECONNRESET"));
 
       const { result } = renderHook(() => usePlaylistDetail(playlistId), { wrapper });
 
-      await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 4000 });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+      await advanceRetryDelay();
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+      await advanceRetryDelay();
+      await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 1000 });
       expect(global.fetch).toHaveBeenCalledTimes(3);
       expect(result.current.error).toBeDefined();
+      jest.useRealTimers();
     });
   });
 
