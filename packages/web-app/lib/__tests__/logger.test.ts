@@ -96,6 +96,18 @@ describe("logger", () => {
       );
       expect(consoleLogSpy).toHaveBeenNthCalledWith(2, "Request data:", requestData);
     });
+
+    it("should log API request with falsy but defined data", () => {
+      logger.apiRequest("POST", "/api/users", 0);
+      expect(consoleLogSpy).toHaveBeenNthCalledWith(
+        1,
+        "%c[Audicle] [API →]",
+        "color: #3b82f6; font-weight: bold",
+        "POST /api/users"
+      );
+      expect(consoleLogSpy).toHaveBeenNthCalledWith(2, "Request data:", 0);
+      expect(consoleLogSpy).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("apiResponse", () => {

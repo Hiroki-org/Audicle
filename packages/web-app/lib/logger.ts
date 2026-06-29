@@ -43,7 +43,7 @@ export const logger = {
 
   apiRequest: (method: string, url: string, data?: unknown) => {
     console.log(`%c${LOG_PREFIX} [API →]`, LOG_STYLES.info, `${method} ${url}`);
-    if (data) {
+    if (data !== undefined) {
       console.log("Request data:", data);
     }
   },
