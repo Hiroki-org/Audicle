@@ -36,6 +36,16 @@ export async function POST(request: Request) {
         }
 
         if (shouldUseLocalSupabaseFallback()) {
+            let actualArticleId: string
+            try {
+                actualArticleId = await supabaseLocal.resolveArticleId(userEmail, articleId)
+            } catch (error) {
+                return NextResponse.json(
+                    { error: error instanceof Error ? error.message : 'Article resolution failed' },
+                    { status: 404 }
+                )
+            }
+
             const localPlaylists = await supabaseLocal.getPlaylistsForOwner(userEmail)
             const ownedPlaylistIds = new Set(localPlaylists.map((playlist) => playlist.id))
             const allPlaylistIds = [...new Set([...addToPlaylistIds, ...removeFromPlaylistIds])]
@@ -51,13 +61,17 @@ export async function POST(request: Request) {
             let removedCount = 0
 
             for (const playlistId of addToPlaylistIds) {
-                await supabaseLocal.addPlaylistItem(playlistId, articleId)
-                addedCount += 1
+                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
+                const alreadyExists = playlist?.playlist_items.some((item) => item.article_id === actualArticleId)
+                if (!alreadyExists) {
+                    await supabaseLocal.addPlaylistItem(playlistId, actualArticleId)
+                    addedCount += 1
+                }
             }
 
             for (const playlistId of removeFromPlaylistIds) {
                 const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const item = playlist?.playlist_items.find((candidate) => candidate.article_id === articleId)
+                const item = playlist?.playlist_items.find((candidate) => candidate.article_id === actualArticleId)
                 if (item && await supabaseLocal.removePlaylistItem(playlistId, item.id)) {
                     removedCount += 1
                 }

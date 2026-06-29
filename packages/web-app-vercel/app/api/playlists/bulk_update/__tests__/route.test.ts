@@ -26,6 +26,7 @@ jest.mock('@/lib/supabaseLocal', () => ({
     getPlaylistWithItems: jest.fn(),
     getPlaylistsForOwner: jest.fn(),
     removePlaylistItem: jest.fn(),
+    resolveArticleId: jest.fn(),
 }))
 
 describe('POST /api/playlists/bulk_update', () => {
@@ -54,6 +55,7 @@ describe('POST /api/playlists/bulk_update', () => {
         // Default mock implementations
         ;(requireAuth as jest.Mock).mockResolvedValue({ userEmail: mockUserEmail, response: null })
         ;(resolveArticleId as jest.Mock).mockResolvedValue(actualArticleId)
+        ;(supabaseLocal.resolveArticleId as jest.Mock).mockResolvedValue(actualArticleId)
 
         // Use the utility to setup the default mock chain returning count=0
         mockSupabaseFrom(0)
@@ -224,7 +226,7 @@ describe('POST /api/playlists/bulk_update', () => {
 
     it('should handle duplicate playlist IDs in the request body correctly', async () => {
         // Request has duplicates, but the unique Set will be length 2
-        const { mockSelect, mockIn, mockEq } = mockSupabaseFrom(2)
+        const { mockIn } = mockSupabaseFrom(2)
 
         const request = createRequest({
             articleId: mockArticleId,
@@ -301,11 +303,13 @@ describe('POST /api/playlists/bulk_update', () => {
         ;(supabaseLocal.addPlaylistItem as jest.Mock).mockResolvedValue({
             id: 'item-new',
             playlist_id: 'playlist-1',
-            article_id: mockArticleId,
+            article_id: actualArticleId,
         })
-        ;(supabaseLocal.getPlaylistWithItems as jest.Mock).mockResolvedValue({
-            playlist_items: [{ id: 'item-old', article_id: mockArticleId }],
-        })
+        ;(supabaseLocal.getPlaylistWithItems as jest.Mock)
+            .mockResolvedValueOnce({ playlist_items: [] })
+            .mockResolvedValueOnce({
+                playlist_items: [{ id: 'item-old', article_id: actualArticleId }],
+            })
         ;(supabaseLocal.removePlaylistItem as jest.Mock).mockResolvedValue(true)
 
         const request = createRequest({
@@ -325,8 +329,37 @@ describe('POST /api/playlists/bulk_update', () => {
         })
         expect(resolveArticleId).not.toHaveBeenCalled()
         expect(supabase.rpc).not.toHaveBeenCalled()
-        expect(supabaseLocal.addPlaylistItem).toHaveBeenCalledWith('playlist-1', mockArticleId)
+        expect(supabaseLocal.resolveArticleId).toHaveBeenCalledWith(mockUserEmail, mockArticleId)
+        expect(supabaseLocal.addPlaylistItem).toHaveBeenCalledWith('playlist-1', actualArticleId)
         expect(supabaseLocal.removePlaylistItem).toHaveBeenCalledWith('playlist-2', 'item-old')
+    })
+
+    it('does not increment local addedCount when the article already exists in the target playlist', async () => {
+        process.env.AUTH_ENV = 'test'
+
+        ;(supabaseLocal.getPlaylistsForOwner as jest.Mock).mockResolvedValue([
+            { id: 'playlist-1', owner_email: mockUserEmail },
+        ])
+        ;(supabaseLocal.getPlaylistWithItems as jest.Mock).mockResolvedValue({
+            playlist_items: [{ id: 'item-existing', article_id: actualArticleId }],
+        })
+
+        const request = createRequest({
+            articleId: mockArticleId,
+            addToPlaylistIds: ['playlist-1'],
+            removeFromPlaylistIds: [],
+        })
+
+        const response = await POST(request)
+        expect(response.status).toBe(200)
+
+        const data = await response.json()
+        expect(data).toMatchObject({
+            message: 'Bulk update completed',
+            addedCount: 0,
+            removedCount: 0,
+        })
+        expect(supabaseLocal.addPlaylistItem).not.toHaveBeenCalled()
     })
 
     it('should return 500 for generic unhandled exceptions', async () => {

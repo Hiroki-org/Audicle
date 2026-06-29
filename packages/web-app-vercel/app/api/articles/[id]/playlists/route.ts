@@ -16,10 +16,20 @@ export async function GET(
         if (response) return response
 
         if (shouldUseLocalSupabaseFallback()) {
+            let actualArticleId: string
+            try {
+                actualArticleId = await supabaseLocal.resolveArticleId(userEmail, articleId)
+            } catch (error) {
+                return NextResponse.json(
+                    { error: error instanceof Error ? error.message : 'Article not found' },
+                    { status: 404 }
+                )
+            }
+
             const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
             const containingPlaylists = playlists
                 .filter((playlist) =>
-                    (playlist.playlist_items || []).some((item) => item.article_id === articleId),
+                    (playlist.playlist_items || []).some((item) => item.article_id === actualArticleId),
                 )
                 .map(({ playlist_items: _playlistItems, items: _items, ...playlist }) => playlist)
 
