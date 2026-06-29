@@ -4,7 +4,6 @@ describe('auth-env', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
-        jest.resetModules();
         process.env = { ...originalEnv };
     });
 
@@ -28,6 +27,18 @@ describe('auth-env', () => {
         it('returns true if both are "test"', () => {
             process.env.AUTH_ENV = 'test';
             process.env.NEXT_PUBLIC_AUTH_ENV = 'test';
+            expect(isTestAuthRuntime()).toBe(true);
+        });
+
+        it('returns true if only NEXT_PUBLIC_AUTH_ENV is "test" when AUTH_ENV is production', () => {
+            process.env.AUTH_ENV = 'production';
+            process.env.NEXT_PUBLIC_AUTH_ENV = 'test';
+            expect(isTestAuthRuntime()).toBe(true);
+        });
+
+        it('returns true if only AUTH_ENV is "test" when NEXT_PUBLIC_AUTH_ENV is production', () => {
+            process.env.AUTH_ENV = 'test';
+            process.env.NEXT_PUBLIC_AUTH_ENV = 'production';
             expect(isTestAuthRuntime()).toBe(true);
         });
 
