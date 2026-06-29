@@ -30,7 +30,6 @@ export async function PUT(request: NextRequest) {
             )
         }
 
-
         // Validate input
         const { playback_speed, voice_model, language, color_theme } = body
         const errors: string[] = []
