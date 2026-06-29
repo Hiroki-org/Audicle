@@ -103,12 +103,18 @@ import * as routeModule from '../route'
 describe('/api/playlists route', () => {
     beforeEach(() => {
         jest.clearAllMocks()
-        // Set NEXT_PUBLIC_SUPABASE_URL to use the mocked supabase
+        // Set full Supabase config to use the mocked supabase
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
+        delete process.env.AUTH_ENV
+        delete process.env.NEXT_PUBLIC_AUTH_ENV
     })
 
     afterEach(() => {
         delete process.env.NEXT_PUBLIC_SUPABASE_URL
+        delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        delete process.env.AUTH_ENV
+        delete process.env.NEXT_PUBLIC_AUTH_ENV
     })
 
     it('returns 200 on GET with playlists data', async () => {
@@ -147,6 +153,7 @@ describe('/api/playlists route', () => {
 
     it('POST /items uses the local playlist fallback when Supabase is not configured', async () => {
         delete process.env.NEXT_PUBLIC_SUPABASE_URL
+        delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
         const supabaseLocal = require('@/lib/supabaseLocal')
         supabaseLocal.resetInMemorySupabase()
@@ -183,6 +190,7 @@ describe('/api/playlists route', () => {
 
     it('GET /items uses the local playlist fallback when Supabase is not configured', async () => {
         delete process.env.NEXT_PUBLIC_SUPABASE_URL
+        delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
         const supabaseLocal = require('@/lib/supabaseLocal')
         supabaseLocal.resetInMemorySupabase()
@@ -213,6 +221,28 @@ describe('/api/playlists route', () => {
                 title: 'Banana',
                 url: 'https://example.com/?id=banana',
             },
+        })
+    })
+
+    it('POST /api/playlists uses local fallback in test auth mode even with Supabase config', async () => {
+        process.env.AUTH_ENV = 'test'
+
+        const supabaseLocal = require('@/lib/supabaseLocal')
+        supabaseLocal.resetInMemorySupabase()
+
+        const mockRequest = new Request('http://localhost:3000/api/playlists', {
+            method: 'POST',
+            body: JSON.stringify({ name: 'Test Auth Playlist' }),
+            headers: { 'Content-Type': 'application/json' },
+        })
+
+        const res = await routeModule.POST(mockRequest)
+
+        expect(res.status).toBe(201)
+        const data = await res.json()
+        expect(data).toMatchObject({
+            owner_email: 'test@example.com',
+            name: 'Test Auth Playlist',
         })
     })
 })

@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { requireAuth } from '@/lib/api-auth'
 import type { Playlist } from '@/types/playlist'
 import { resolveArticleId } from '@/lib/api-helpers'
+import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
+import * as supabaseLocal from '@/lib/supabaseLocal'
 
 export async function GET(
     request: Request,
@@ -12,6 +14,27 @@ export async function GET(
         const { id: articleId } = await context.params
         const { userEmail, response } = await requireAuth()
         if (response) return response
+
+        if (shouldUseLocalSupabaseFallback()) {
+            let actualArticleId: string
+            try {
+                actualArticleId = await supabaseLocal.resolveArticleId(userEmail, articleId)
+            } catch (error) {
+                return NextResponse.json(
+                    { error: error instanceof Error ? error.message : 'Article not found' },
+                    { status: 404 }
+                )
+            }
+
+            const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
+            const containingPlaylists = playlists
+                .filter((playlist) =>
+                    (playlist.playlist_items || []).some((item) => item.article_id === actualArticleId),
+                )
+                .map(({ playlist_items: _playlistItems, items: _items, ...playlist }) => playlist)
+
+            return NextResponse.json(containingPlaylists as Playlist[])
+        }
 
         // まずarticle_hashからarticleのURLを取得（article_statsテーブルから）
         let actualArticleId: string
@@ -42,7 +65,7 @@ export async function GET(
 
         // Remove the nested playlist_items array before returning
         const formattedPlaylists = playlists ? (playlists as any[]).map(p => {
-            const { playlist_items, ...rest } = p;
+            const { playlist_items: _playlistItems, ...rest } = p;
             return rest;
         }) : []
 

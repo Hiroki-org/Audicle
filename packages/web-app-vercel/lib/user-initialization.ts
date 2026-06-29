@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { getOrCreateDefaultPlaylist } from './playlist-utils'
-import { hasSupabaseRuntimeConfig, isTestAuthRuntime } from './auth-env'
+import { isTestAuthRuntime } from './auth-env'
 
 export interface UserInitializationResult {
     success: boolean
@@ -8,7 +8,7 @@ export interface UserInitializationResult {
 }
 
 function shouldUseLocalUserInitialization(): boolean {
-    return isTestAuthRuntime() && !hasSupabaseRuntimeConfig()
+    return isTestAuthRuntime()
 }
 
 /**
