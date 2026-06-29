@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { requireAuth } from '@/lib/api-auth'
 import { resolveArticleId } from '@/lib/api-helpers'
+import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
+import * as supabaseLocal from '@/lib/supabaseLocal'
 
 interface BulkUpdateRequest {
     articleId: string
@@ -30,6 +32,44 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { error: 'addToPlaylistIds and removeFromPlaylistIds must be arrays' },
                 { status: 400 }
+            )
+        }
+
+        if (shouldUseLocalSupabaseFallback()) {
+            const localPlaylists = await supabaseLocal.getPlaylistsForOwner(userEmail)
+            const ownedPlaylistIds = new Set(localPlaylists.map((playlist) => playlist.id))
+            const allPlaylistIds = [...new Set([...addToPlaylistIds, ...removeFromPlaylistIds])]
+
+            if (allPlaylistIds.some((playlistId) => !ownedPlaylistIds.has(playlistId))) {
+                return NextResponse.json(
+                    { error: 'One or more playlist IDs are invalid or not owned by the user' },
+                    { status: 403 }
+                )
+            }
+
+            let addedCount = 0
+            let removedCount = 0
+
+            for (const playlistId of addToPlaylistIds) {
+                await supabaseLocal.addPlaylistItem(playlistId, articleId)
+                addedCount += 1
+            }
+
+            for (const playlistId of removeFromPlaylistIds) {
+                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
+                const item = playlist?.playlist_items.find((candidate) => candidate.article_id === articleId)
+                if (item && await supabaseLocal.removePlaylistItem(playlistId, item.id)) {
+                    removedCount += 1
+                }
+            }
+
+            return NextResponse.json(
+                {
+                    message: 'Bulk update completed',
+                    addedCount,
+                    removedCount,
+                },
+                { status: 200 }
             )
         }
 
