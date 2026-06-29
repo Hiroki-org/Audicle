@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase'
 import * as supabaseLocal from '@/lib/supabaseLocal'
 import { requireAuth } from '@/lib/api-auth'
 import type { Playlist } from '@/types/playlist'
-import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
 
 // GET: ユーザーのプレイリスト一覧取得
 export async function GET() {
@@ -14,7 +13,7 @@ export async function GET() {
         let data: Playlist[] | null = null
         let error: Error | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             // Local fallback for tests (no Supabase configured)
             try {
                 const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
@@ -77,7 +76,7 @@ export async function POST(request: Request) {
         let insertData: Playlist | null = null
         let insertError: Error | null = null
 
-        if (shouldUseLocalSupabaseFallback()) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
             insertData = await supabaseLocal.createPlaylist(userEmail, name, description)
         } else {
             const resp = await supabase
