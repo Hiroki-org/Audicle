@@ -10,23 +10,10 @@ interface Article {
     owner_email: string;
     url: string;
     title: string;
-    article_hash?: string;
     thumbnail_url?: string;
     last_read_position?: number;
     created_at: string;
     updated_at: string;
-}
-
-interface ArticleStat {
-    article_hash: string;
-    url: string;
-    title: string;
-    domain?: string;
-    access_count: number;
-    cache_hits: number;
-    cache_misses: number;
-    is_fully_cached: boolean;
-    last_accessed_at: string;
 }
 
 interface Playlist {
@@ -54,12 +41,10 @@ const inMemoryDB: {
     playlists: Playlist[];
     articles: Article[];
     playlist_items: PlaylistItem[];
-    article_stats: ArticleStat[];
 } = {
     playlists: [],
     articles: [],
     playlist_items: [],
-    article_stats: [],
 };
 
 function normalizeOwnerEmail(email: string | null) {
@@ -70,7 +55,6 @@ export function resetInMemorySupabase() {
     inMemoryDB.playlists = [];
     inMemoryDB.articles = [];
     inMemoryDB.playlist_items = [];
-    inMemoryDB.article_stats = [];
 }
 
 export async function createPlaylist(email: string | null, name: string, description?: string | null) {
@@ -142,14 +126,7 @@ export async function deletePlaylistById(ownerEmail: string | null, id: string) 
     return true;
 }
 
-export async function upsertArticle(
-    ownerEmail: string | null,
-    url: string,
-    title: string,
-    thumbnail_url?: string | null,
-    last_read_position?: number,
-    article_hash?: string | null,
-) {
+export async function upsertArticle(ownerEmail: string | null, url: string, title: string, thumbnail_url?: string | null, last_read_position?: number) {
     const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
     let article = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.url === url);
     const now = new Date().toISOString();
@@ -159,7 +136,6 @@ export async function upsertArticle(
             owner_email: normalizedOwnerEmail,
             url,
             title,
-            article_hash: article_hash || undefined,
             thumbnail_url: thumbnail_url || undefined,
             last_read_position: last_read_position ?? 0,
             created_at: now,
@@ -169,7 +145,6 @@ export async function upsertArticle(
     } else {
         // update title & thumbnail if provided
         article.title = title || article.title;
-        article.article_hash = article_hash || article.article_hash || undefined;
         article.thumbnail_url = thumbnail_url || article.thumbnail_url || undefined;
         if (last_read_position !== undefined) {
             article.last_read_position = last_read_position;
@@ -177,65 +152,6 @@ export async function upsertArticle(
         article.updated_at = now;
     }
     return article;
-}
-
-export async function recordArticleStat(input: {
-    articleHash: string;
-    url: string;
-    title: string;
-    domain?: string;
-    cacheHits: number;
-    cacheMisses: number;
-    isFullyCached: boolean;
-}) {
-    const now = new Date().toISOString();
-    let stat = inMemoryDB.article_stats.find(s => s.article_hash === input.articleHash);
-
-    if (!stat) {
-        stat = {
-            article_hash: input.articleHash,
-            url: input.url,
-            title: input.title,
-            domain: input.domain,
-            access_count: 0,
-            cache_hits: 0,
-            cache_misses: 0,
-            is_fully_cached: input.isFullyCached,
-            last_accessed_at: now,
-        };
-        inMemoryDB.article_stats.push(stat);
-    }
-
-    stat.url = input.url;
-    stat.title = input.title;
-    stat.domain = input.domain || stat.domain;
-    stat.access_count += 1;
-    stat.cache_hits += input.cacheHits;
-    stat.cache_misses += input.cacheMisses;
-    stat.is_fully_cached = input.isFullyCached;
-    stat.last_accessed_at = now;
-
-    return stat;
-}
-
-export async function resolveArticleId(ownerEmail: string | null, articleId: string) {
-    const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
-    const existingById = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.id === articleId);
-    if (existingById) return existingById.id;
-
-    const existingByHash = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.article_hash === articleId);
-    if (existingByHash) return existingByHash.id;
-
-    const existingByUrl = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.url === articleId);
-    if (existingByUrl) return existingByUrl.id;
-
-    const stat = inMemoryDB.article_stats.find(s => s.article_hash === articleId);
-    if (!stat) {
-        throw new Error('Article stats not found');
-    }
-
-    const article = await upsertArticle(normalizedOwnerEmail, stat.url, stat.title, undefined, undefined, articleId);
-    return article.id;
 }
 
 export async function addPlaylistItem(playlistId: string, articleId: string) {
@@ -287,7 +203,7 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
         });
     } else if (['added_at', 'created_at', 'updated_at'].includes(sortField)) {
         sorted = [...items].sort((a, b) => {
-            const sField = sortField as 'created_at' | 'updated_at';
+            const sField = sortField as keyof Article;
             const aDate = sortField === 'added_at' ? a.added_at : (a.article?.[sField] as string) || '';
             const bDate = sortField === 'added_at' ? b.added_at : (b.article?.[sField] as string) || '';
             return sortOrder === 'desc' ? bDate.localeCompare(aDate) : aDate.localeCompare(bDate);

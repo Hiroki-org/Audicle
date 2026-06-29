@@ -3,7 +3,6 @@
 import { NextRequest } from "next/server";
 import { POST } from "../route";
 import { auth } from "@/lib/auth";
-import * as supabaseLocal from "@/lib/supabaseLocal";
 
 // Authをモック
 jest.mock("@/lib/auth", () => ({
@@ -20,10 +19,6 @@ jest.mock("@/lib/supabase", () => ({
   },
 }));
 
-jest.mock("@/lib/supabaseLocal", () => ({
-  recordArticleStat: jest.fn(),
-}));
-
 describe("/api/stats/article route", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
@@ -35,10 +30,6 @@ describe("/api/stats/article route", () => {
     // hashEmailがエラーにならないように環境変数をセット
     process.env.TEST_EMAIL_HASH_SECRET = "test_secret";
     process.env.TEST_SESSION_TOKEN = "test_token";
-    process.env.NEXT_PUBLIC_SUPABASE_URL = "http://localhost:54321";
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
-    delete process.env.AUTH_ENV;
-    delete process.env.NEXT_PUBLIC_AUTH_ENV;
   });
 
   afterEach(() => {
@@ -158,34 +149,6 @@ describe("/api/stats/article route", () => {
       accessCount: 1,
       cacheHitRate: 71.43,
     });
-  });
-
-  it("records stats locally in test auth mode even when Supabase config is present", async () => {
-    process.env.AUTH_ENV = "test";
-    (supabaseLocal.recordArticleStat as jest.Mock).mockResolvedValueOnce({
-      access_count: 7,
-    });
-
-    const request = createRequest(validBody);
-    const response = await POST(request);
-    const json = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(json).toEqual({
-      success: true,
-      accessCount: 7,
-      cacheHitRate: 71.43,
-    });
-    expect(supabaseLocal.recordArticleStat).toHaveBeenCalledWith({
-      articleHash: "hash123",
-      url: "https://example.com/article",
-      title: "Test Article",
-      domain: "example.com",
-      cacheHits: 5,
-      cacheMisses: 2,
-      isFullyCached: false,
-    });
-    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it("returns 401 when user is not authenticated", async () => {
