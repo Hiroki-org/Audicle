@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { hashEmail } from "@/lib/emailHash";
+import { shouldUseLocalSupabaseFallback } from "@/lib/auth-env";
+import * as supabaseLocal from "@/lib/supabaseLocal";
 
 interface ArticleStatsRequest {
   articleHash: string;
@@ -65,6 +67,27 @@ export async function POST(request: NextRequest) {
     // キャッシュヒット率を計算
     const totalRequests = cacheHits + cacheMisses;
     const cacheHitRate = totalRequests > 0 ? cacheHits / totalRequests : 0;
+
+    if (shouldUseLocalSupabaseFallback()) {
+      const stat = await supabaseLocal.recordArticleStat({
+        articleHash,
+        url,
+        title,
+        domain,
+        cacheHits,
+        cacheMisses,
+        isFullyCached,
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          accessCount: stat.access_count,
+          cacheHitRate: parseFloat((cacheHitRate * 100).toFixed(2)),
+        },
+        { status: 200 },
+      );
+    }
 
     // Supabase RPC関数を呼び出し
     const { data, error } = await supabase.rpc("increment_article_stats", {
