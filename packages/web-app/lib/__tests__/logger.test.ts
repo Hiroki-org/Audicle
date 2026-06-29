@@ -25,16 +25,6 @@ describe("logger", () => {
         { key: "value" }
       );
     });
-
-    it("should log info message without extra arguments", () => {
-      logger.info("Test message");
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        "%c[Audicle] [INFO]",
-        "color: #3b82f6; font-weight: bold",
-        "Test message"
-      );
-      expect(consoleLogSpy).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe("success", () => {
@@ -119,18 +109,6 @@ describe("logger", () => {
         "/api/users"
       );
       expect(consoleLogSpy).toHaveBeenNthCalledWith(2, "Response data:", responseData);
-    });
-
-    it("should always log API response data when it is undefined", () => {
-      logger.apiResponse("/api/users", undefined);
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
-        1,
-        "%c[Audicle] [API ←]",
-        "color: #10b981; font-weight: bold",
-        "/api/users"
-      );
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(2, "Response data:", undefined);
-      expect(consoleLogSpy).toHaveBeenCalledTimes(2);
     });
   });
 

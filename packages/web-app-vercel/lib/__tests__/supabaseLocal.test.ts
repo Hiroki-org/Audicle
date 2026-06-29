@@ -8,9 +8,7 @@ import {
     upsertArticle,
     addPlaylistItem,
     getPlaylistWithItems,
-    removePlaylistItem,
-    recordArticleStat,
-    resolveArticleId
+    removePlaylistItem
 } from '../supabaseLocal';
 
 describe('supabaseLocal', () => {
@@ -212,45 +210,6 @@ describe('supabaseLocal', () => {
             expect(updated.id).toBe(initial.id);
             expect(updated.title).toBe('New Title');
             expect(updated.last_read_position).toBe(30);
-        });
-    });
-
-    describe('resolveArticleId', () => {
-        it('returns an existing article id for the owner', async () => {
-            const article = await upsertArticle('user@example.com', 'url', 'Title');
-
-            await expect(resolveArticleId('user@example.com', article.id)).resolves.toBe(article.id);
-        });
-
-        it('resolves an article hash through recorded article stats and creates the owner article', async () => {
-            await recordArticleStat({
-                articleHash: 'hash-1',
-                url: 'https://example.com/article',
-                title: 'Article from stats',
-                domain: 'example.com',
-                cacheHits: 2,
-                cacheMisses: 1,
-                isFullyCached: false,
-            });
-
-            const articleId = await resolveArticleId('user@example.com', 'hash-1');
-            const playlists = await getPlaylistsForOwner('user@example.com');
-            expect(playlists).toHaveLength(0);
-
-            const playlist = await createPlaylist('user@example.com', 'P1');
-            await addPlaylistItem(playlist.id, articleId);
-            const playlistWithItems = await getPlaylistWithItems('user@example.com', playlist.id);
-
-            expect(playlistWithItems?.items[0].article).toMatchObject({
-                id: articleId,
-                url: 'https://example.com/article',
-                title: 'Article from stats',
-                article_hash: 'hash-1',
-            });
-        });
-
-        it('throws for an unknown article hash', async () => {
-            await expect(resolveArticleId('user@example.com', 'missing-hash')).rejects.toThrow('Article stats not found');
         });
     });
 

@@ -2,7 +2,6 @@ import { supabase } from './supabase'
 import * as supabaseLocal from './supabaseLocal'
 import type { PlaylistWithItems } from '@/types/playlist'
 import { STORAGE_KEYS } from './constants'
-import { shouldUseLocalSupabaseFallback } from './auth-env'
 
 export interface DefaultPlaylistResult {
     playlist?: PlaylistWithItems
@@ -42,7 +41,7 @@ export function setPlaylistSortKey(playlistId: string, sortKey: string): void {
  */
 export async function getOrCreateDefaultPlaylist(userEmail: string): Promise<DefaultPlaylistResult> {
     // デフォルトプレイリストを取得
-    if (shouldUseLocalSupabaseFallback()) {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
         // Local fallback (tests)
         const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail)
         const defaultPlaylist = playlists.find(p => p.is_default)
