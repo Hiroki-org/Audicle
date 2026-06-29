@@ -5,6 +5,7 @@ import * as supabaseLocal from '@/lib/supabaseLocal'
 import { getOrCreateDefaultPlaylist } from '@/lib/playlist-utils'
 import type { Article } from '@/types/playlist'
 import { validateUrl } from '@/lib/validation'
+import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
 
 /**
  * GET リクエスト: 後方互換性のため（既存のブックマークなど）
@@ -111,7 +112,7 @@ async function handleShareTarget(
         // 記事を作成または既存のものを取得
         let article: Article | null = null
 
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (shouldUseLocalSupabaseFallback()) {
             // Local fallback
             article = await supabaseLocal.upsertArticle(
                 userEmail,
@@ -181,7 +182,7 @@ async function handleShareTarget(
         }
 
         // プレイリストに追加（既に存在する場合はスキップ）
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (shouldUseLocalSupabaseFallback()) {
             // Local fallback
             await supabaseLocal.addPlaylistItem(playlistId, article.id)
         } else {

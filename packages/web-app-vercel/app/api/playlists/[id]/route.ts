@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import * as supabaseLocal from '@/lib/supabaseLocal'
 import { requireAuth } from '@/lib/api-auth'
 import { PlaylistWithItems } from '@/types/playlist'
+import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
 
 // リトライヘルパー関数
 async function retryQuery<T>(queryFn: () => Promise<T>, maxRetries: number = 3, delay: number = 1000): Promise<T> {
@@ -47,7 +48,7 @@ export async function GET(
         let playlist: PlaylistWithItems | null = null
         let playlistError: { code: string } | Error | null = null
 
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (shouldUseLocalSupabaseFallback()) {
             try {
                 playlist = await supabaseLocal.getPlaylistWithItems(userEmail, id, { field: field || undefined, order })
                 if (!playlist) {
@@ -137,7 +138,7 @@ export async function PATCH(
             )
         }
 
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (shouldUseLocalSupabaseFallback()) {
             // Local update check: we need to check ownership first because updatePlaylist in local doesn't check it explicitly
             const playlists = await supabaseLocal.getPlaylistsForOwner(userEmail);
             const ownsPlaylist = playlists.some(p => p.id === id);
@@ -199,7 +200,7 @@ export async function DELETE(
         const { id } = await params
 
         // デフォルトプレイリストかどうかを確認
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        if (shouldUseLocalSupabaseFallback()) {
             const found = (await supabaseLocal.getPlaylistsForOwner(userEmail)).find(p => p.id === id)
             if (!found) {
                 return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
