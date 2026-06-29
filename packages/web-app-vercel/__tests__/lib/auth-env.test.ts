@@ -1,16 +1,19 @@
-import { isTestAuthRuntime, hasSupabaseRuntimeConfig } from '../../lib/auth-env';
+import { hasSupabaseRuntimeConfig, isTestAuthRuntime } from '../../lib/auth-env';
 
 describe('auth-env', () => {
-    const originalEnv = process.env;
+    const originalEnv = { ...process.env };
 
-    beforeEach(() => {
-        jest.resetModules();
-        process.env = { ...originalEnv };
-    });
+    const restoreEnv = () => {
+        for (const key of Object.keys(process.env)) {
+            if (!(key in originalEnv)) {
+                delete process.env[key];
+            }
+        }
+        Object.assign(process.env, originalEnv);
+    };
 
-    afterAll(() => {
-        process.env = originalEnv;
-    });
+    beforeEach(restoreEnv);
+    afterEach(restoreEnv);
 
     describe('isTestAuthRuntime', () => {
         it('returns true if AUTH_ENV is "test"', () => {
@@ -28,6 +31,18 @@ describe('auth-env', () => {
         it('returns true if both are "test"', () => {
             process.env.AUTH_ENV = 'test';
             process.env.NEXT_PUBLIC_AUTH_ENV = 'test';
+            expect(isTestAuthRuntime()).toBe(true);
+        });
+
+        it('returns true if only NEXT_PUBLIC_AUTH_ENV is "test" when AUTH_ENV is production', () => {
+            process.env.AUTH_ENV = 'production';
+            process.env.NEXT_PUBLIC_AUTH_ENV = 'test';
+            expect(isTestAuthRuntime()).toBe(true);
+        });
+
+        it('returns true if only AUTH_ENV is "test" when NEXT_PUBLIC_AUTH_ENV is production', () => {
+            process.env.AUTH_ENV = 'test';
+            process.env.NEXT_PUBLIC_AUTH_ENV = 'production';
             expect(isTestAuthRuntime()).toBe(true);
         });
 
