@@ -9,7 +9,14 @@ if (!secret) {
 const sub = process.env.TEST_USER_ID || "test-user-id-123";
 const email = process.env.TEST_USER_EMAIL || "test@example.com";
 const name = process.env.TEST_USER_NAME || "Test User";
-const expiresInSeconds = parseInt(process.env.TEST_TOKEN_EXPIRES_IN_SECONDS || "3600", 10);
+const expiresInSeconds = Number.parseInt(
+  process.env.TEST_TOKEN_EXPIRES_IN_SECONDS || "3600",
+  10,
+);
+
+if (!Number.isFinite(expiresInSeconds) || expiresInSeconds <= 0) {
+  throw new Error("TEST_TOKEN_EXPIRES_IN_SECONDS must be a positive integer");
+}
 
 // テスト用のユーザーデータ
 const testUser = {
