@@ -332,9 +332,14 @@ async def synthesize_speech(request: SynthesizeRequest):
             # Raise a summarized error so the outer exception handler
             # can trigger the existing fallback behavior.
             raise RuntimeError(
-                f"Synthesis failed for {len(errors)} out of {len(results)} chunks: "
-                + "; ".join(f"{type(e).__name__}: {e}" for e in errors[:3])  # Limit to first 3 errors
-                + (f" (and {len(errors) - 3} more)" if len(errors) > 3 else "")
+                "".join([
+                    f"Synthesis failed for {len(errors)} "
+                    f"out of {len(results)} chunks: ",
+                    "; ".join(
+                        [f"{type(e).__name__}: {e}" for e in errors[:3]]
+                    ),
+                    f" (and {len(errors) - 3} more)" if len(errors) > 3 else ""
+                ])
             )
 
         # All results are successful chunk bytes at this point
