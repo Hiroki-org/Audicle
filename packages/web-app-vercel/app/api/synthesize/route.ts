@@ -1,3 +1,4 @@
+import { processArticleMetadata, processChunks, handleLegacyResponse } from './helpers';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCorsHeaders, CorsError } from '@/lib/cors';
 import { randomUUID } from 'crypto';
