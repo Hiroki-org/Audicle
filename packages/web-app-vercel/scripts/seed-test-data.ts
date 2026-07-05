@@ -246,10 +246,13 @@ async function seedTestData() {
 
     const existingArticles = existingData || [];
 
+
+    const getArticleKey = (email: string, url: string) => `${email}||${url}`;
+
     // (owner_email, url)をキーにした既存記事のマップを作成
     const existingMap = new Map();
     for (const existing of existingArticles) {
-        existingMap.set(existing.owner_email + "||" + existing.url, existing);
+        existingMap.set(getArticleKey(existing.owner_email, existing.url), existing);
     }
 
     const toInsert: typeof articles = [];
@@ -259,7 +262,7 @@ async function seedTestData() {
     const processedKeys = new Set();
 
     for (const article of articles) {
-        const key = article.owner_email + "||" + article.url;
+        const key = getArticleKey(article.owner_email, article.url);
         if (processedKeys.has(key)) continue;
         processedKeys.add(key);
 
@@ -286,7 +289,7 @@ async function seedTestData() {
         }
         if (created) {
             for (const c of created) {
-                createdArticlesMap.set(c.owner_email + "||" + c.url, c as Article);
+                createdArticlesMap.set(getArticleKey(c.owner_email, c.url), c as Article);
             }
         }
     }
@@ -294,7 +297,7 @@ async function seedTestData() {
     // 既存記事を更新
     if (toUpdate.length > 0) {
         const batchUpdateData = toUpdate.map((article) => {
-            const key = article.owner_email + "||" + article.url;
+            const key = getArticleKey(article.owner_email, article.url);
             const existing = existingMap.get(key);
 
             if (!existing) {
@@ -323,7 +326,7 @@ async function seedTestData() {
 
         if (updatedItems) {
             for (const updated of updatedItems) {
-                createdArticlesMap.set(updated.owner_email + "||" + updated.url, updated as Article);
+                createdArticlesMap.set(getArticleKey(updated.owner_email, updated.url), updated as Article);
             }
         }
     }
@@ -333,7 +336,7 @@ async function seedTestData() {
     const addedKeys = new Set<string>();
 
     for (const article of articles) {
-        const key = article.owner_email + "||" + article.url;
+        const key = getArticleKey(article.owner_email, article.url);
         const created = createdArticlesMap.get(key);
         // 重複を防ぐ (O(1)のSetでチェック)
         if (created && !addedKeys.has(key)) {
