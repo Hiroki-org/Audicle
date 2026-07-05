@@ -5,20 +5,6 @@ import {
   validateColorTheme,
   validateUserSettings,
 } from '../settingsValidator';
-// Removed unused imports: VOICE_MODELS and COLOR_THEMES
-
-jest.mock('@/types/settings', () => ({
-  ...jest.requireActual('@/types/settings'),
-  VOICE_MODELS: [
-    { value: 'ja-JP-Neural2-B', label: 'Japanese' },
-    { value: 'en-US-Standard-C', label: 'English' },
-  ],
-  COLOR_THEMES: [
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
-    { value: 'sepia', label: 'Sepia' },
-  ],
-}));
 
 describe('settingsValidator', () => {
   describe('validatePlaybackSpeed', () => {
@@ -38,13 +24,17 @@ describe('settingsValidator', () => {
 
   describe('validateVoiceModel', () => {
     it('should return true for valid voice models', () => {
-      expect(validateVoiceModel('ja-JP-Neural2-B')).toBe(true);
-      expect(validateVoiceModel('en-US-Standard-C')).toBe(true);
+      expect(validateVoiceModel('ja-JP-Standard-B')).toBe(true);
+      expect(validateVoiceModel('en-US-Wavenet-C')).toBe(true);
     });
 
     it('should return false for invalid voice models', () => {
       expect(validateVoiceModel('invalid-model')).toBe(false);
       expect(validateVoiceModel(123)).toBe(false);
+      expect(validateVoiceModel(null)).toBe(false);
+      expect(validateVoiceModel(undefined)).toBe(false);
+      expect(validateVoiceModel('')).toBe(false);
+      expect(validateVoiceModel({})).toBe(false);
     });
   });
 
@@ -62,23 +52,28 @@ describe('settingsValidator', () => {
 
   describe('validateColorTheme', () => {
     it('should return true for valid color themes', () => {
-      expect(validateColorTheme('light')).toBe(true);
-      expect(validateColorTheme('dark')).toBe(true);
-      expect(validateColorTheme('sepia')).toBe(true);
+      expect(validateColorTheme('ocean')).toBe(true);
+      expect(validateColorTheme('purple')).toBe(true);
+      expect(validateColorTheme('forest')).toBe(true);
+      expect(validateColorTheme('rose')).toBe(true);
+      expect(validateColorTheme('orange')).toBe(true);
     });
 
     it('should return false for invalid color themes', () => {
       expect(validateColorTheme('blue')).toBe(false);
       expect(validateColorTheme(1)).toBe(false);
+      expect(validateColorTheme('light')).toBe(false);
+      expect(validateColorTheme('dark')).toBe(false);
+      expect(validateColorTheme('sepia')).toBe(false);
     });
   });
 
   describe('validateUserSettings', () => {
     const validSettings = {
       playback_speed: 1.0,
-      voice_model: 'ja-JP-Neural2-B',
+      voice_model: 'ja-JP-Standard-B',
       language: 'ja-JP',
-      color_theme: 'dark',
+      color_theme: 'ocean',
     };
 
     it('should return true for a valid settings object', () => {
