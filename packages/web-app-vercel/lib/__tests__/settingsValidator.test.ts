@@ -42,9 +42,19 @@ describe('settingsValidator', () => {
       expect(validateVoiceModel('en-US-Standard-C')).toBe(true);
     });
 
-    it('should return false for invalid voice models', () => {
+    it('should return false for invalid string models', () => {
       expect(validateVoiceModel('invalid-model')).toBe(false);
+      expect(validateVoiceModel('')).toBe(false);
+      expect(validateVoiceModel('JA-JP-NEURAL2-B')).toBe(false); // case sensitive
+    });
+
+    it('should return false for non-string types', () => {
       expect(validateVoiceModel(123)).toBe(false);
+      expect(validateVoiceModel(null)).toBe(false);
+      expect(validateVoiceModel(undefined)).toBe(false);
+      expect(validateVoiceModel([])).toBe(false);
+      expect(validateVoiceModel({})).toBe(false);
+      expect(validateVoiceModel(true)).toBe(false);
     });
   });
 
