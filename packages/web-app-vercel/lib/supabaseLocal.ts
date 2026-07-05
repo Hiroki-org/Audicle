@@ -51,15 +51,15 @@ interface PlaylistItem {
 }
 
 const inMemoryDB: {
-    playlists: Playlist[];
-    articles: Article[];
-    playlist_items: PlaylistItem[];
-    article_stats: ArticleStat[];
+    playlists: Map<string, Playlist>;
+    articles: Map<string, Article>;
+    playlist_items: Map<string, PlaylistItem>;
+    article_stats: Map<string, ArticleStat>;
 } = {
-    playlists: [],
-    articles: [],
-    playlist_items: [],
-    article_stats: [],
+    playlists: new Map(),
+    articles: new Map(),
+    playlist_items: new Map(),
+    article_stats: new Map(),
 };
 
 function normalizeOwnerEmail(email: string | null) {
@@ -67,10 +67,10 @@ function normalizeOwnerEmail(email: string | null) {
 }
 
 export function resetInMemorySupabase() {
-    inMemoryDB.playlists = [];
-    inMemoryDB.articles = [];
-    inMemoryDB.playlist_items = [];
-    inMemoryDB.article_stats = [];
+    inMemoryDB.playlists.clear();
+    inMemoryDB.articles.clear();
+    inMemoryDB.playlist_items.clear();
+    inMemoryDB.article_stats.clear();
 }
 
 export async function createPlaylist(email: string | null, name: string, description?: string | null) {
@@ -89,19 +89,19 @@ export async function createPlaylist(email: string | null, name: string, descrip
         created_at: now,
         updated_at: now,
     };
-    inMemoryDB.playlists.push(playlist);
+    inMemoryDB.playlists.set(id, playlist);
     return playlist;
 }
 
 export async function getPlaylistsForOwner(email: string | null) {
     const ownerEmail = normalizeOwnerEmail(email);
-    return inMemoryDB.playlists
+    return Array.from(inMemoryDB.playlists.values())
         .filter(p => p.owner_email === ownerEmail)
         .map(p => {
-            const rawItems = inMemoryDB.playlist_items.filter(i => i.playlist_id === p.id);
+            const rawItems = Array.from(inMemoryDB.playlist_items.values()).filter(i => i.playlist_id === p.id);
             const itemsWithArticle: PlaylistItemWithArticle[] = rawItems.map(pi => ({
                 ...pi,
-                article: inMemoryDB.articles.find(a => a.id === pi.article_id) || undefined,
+                article: inMemoryDB.articles.get(pi.article_id) || undefined,
             }));
             return {
                 ...p,
@@ -114,7 +114,7 @@ export async function getPlaylistsForOwner(email: string | null) {
 }
 
 export async function updatePlaylist(playlistId: string, updates: Partial<Playlist>) {
-    const playlist = inMemoryDB.playlists.find(p => p.id === playlistId);
+    const playlist = inMemoryDB.playlists.get(playlistId);
     if (!playlist) return null;
 
     Object.assign(playlist, updates);
@@ -125,7 +125,7 @@ export async function updatePlaylist(playlistId: string, updates: Partial<Playli
 export async function setDefaultPlaylist(ownerEmail: string, playlistId: string) {
     const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
     // Unset default for all other playlists of this owner
-    inMemoryDB.playlists.forEach(p => {
+    Array.from(inMemoryDB.playlists.values()).forEach(p => {
         if (p.owner_email === normalizedOwnerEmail) {
             p.is_default = p.id === playlistId;
         }
@@ -134,11 +134,15 @@ export async function setDefaultPlaylist(ownerEmail: string, playlistId: string)
 
 export async function deletePlaylistById(ownerEmail: string | null, id: string) {
     const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
-    const idx = inMemoryDB.playlists.findIndex(p => p.id === id && p.owner_email === normalizedOwnerEmail);
-    if (idx === -1) return false;
-    const [removed] = inMemoryDB.playlists.splice(idx, 1);
+    const playlist = inMemoryDB.playlists.get(id);
+    if (!playlist || playlist.owner_email !== normalizedOwnerEmail) return false;
+    inMemoryDB.playlists.delete(id);
     // remove associated items
-    inMemoryDB.playlist_items = inMemoryDB.playlist_items.filter(i => i.playlist_id !== removed.id);
+    for (const [itemId, item] of inMemoryDB.playlist_items.entries()) {
+        if (item.playlist_id === id) {
+            inMemoryDB.playlist_items.delete(itemId);
+        }
+    }
     return true;
 }
 
@@ -151,11 +155,12 @@ export async function upsertArticle(
     article_hash?: string | null,
 ) {
     const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
-    let article = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.url === url);
+    let article = Array.from(inMemoryDB.articles.values()).find(a => a.owner_email === normalizedOwnerEmail && a.url === url);
     const now = new Date().toISOString();
     if (!article) {
+        const id = crypto.randomUUID();
         article = {
-            id: crypto.randomUUID(),
+            id,
             owner_email: normalizedOwnerEmail,
             url,
             title,
@@ -165,7 +170,7 @@ export async function upsertArticle(
             created_at: now,
             updated_at: now,
         };
-        inMemoryDB.articles.push(article);
+        inMemoryDB.articles.set(id, article);
     } else {
         // update title & thumbnail if provided
         article.title = title || article.title;
@@ -189,7 +194,7 @@ export async function recordArticleStat(input: {
     isFullyCached: boolean;
 }) {
     const now = new Date().toISOString();
-    let stat = inMemoryDB.article_stats.find(s => s.article_hash === input.articleHash);
+    let stat = inMemoryDB.article_stats.get(input.articleHash);
 
     if (!stat) {
         stat = {
@@ -203,7 +208,7 @@ export async function recordArticleStat(input: {
             is_fully_cached: input.isFullyCached,
             last_accessed_at: now,
         };
-        inMemoryDB.article_stats.push(stat);
+        inMemoryDB.article_stats.set(input.articleHash, stat);
     }
 
     stat.url = input.url;
@@ -220,16 +225,16 @@ export async function recordArticleStat(input: {
 
 export async function resolveArticleId(ownerEmail: string | null, articleId: string) {
     const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
-    const existingById = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.id === articleId);
-    if (existingById) return existingById.id;
+    const existingById = inMemoryDB.articles.get(articleId);
+    if (existingById && existingById.owner_email === normalizedOwnerEmail) return existingById.id;
 
-    const existingByHash = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.article_hash === articleId);
+    const existingByHash = Array.from(inMemoryDB.articles.values()).find(a => a.owner_email === normalizedOwnerEmail && a.article_hash === articleId);
     if (existingByHash) return existingByHash.id;
 
-    const existingByUrl = inMemoryDB.articles.find(a => a.owner_email === normalizedOwnerEmail && a.url === articleId);
+    const existingByUrl = Array.from(inMemoryDB.articles.values()).find(a => a.owner_email === normalizedOwnerEmail && a.url === articleId);
     if (existingByUrl) return existingByUrl.id;
 
-    const stat = inMemoryDB.article_stats.find(s => s.article_hash === articleId);
+    const stat = inMemoryDB.article_stats.get(articleId);
     if (!stat) {
         throw new Error('Article stats not found');
     }
@@ -240,34 +245,35 @@ export async function resolveArticleId(ownerEmail: string | null, articleId: str
 
 export async function addPlaylistItem(playlistId: string, articleId: string) {
     // If item exists, return it
-    const existing = inMemoryDB.playlist_items.find(pi => pi.playlist_id === playlistId && pi.article_id === articleId);
+    const existing = Array.from(inMemoryDB.playlist_items.values()).find(pi => pi.playlist_id === playlistId && pi.article_id === articleId);
     if (existing) return existing;
 
     // Determine position: find max position for playlist
-    const items = inMemoryDB.playlist_items.filter(i => i.playlist_id === playlistId);
+    const items = Array.from(inMemoryDB.playlist_items.values()).filter(i => i.playlist_id === playlistId);
     const maxPos = items.length === 0 ? 0 : Math.max(...items.map(i => i.position ?? 0));
 
+    const id = crypto.randomUUID();
     const item: PlaylistItem = {
-        id: crypto.randomUUID(),
+        id,
         playlist_id: playlistId,
         article_id: articleId,
         position: maxPos + 1,
         added_at: new Date().toISOString(),
     };
-    inMemoryDB.playlist_items.push(item);
+    inMemoryDB.playlist_items.set(id, item);
     return item;
 }
 
 export async function getPlaylistWithItems(ownerEmail: string | null, id: string, sort?: { field?: string; order?: 'asc' | 'desc' }) {
     const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
-    const playlist = inMemoryDB.playlists.find(p => p.id === id && p.owner_email === normalizedOwnerEmail);
-    if (!playlist) return null;
+    const playlist = inMemoryDB.playlists.get(id);
+    if (!playlist || playlist.owner_email !== normalizedOwnerEmail) return null;
 
     // Collect items with article info
-    const items: PlaylistItemWithArticle[] = inMemoryDB.playlist_items
+    const items: PlaylistItemWithArticle[] = Array.from(inMemoryDB.playlist_items.values())
         .filter(pi => pi.playlist_id === playlist.id)
         .map(pi => {
-            const article = inMemoryDB.articles.find(a => a.id === pi.article_id);
+            const article = inMemoryDB.articles.get(pi.article_id);
             return {
                 ...pi,
                 article: article || undefined,
@@ -310,8 +316,8 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
 }
 
 export async function removePlaylistItem(playlistId: string, itemId: string) {
-    const idx = inMemoryDB.playlist_items.findIndex(i => i.id === itemId && i.playlist_id === playlistId);
-    if (idx === -1) return false;
-    inMemoryDB.playlist_items.splice(idx, 1);
+    const item = inMemoryDB.playlist_items.get(itemId);
+    if (!item || item.playlist_id !== playlistId) return false;
+    inMemoryDB.playlist_items.delete(itemId);
     return true;
 }
