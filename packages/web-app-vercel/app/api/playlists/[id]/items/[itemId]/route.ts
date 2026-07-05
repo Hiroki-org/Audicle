@@ -56,7 +56,11 @@ export async function DELETE(
 
         if (shouldUseLocalSupabaseFallback()) {
             const items = (await supabaseLocal.getPlaylistWithItems(userEmail, playlistId))?.playlist_items || []
-            const found = items.find((i: PlaylistItemWithArticle) => i.id === itemId)
+            const itemsById = items.reduce((acc: Record<string, PlaylistItemWithArticle>, item: PlaylistItemWithArticle) => {
+                acc[item.id] = item;
+                return acc;
+            }, {} as Record<string, PlaylistItemWithArticle>);
+            const found = itemsById[itemId]
             if (found) {
                 itemToDelete = { article_id: found.article_id }
             }
