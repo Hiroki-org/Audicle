@@ -1,5 +1,6 @@
 import { articleStorage } from '../storage';
 import { Chunk } from '@/types/api';
+import { logger } from '@/lib/logger';
 
 // Mock logger
 jest.mock('@/lib/logger', () => ({
@@ -64,6 +65,19 @@ describe('articleStorage', () => {
       expect(contentJson).toBeTruthy();
       const content = JSON.parse(contentJson!);
       expect(content).toEqual(mockChunks);
+    });
+
+    it('should throw error and log when storage fails (e.g. QuotaExceededError)', () => {
+      const error = new Error('QuotaExceededError');
+      const setItemSpy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw error;
+      });
+
+      expect(() => articleStorage.add(mockArticleInput)).toThrow('QuotaExceededError');
+
+      expect(logger.error).toHaveBeenCalledWith('Failed to add article', error);
+
+      setItemSpy.mockRestore();
     });
   });
 
