@@ -31,9 +31,10 @@ export class AudioCache {
   // 簡単なハッシュ関数
   private hashString(str: string): string {
     let hash = 0;
-    const len = str.length;
-    for (let i = 0; i < len; i++) {
-      hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32bit integer
     }
     return hash.toString(36);
   }
