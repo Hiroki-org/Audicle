@@ -26,6 +26,7 @@ describe('settingsValidator', () => {
       expect(validatePlaybackSpeed(1.0)).toBe(true);
       expect(validatePlaybackSpeed(0.5)).toBe(true);
       expect(validatePlaybackSpeed(3.0)).toBe(true);
+      expect(validatePlaybackSpeed(2.5)).toBe(true);
     });
 
     it('should return false for invalid speeds', () => {
@@ -33,6 +34,17 @@ describe('settingsValidator', () => {
       expect(validatePlaybackSpeed(3.1)).toBe(false);
       expect(validatePlaybackSpeed('1.0')).toBe(false);
       expect(validatePlaybackSpeed(null)).toBe(false);
+    });
+
+    it('should return false for edge cases and non-number types', () => {
+      expect(validatePlaybackSpeed(undefined)).toBe(false);
+      expect(validatePlaybackSpeed(NaN)).toBe(false);
+      expect(validatePlaybackSpeed(Infinity)).toBe(false);
+      expect(validatePlaybackSpeed(-Infinity)).toBe(false);
+      expect(validatePlaybackSpeed([])).toBe(false);
+      expect(validatePlaybackSpeed({})).toBe(false);
+      expect(validatePlaybackSpeed(true)).toBe(false);
+      expect(validatePlaybackSpeed(false)).toBe(false);
     });
   });
 
