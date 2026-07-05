@@ -228,8 +228,8 @@ describe('articleStorage', () => {
 
             expect(localStorageMock.setItem).toHaveBeenCalled();
             const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
-            expect(savedData).toHaveLength(1);
-            expect(savedData[0].id).toBe('2');
+            expect(Object.keys(savedData)).toHaveLength(1);
+            expect(savedData['2'].id).toBe('2');
         });
     });
 

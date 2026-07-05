@@ -1,5 +1,3 @@
-// 記事データの型定義と保存機能
-
 import { Chunk } from "@/types/api";
 
 export interface Article {
@@ -12,18 +10,28 @@ export interface Article {
 
 const STORAGE_KEY = "audicle_articles";
 
-const _readArticles = (): Article[] => {
-    if (typeof window === "undefined") return [];
+const _readArticles = (): Record<string, Article> => {
+    if (typeof window === "undefined") return {};
     const data = localStorage.getItem(STORAGE_KEY);
     try {
-        return data ? JSON.parse(data) : [];
+        if (!data) return {};
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+            // Migrate array to record
+            const record: Record<string, Article> = {};
+            for (const article of parsed) {
+                record[article.id] = article;
+            }
+            return record;
+        }
+        return parsed as Record<string, Article>;
     } catch (e) {
         console.error("Failed to parse articles from localStorage", e);
-        return [];
+        return {};
     }
 };
 
-const _writeArticles = (articles: Article[]): void => {
+const _writeArticles = (articles: Record<string, Article>): void => {
     if (typeof window === "undefined") return;
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(articles));
@@ -35,52 +43,61 @@ const _writeArticles = (articles: Article[]): void => {
 export const articleStorage = {
     // すべての記事を取得
     getAll: (): Article[] => {
-        return _readArticles();
+        const record = _readArticles();
+        return Object.values(record).sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
     },
 
     // 記事を追加
     add: (article: Omit<Article, "id" | "createdAt"> & { id?: string }): Article => {
-        const articles = _readArticles();
+        const record = _readArticles();
         const newArticle: Article = {
             ...article,
             id: article.id || crypto.randomUUID(),
             createdAt: new Date().toISOString(),
         };
-        articles.unshift(newArticle);
-        _writeArticles(articles);
+        record[newArticle.id] = newArticle;
+        _writeArticles(record);
         return newArticle;
     },
 
     // 記事を更新
     update: (id: string, updates: Partial<Omit<Article, "id" | "createdAt">>): Article | null => {
-        const articles = _readArticles();
-        const index = articles.findIndex((a) => a.id === id);
-        if (index === -1) return null;
-        articles[index] = { ...articles[index], ...updates };
-        _writeArticles(articles);
-        return articles[index];
+        const record = _readArticles();
+        if (!record[id]) return null;
+        record[id] = { ...record[id], ...updates };
+        _writeArticles(record);
+        return record[id];
     },
 
     // IDで記事を取得
     getById: (id: string): Article | undefined => {
-        return _readArticles().find((a) => a.id === id);
+        const record = _readArticles();
+        return record[id];
     },
 
     // 記事をupsert（URLをキーに既存を更新、なければ追加）
     upsert: (article: Omit<Article, "id" | "createdAt"> & { id?: string }): Article => {
-        const articles = _readArticles();
-        const existingIndex = articles.findIndex((a) => a.url === article.url);
+        const record = _readArticles();
+        const existingArticle = Object.values(record).find((a) => a.url === article.url);
 
-        if (existingIndex >= 0) {
+        if (existingArticle) {
             // 既存の記事を更新
-            articles[existingIndex] = {
-                ...articles[existingIndex],
+            const updatedArticle = {
+                ...existingArticle,
                 ...article,
                 // idが指定されている場合は更新
                 ...(article.id && { id: article.id }),
             };
-            _writeArticles(articles);
-            return articles[existingIndex];
+
+            if (article.id && article.id !== existingArticle.id) {
+                delete record[existingArticle.id];
+            }
+
+            record[updatedArticle.id] = updatedArticle;
+            _writeArticles(record);
+            return updatedArticle;
         } else {
             // 新規追加
             return articleStorage.add(article);
@@ -89,8 +106,11 @@ export const articleStorage = {
 
     // 記事を削除
     remove: (id: string): void => {
-        const articles = _readArticles().filter((a) => a.id !== id);
-        _writeArticles(articles);
+        const record = _readArticles();
+        if (record[id]) {
+            delete record[id];
+            _writeArticles(record);
+        }
     },
 
     // すべてクリア
