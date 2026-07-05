@@ -133,6 +133,56 @@ describe('articleStorage', () => {
   });
 
   describe('migrate', () => {
+
+    it('should continue migration and log error if localStorage.setItem fails for an article', async () => {
+      const legacyArticles = [
+        {
+          id: 'fail-article',
+          title: 'Fail Article',
+          url: 'https://fail.com',
+          chunks: mockChunks,
+          createdAt: 1234567890,
+        },
+        {
+          id: 'success-article',
+          title: 'Success Article',
+          url: 'https://success.com',
+          chunks: mockChunks,
+          createdAt: 1234567891,
+        }
+      ];
+      localStorage.setItem('audicle_articles', JSON.stringify(legacyArticles));
+
+      // Import the mocked logger to check assertions
+      const { logger } = await import('@/lib/logger');
+
+      const originalSetItem = Storage.prototype.setItem;
+      const setItemSpy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => {
+        if (key.includes('fail-article')) {
+          throw new Error('Storage quota exceeded');
+        }
+        return originalSetItem.call(localStorage, key, value);
+      });
+
+      articleStorage.migrate();
+
+      // Ensure error was logged
+      expect(logger.error).toHaveBeenCalledWith(
+        'Migration: Failed to save article fail-article',
+        expect.any(Error)
+      );
+
+      // Check index only has success article
+      const articles = articleStorage.getAll();
+      expect(articles).toHaveLength(1);
+      expect(articles[0].id).toBe('success-article');
+
+      // Check legacy removal still happens
+      expect(localStorage.getItem('audicle_articles')).toBeNull();
+
+      setItemSpy.mockRestore();
+    });
+
     it('should migrate legacy data', () => {
       const legacyArticles = [
         {
