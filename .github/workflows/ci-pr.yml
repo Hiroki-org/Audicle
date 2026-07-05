@@ -21,7 +21,7 @@ jobs:
         run: echo "PR CI is using the in-memory Supabase fallback; remote test database seed is disabled."
       - name: Checkout code
         if: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' }}
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v6.0.2
       - name: Setup Node.js
         if: ${{ vars.CI_USE_REMOTE_SUPABASE == 'true' }}
         uses: actions/setup-node@v6
@@ -46,7 +46,7 @@ jobs:
     name: Setup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
@@ -62,13 +62,13 @@ jobs:
     needs: setup
     runs-on: ubuntu-slim
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -87,13 +87,13 @@ jobs:
     needs: setup
     runs-on: ubuntu-slim
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -114,13 +114,13 @@ jobs:
     needs: setup
     runs-on: ubuntu-slim
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Restore npm cache
         id: cache-deps-integration
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -141,13 +141,13 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Restore node_modules
         id: cache-deps
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -187,13 +187,13 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -205,7 +205,7 @@ jobs:
         working-directory: packages/web-app-vercel
       - name: Restore Playwright browsers
         id: playwright-cache-e2e
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-pr-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -247,13 +247,13 @@ jobs:
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
       NEXT_PUBLIC_AUTH_ENV: test
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -265,7 +265,7 @@ jobs:
         working-directory: packages/web-app-vercel
       - name: Restore Playwright browsers
         id: playwright-cache-e2e
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-pr-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -306,13 +306,13 @@ jobs:
       NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
       NEXT_PUBLIC_AUTH_ENV: test
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -324,7 +324,7 @@ jobs:
         working-directory: packages/web-app-vercel
       - name: Restore Playwright cache
         id: playwright-cache
-        uses: actions/cache@v6
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}

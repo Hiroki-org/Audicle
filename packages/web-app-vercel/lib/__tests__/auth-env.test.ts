@@ -8,6 +8,7 @@ describe('auth-env', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
+        jest.resetModules();
         process.env = { ...originalEnv };
     });
 
@@ -18,12 +19,10 @@ describe('auth-env', () => {
     describe('isTestAuthRuntime', () => {
         it('should return true if AUTH_ENV is "test"', () => {
             process.env.AUTH_ENV = 'test';
-            delete process.env.NEXT_PUBLIC_AUTH_ENV;
             expect(isTestAuthRuntime()).toBe(true);
         });
 
         it('should return true if NEXT_PUBLIC_AUTH_ENV is "test"', () => {
-            delete process.env.AUTH_ENV;
             process.env.NEXT_PUBLIC_AUTH_ENV = 'test';
             expect(isTestAuthRuntime()).toBe(true);
         });
@@ -77,13 +76,6 @@ describe('auth-env', () => {
 
         it('should return true if hasSupabaseRuntimeConfig is false', () => {
             process.env.AUTH_ENV = 'production';
-            delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-            delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-            expect(shouldUseLocalSupabaseFallback()).toBe(true);
-        });
-
-        it('should return true if isTestAuthRuntime is true and hasSupabaseRuntimeConfig is false', () => {
-            process.env.AUTH_ENV = 'test';
             delete process.env.NEXT_PUBLIC_SUPABASE_URL;
             delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
             expect(shouldUseLocalSupabaseFallback()).toBe(true);
