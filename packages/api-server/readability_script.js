@@ -139,11 +139,15 @@ async function extractContent(url) {
   }
 }
 
-// コマンドライン引数からURLを取得
-const url = process.argv[2];
-if (!url) {
-  console.error(JSON.stringify({ error: "URL is required" }));
-  process.exit(1);
-}
+if (require.main === module) {
+  // コマンドライン引数からURLを取得
+  const url = process.argv[2];
+  if (!url) {
+    console.error(JSON.stringify({ error: "URL is required" }));
+    process.exit(1);
+  }
 
-extractContent(url);
+  extractContent(url);
+} else {
+  module.exports = { isIpSafe };
+}

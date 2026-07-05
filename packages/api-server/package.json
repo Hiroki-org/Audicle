@@ -4,7 +4,7 @@
   "description": "API server for text extraction using Readability.js",
   "main": "readability_script.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
@@ -13,5 +13,8 @@
     "node-fetch": "^2.6.7"
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
 }
