@@ -98,5 +98,12 @@ describe('settingsValidator', () => {
       expect(validateUserSettings(123)).toBe(false);
       expect(validateUserSettings({})).toBe(false);
     });
+
+    it('should return false for partial settings objects missing required fields', () => {
+      expect(validateUserSettings({ playback_speed: 1.0, voice_model: 'ja-JP-Neural2-B' })).toBe(false);
+      expect(validateUserSettings({ language: 'ja-JP', color_theme: 'dark' })).toBe(false);
+      expect(validateUserSettings({ playback_speed: 1.0 })).toBe(false);
+    });
+
   });
 });
