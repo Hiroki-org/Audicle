@@ -1260,9 +1260,9 @@ function buildQueueWithReadability() {
   }
 
   // 抽出した HTML をテキストに変換し、段落に分割
-  const tempDiv = document.createElement("div");
-  tempDiv.innerHTML = article.content;
-  const paragraphs = tempDiv.querySelectorAll("p");
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(article.content, "text/html");
+  const paragraphs = doc.querySelectorAll("p");
 
   const queue = [];
   paragraphs.forEach((p, index) => {
