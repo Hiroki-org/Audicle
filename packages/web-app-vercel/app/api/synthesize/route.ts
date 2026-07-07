@@ -10,7 +10,7 @@ import fs from 'fs';
 import { getCacheIndex, addCachedChunk, isCachedInIndex } from '@/lib/db/cacheIndex';
 import { calculateTextHash } from '@/lib/textHash';
 import { getStorageProvider } from '@/lib/storage';
-import { GoogleError } from 'google-gax';
+import { GoogleError, type ClientOptions } from 'google-gax';
 import { removeSeparatorCharacters } from '@/lib/textCleaner';
 
 // Node.js runtimeを明示的に指定（Google Cloud TTS SDKはEdge Runtimeで動作しない）
@@ -188,7 +188,7 @@ function getTTSClient(): TextToSpeechClient | null {
     // best-effort cast.
     ttsCLient = new TextToSpeechClient({
 
-        credentials: credentials as any,
+        credentials: credentials as ClientOptions['credentials'],
     });
     return ttsCLient;
 }
