@@ -1,21 +1,20 @@
 import pytest
 import os
-from fastapi.testclient import TestClient
 import importlib
+from fastapi.testclient import TestClient
 
-@pytest.fixture(autouse=True)
-def setup_env():
+
+@pytest.fixture(scope="module")
+def client():
     os.environ["CORS_ALLOWED_ORIGINS"] = "http://localhost:3000"
-    yield
-    if "CORS_ALLOWED_ORIGINS" in os.environ:
-        del os.environ["CORS_ALLOWED_ORIGINS"]
-
-def test_cors_allowed_method():
     import main
     importlib.reload(main)
-    from main import app
-    client = TestClient(app)
+    client = TestClient(main.app)
+    yield client
+    os.environ.pop("CORS_ALLOWED_ORIGINS", None)
 
+
+def test_cors_allowed_method(client):
     headers = {
         "Origin": "http://localhost:3000",
         "Access-Control-Request-Method": "POST"
@@ -23,12 +22,8 @@ def test_cors_allowed_method():
     response = client.options("/extract", headers=headers)
     assert response.status_code == 200
 
-def test_cors_disallowed_method():
-    import main
-    importlib.reload(main)
-    from main import app
-    client = TestClient(app)
 
+def test_cors_disallowed_method(client):
     headers = {
         "Origin": "http://localhost:3000",
         "Access-Control-Request-Method": "DELETE"
