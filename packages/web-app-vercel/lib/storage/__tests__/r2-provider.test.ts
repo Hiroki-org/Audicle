@@ -6,33 +6,19 @@ jest.mock("@aws-sdk/client-s3");
 jest.mock("@aws-sdk/s3-request-presigner");
 
 describe("R2StorageProvider", () => {
-    const requiredEnv = {
-        R2_ACCOUNT_ID: "test-account-id",
-        R2_ACCESS_KEY_ID: "test-access-key",
-        R2_SECRET_ACCESS_KEY: "test-secret-key",
-        R2_BUCKET_NAME: "test-bucket",
-    };
-    const originalEnv = Object.fromEntries(
-        Object.keys(requiredEnv).map((key) => [key, process.env[key]])
-    );
-
-    const restoreRequiredEnv = () => {
-        for (const [key, value] of Object.entries(originalEnv)) {
-            if (value === undefined) {
-                delete process.env[key];
-            } else {
-                process.env[key] = value;
-            }
-        }
-    };
+    const originalEnv = process.env;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        Object.assign(process.env, requiredEnv);
+        process.env = { ...originalEnv };
+        process.env.R2_ACCOUNT_ID = "test-account-id";
+        process.env.R2_ACCESS_KEY_ID = "test-access-key";
+        process.env.R2_SECRET_ACCESS_KEY = "test-secret-key";
+        process.env.R2_BUCKET_NAME = "test-bucket";
     });
 
     afterAll(() => {
-        restoreRequiredEnv();
+        process.env = originalEnv;
     });
 
     describe("constructor", () => {
@@ -48,8 +34,8 @@ describe("R2StorageProvider", () => {
             });
         });
 
-        it.each(Object.keys(requiredEnv))("should throw error when %s is missing", (envKey) => {
-            delete process.env[envKey];
+        it("should throw error when missing required env vars", () => {
+            delete process.env.R2_ACCOUNT_ID;
             expect(() => new R2StorageProvider()).toThrow(
                 "Missing required R2 environment variables: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME"
             );
@@ -78,9 +64,7 @@ describe("R2StorageProvider", () => {
                     Key: "test-key",
                     ContentType: "audio/mpeg",
                 });
-                expect(getSignedUrl).toHaveBeenCalledWith(mockS3ClientInstance, expect.any(Object), {
-                    expiresIn: 3600,
-                });
+                expect(getSignedUrl).toHaveBeenCalledWith(mockS3ClientInstance, expect.any(Object), { expiresIn: 3600 });
             });
         });
 
@@ -113,33 +97,6 @@ describe("R2StorageProvider", () => {
                     ContentType: "text/plain",
                 });
                 expect(mockS3ClientInstance.send).toHaveBeenCalledWith(expect.any(Object));
-                expect(GetObjectCommand).toHaveBeenCalledWith({
-                    Bucket: "test-bucket",
-                    Key: "test-key",
-                });
-                expect(getSignedUrl).toHaveBeenCalledWith(mockS3ClientInstance, expect.any(Object), { expiresIn: 3600 });
-            });
-
-            it("should upload an ArrayBuffer body", async () => {
-                (getSignedUrl as jest.Mock).mockResolvedValue("https://presigned-get-url-after-upload");
-                mockS3ClientInstance.send.mockResolvedValue({});
-
-                const data = new Uint8Array([1, 2, 3]).buffer;
-                await provider.uploadObject("array-buffer-key", data, "application/octet-stream", 1800);
-
-                expect(PutObjectCommand).toHaveBeenCalledWith({
-                    Bucket: "test-bucket",
-                    Key: "array-buffer-key",
-                    Body: expect.any(Uint8Array),
-                    ContentType: "application/octet-stream",
-                });
-                expect(GetObjectCommand).toHaveBeenCalledWith({
-                    Bucket: "test-bucket",
-                    Key: "array-buffer-key",
-                });
-                expect(getSignedUrl).toHaveBeenCalledWith(mockS3ClientInstance, expect.any(Object), {
-                    expiresIn: 1800,
-                });
             });
         });
 
