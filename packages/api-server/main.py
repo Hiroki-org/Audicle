@@ -21,29 +21,12 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Audicle API Server", version="1.0.0")
 
 # CORS設定
-def _validate_cors_origin(origin: str) -> str:
-    if "*" in origin:
-        raise ValueError("CORS_ALLOWED_ORIGINS にワイルドカードは使用できません。")
-
-    parsed = urllib.parse.urlparse(origin)
-    if parsed.scheme not in {"http", "https"}:
-        raise ValueError(f"Invalid CORS origin scheme: {origin}")
-    if not parsed.hostname or parsed.username or parsed.password:
-        raise ValueError(f"Invalid CORS origin host: {origin}")
-    if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
-        raise ValueError(f"Invalid CORS origin format: {origin}")
-
-    return origin.rstrip("/")
-
-
 cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS")
 allow_origins = []
 if cors_origins_env:
-    allow_origins = [
-        _validate_cors_origin(origin.strip())
-        for origin in cors_origins_env.split(",")
-        if origin.strip()
-    ]
+    allow_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    if "*" in allow_origins:
+        raise ValueError("CORS_ALLOWED_ORIGINS に '*' は使用できません。allow_credentials=True と組み合わせると起動に失敗します。")
 
 if not allow_origins:
     raise ValueError("CORS_ALLOWED_ORIGINS 環境変数が設定されていないか、有効なオリジンがありません。フロントエンドからのアクセスを許可するために、有効なオリジンを指定してください。")
