@@ -34,6 +34,10 @@ describe('articleStorage', () => {
         localStorageMock.clear();
     });
 
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
     describe('getAll', () => {
         it('should return empty array when no articles', () => {
             localStorageMock.getItem.mockReturnValueOnce(null);
@@ -60,7 +64,6 @@ describe('articleStorage', () => {
             expect(articleStorage.getAll()).toEqual([]);
             expect(consoleSpy).toHaveBeenCalled();
             expect(localStorageMock.removeItem).toHaveBeenCalledWith('audicle_articles');
-            consoleSpy.mockRestore();
         });
     });
 
