@@ -194,6 +194,16 @@ describe("usePlaylists hooks", () => {
       expect(global.fetch).toHaveBeenCalledWith(`/api/playlists/${playlistId}`);
     });
 
+    it("should not fetch when userEmail is undefined", async () => {
+      mockUseSession.mockReturnValue({ data: null, status: "unauthenticated" });
+
+      const { result } = renderHook(() => usePlaylistDetail("playlist123"), { wrapper });
+
+      expect(result.current.isPending).toBe(true);
+      expect(result.current.fetchStatus).toBe("idle");
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
     it("should not fetch when playlistId is missing", async () => {
       const { result } = renderHook(() => usePlaylistDetail(""), { wrapper });
 
