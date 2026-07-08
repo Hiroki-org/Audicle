@@ -19,7 +19,6 @@ const _readArticles = (): Article[] => {
         return data ? JSON.parse(data) : [];
     } catch (e) {
         console.error("Failed to parse articles from localStorage", e);
-        localStorage.removeItem(STORAGE_KEY);
         return [];
     }
 };

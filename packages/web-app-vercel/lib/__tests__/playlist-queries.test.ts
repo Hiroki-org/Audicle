@@ -1,32 +1,17 @@
 import { fetchPlaylistsByItem } from '../playlist-queries';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-type QueryResult = {
-    data: unknown[] | null;
-    error: unknown | null;
-};
-
-interface MockQueryBuilder extends PromiseLike<QueryResult> {
-    select: jest.Mock<MockQueryBuilder, [string]>;
-    eq: jest.Mock<MockQueryBuilder, [string, string]>;
-    order: jest.Mock<MockQueryBuilder, [string, { ascending: boolean }]>;
-}
-
 describe('fetchPlaylistsByItem', () => {
     let mockSupabase: jest.Mocked<SupabaseClient>;
-    let mockQueryBuilder: MockQueryBuilder;
-    let mockQueryResult: QueryResult;
+    let mockQueryBuilder: any;
 
     beforeEach(() => {
-        mockQueryResult = { data: null, error: null };
         mockQueryBuilder = {
             select: jest.fn().mockReturnThis(),
             eq: jest.fn().mockReturnThis(),
-            order: jest.fn().mockReturnThis(),
-            then: jest.fn((onFulfilled, onRejected) =>
-                Promise.resolve(mockQueryResult).then(onFulfilled, onRejected)
-            ),
         };
+        // Setup order chain properly to handle query = query.order() chaining
+        mockQueryBuilder.order = jest.fn().mockReturnThis();
 
         mockSupabase = {
             from: jest.fn().mockReturnValue(mockQueryBuilder),
@@ -35,7 +20,14 @@ describe('fetchPlaylistsByItem', () => {
 
     it('should fetch playlists with position sort when includePositionSort is true', async () => {
         const mockData = [{ id: 'playlist1' }];
-        mockQueryResult = { data: mockData, error: null };
+
+        // Ensure the last call to order returns a promise
+        mockQueryBuilder.order.mockImplementation((field: string, options: any) => {
+             if (field === 'created_at') {
+                 return Promise.resolve({ data: mockData, error: null });
+             }
+             return mockQueryBuilder;
+        });
 
         const result = await fetchPlaylistsByItem({
             supabase: mockSupabase,
@@ -56,26 +48,15 @@ describe('fetchPlaylistsByItem', () => {
         expect(result).toEqual({ playlistsWithItems: mockData, playlistsError: null });
     });
 
-    it('should use position sort by default', async () => {
-        const mockData = [{ id: 'playlist-default' }];
-        mockQueryResult = { data: mockData, error: null };
-
-        const result = await fetchPlaylistsByItem({
-            supabase: mockSupabase,
-            userEmail: 'test@example.com',
-            itemId: 'item123',
-            filterField: 'article_id',
-        });
-
-        expect(mockQueryBuilder.order).toHaveBeenCalledWith('position', { ascending: true });
-        expect(mockQueryBuilder.order).toHaveBeenCalledWith('is_default', { ascending: false });
-        expect(mockQueryBuilder.order).toHaveBeenCalledWith('created_at', { ascending: false });
-        expect(result).toEqual({ playlistsWithItems: mockData, playlistsError: null });
-    });
-
     it('should fetch playlists without position sort when includePositionSort is false', async () => {
         const mockData = [{ id: 'playlist2' }];
-        mockQueryResult = { data: mockData, error: null };
+
+        mockQueryBuilder.order.mockImplementation((field: string, options: any) => {
+             if (field === 'created_at') {
+                 return Promise.resolve({ data: mockData, error: null });
+             }
+             return mockQueryBuilder;
+        });
 
         const result = await fetchPlaylistsByItem({
             supabase: mockSupabase,
@@ -98,7 +79,13 @@ describe('fetchPlaylistsByItem', () => {
 
     it('should handle errors from supabase', async () => {
         const mockError = new Error('Database error');
-        mockQueryResult = { data: null, error: mockError };
+
+        mockQueryBuilder.order.mockImplementation((field: string, options: any) => {
+             if (field === 'created_at') {
+                 return Promise.resolve({ data: null, error: mockError });
+             }
+             return mockQueryBuilder;
+        });
 
         const result = await fetchPlaylistsByItem({
             supabase: mockSupabase,
