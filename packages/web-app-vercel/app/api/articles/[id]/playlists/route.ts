@@ -6,6 +6,10 @@ import { resolveArticleId } from '@/lib/api-helpers'
 import { shouldUseLocalSupabaseFallback } from '@/lib/auth-env'
 import * as supabaseLocal from '@/lib/supabaseLocal'
 
+type PlaylistWithArticleId = Playlist & {
+    playlist_items: { article_id: string }[]
+}
+
 export async function GET(
     request: Request,
     context: { params: Promise<{ id: string }> }
@@ -48,7 +52,6 @@ export async function GET(
         }
 
         // プレイリストを取得（所有権フィルタリングとarticle_idによる結合フィルタリング付き）
-        type PlaylistWithItems = Playlist & { playlist_items: { article_id: string }[] };
         const { data: playlists, error: playlistsError } = await supabase
             .from('playlists')
             .select('*, playlist_items!inner(article_id)')
@@ -56,7 +59,7 @@ export async function GET(
             .eq('playlist_items.article_id', actualArticleId)
             .order('is_default', { ascending: false })
             .order('created_at', { ascending: false })
-            .returns<PlaylistWithItems[]>()
+            .returns<PlaylistWithArticleId[]>()
 
         if (playlistsError) {
             return NextResponse.json(
@@ -66,12 +69,12 @@ export async function GET(
         }
 
         // Remove the nested playlist_items array before returning
-        const formattedPlaylists = playlists ? playlists.map(p => {
+        const formattedPlaylists: Playlist[] = playlists ? playlists.map(p => {
             const { playlist_items: _playlistItems, ...rest } = p;
             return rest;
         }) : []
 
-        return NextResponse.json(formattedPlaylists as Playlist[])
+        return NextResponse.json(formattedPlaylists)
     } catch (_error) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
