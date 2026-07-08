@@ -59,6 +59,7 @@ describe('articleStorage', () => {
             localStorageMock.getItem.mockReturnValueOnce('invalid json');
             expect(articleStorage.getAll()).toEqual([]);
             expect(consoleSpy).toHaveBeenCalled();
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('audicle_articles');
             consoleSpy.mockRestore();
         });
     });
