@@ -35,6 +35,20 @@ describe('articleStorage', () => {
   };
 
   describe('add', () => {
+    it('should throw error when localStorage.setItem fails (e.g. QuotaExceededError)', () => {
+      const error = new Error('QuotaExceededError');
+      jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw error;
+      });
+
+      expect(() => articleStorage.add(mockArticleInput)).toThrow('QuotaExceededError');
+
+      const { logger } = require('@/lib/logger');
+      expect(logger.error).toHaveBeenCalledWith('Failed to add article', error);
+
+      jest.restoreAllMocks();
+    });
+
     it('should add an article and separate content from index', () => {
       const result = articleStorage.add(mockArticleInput);
 
