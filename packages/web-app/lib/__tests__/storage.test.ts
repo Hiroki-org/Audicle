@@ -168,6 +168,22 @@ describe('articleStorage', () => {
       expect(articleStorage.getAll()).toHaveLength(0);
     });
 
+
+    it('should log error when global migration fails', () => {
+      const { logger } = require('@/lib/logger');
+
+      const error = new Error('Mock global failure');
+      jest.spyOn(Storage.prototype, 'getItem').mockImplementationOnce(() => {
+        throw error;
+      });
+
+      articleStorage.migrate();
+
+      expect(logger.error).toHaveBeenCalledWith('Migration failed', error);
+
+      jest.restoreAllMocks();
+    });
+
     it('should handle invalid legacy data', () => {
         localStorage.setItem('audicle_articles', 'invalid-json');
         articleStorage.migrate();

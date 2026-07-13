@@ -20,9 +20,9 @@ export const articleStorage = {
   migrate: (): void => {
     if (typeof window === "undefined") return;
 
-    const legacyData = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (legacyData) {
-      try {
+    try {
+      const legacyData = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacyData) {
         const articles = JSON.parse(legacyData);
 
         if (!Array.isArray(articles)) {
@@ -76,9 +76,9 @@ export const articleStorage = {
         localStorage.removeItem(LEGACY_STORAGE_KEY);
         logger.success(`Migration successful: ${successCount} articles migrated`);
 
-      } catch (e) {
-        logger.error("Migration failed", e);
       }
+    } catch (e) {
+      logger.error("Migration failed", e);
     }
   },
 
