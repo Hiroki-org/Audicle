@@ -43,8 +43,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         }
 
                         // テスト用の固定認証
-                        const expectedEmail = process.env.TEST_USER_EMAIL || 'test@example.com';
-                        const expectedPassword = process.env.TEST_USER_PASSWORD || 'password';
+                        const expectedEmail = process.env.TEST_USER_EMAIL;
+                        const expectedPassword = process.env.TEST_USER_PASSWORD;
+
+                        if (!expectedEmail || !expectedPassword) {
+                            console.error('[AUTH ERROR] TEST_USER_EMAIL and TEST_USER_PASSWORD must be set for test authentication');
+                            return null;
+                        }
 
                         if (
                             credentials?.email === expectedEmail &&
