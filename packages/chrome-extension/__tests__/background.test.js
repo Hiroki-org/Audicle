@@ -32,7 +32,7 @@ const evalContext = `
     if (global.mockBlobToDataURL) {
       return global.mockBlobToDataURL(blob);
     }
-    throw new Error('Not mocked');
+    return 'data:audio/mpeg;base64,mockbase64'; // Default successful mock
   };
 `;
 eval(evalContext);
@@ -101,5 +101,30 @@ describe('RemoteAudioSynthesizer', () => {
     });
 
     await expect(synthesizer.synthesize('hello world')).rejects.toThrow('Test API Server synthesis failed: Test API Server error: 500 Internal Server Error Server crashed');
+  });
+
+  it('should handle error when reading blob fails', async () => {
+    const synthesizer = new global.RemoteAudioSynthesizer('http://localhost:8000', '/api/synthesize', 'Test API Server');
+
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      blob: jest.fn().mockRejectedValueOnce(new Error('Failed to read blob'))
+    });
+
+    await expect(synthesizer.synthesize('hello world')).rejects.toThrow('Test API Server synthesis failed: Failed to read blob');
+  });
+
+  it('should handle error when blobToDataURL fails', async () => {
+    const synthesizer = new global.RemoteAudioSynthesizer('http://localhost:8000', '/api/synthesize', 'Test API Server');
+
+    const mockBlob = new global.Blob(['mock audio data'], { type: 'audio/mpeg' });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      blob: jest.fn().mockResolvedValueOnce(mockBlob)
+    });
+
+    global.mockBlobToDataURL = jest.fn().mockRejectedValueOnce(new Error('Failed to convert blob to data URL'));
+
+    await expect(synthesizer.synthesize('hello world')).rejects.toThrow('Test API Server synthesis failed: Failed to convert blob to data URL');
   });
 });
