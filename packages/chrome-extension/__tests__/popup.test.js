@@ -23,6 +23,19 @@ describe('getHostnameFromUrl', () => {
     expect(getHostnameFromUrl(undefined)).toBe('');
   });
 
+
+  it('should log an error and return empty string for malformed URLs that throw TypeError', () => {
+    // We already mock console.error in beforeEach, but we can check if it was called
+    const invalidUrl = 'malformed-url';
+    const result = getHostnameFromUrl(invalidUrl);
+    expect(result).toBe('');
+    expect(console.error).toHaveBeenCalledWith(
+      "Invalid URL:",
+      invalidUrl,
+      expect.anything()
+    );
+  });
+
   it('should handle chrome:// and other custom protocol URLs', () => {
     expect(getHostnameFromUrl('chrome://extensions/')).toBe('extensions');
     expect(getHostnameFromUrl('chrome-extension://abcdefghijklmnopqrstuvwxyz/')).toBe('abcdefghijklmnopqrstuvwxyz');
