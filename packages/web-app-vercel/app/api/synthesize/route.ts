@@ -364,6 +364,7 @@ export async function POST(request: NextRequest) {
             voice: body.voice || body.voice_model
         });
 
+
         // 入力バリデーション
         if (!body.chunks && !body.text) {
             log('warn', 'text または chunks がリクエストボディにありません');
@@ -372,6 +373,38 @@ export async function POST(request: NextRequest) {
                 { status: 400, headers: corsHeaders }
             );
         }
+
+        // セキュリティバリデーション: 最大文字数/チャンク数の制限
+        const MAX_TOTAL_LENGTH = 10000;
+        const MAX_CHUNKS = 100;
+
+        if (body.chunks) {
+            if (body.chunks.length > MAX_CHUNKS) {
+                log('warn', 'Too many chunks requested', { count: body.chunks.length });
+                return NextResponse.json(
+                    { error: 'Too many chunks. Maximum allowed is ' + MAX_CHUNKS },
+                    { status: 400, headers: corsHeaders }
+                );
+            }
+
+            const totalLength = body.chunks.reduce((acc: number, chunk: any) => acc + (chunk.text ? chunk.text.length : 0), 0);
+            if (totalLength > MAX_TOTAL_LENGTH) {
+                log('warn', 'Total text length exceeds maximum', { length: totalLength });
+                return NextResponse.json(
+                    { error: 'Total text length exceeds maximum allowed (' + MAX_TOTAL_LENGTH + ' characters)' },
+                    { status: 400, headers: corsHeaders }
+                );
+            }
+        } else if (body.text) {
+            if (body.text.length > MAX_TOTAL_LENGTH) {
+                log('warn', 'Text length exceeds maximum', { length: body.text.length });
+                return NextResponse.json(
+                    { error: 'Text length exceeds maximum allowed (' + MAX_TOTAL_LENGTH + ' characters)' },
+                    { status: 400, headers: corsHeaders }
+                );
+            }
+        }
+
 
         const speakingRate = body.speakingRate || 1.0;
         const storage = getStorageProvider();
