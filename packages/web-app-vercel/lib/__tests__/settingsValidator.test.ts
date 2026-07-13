@@ -57,6 +57,11 @@ describe('settingsValidator', () => {
     it('should return false for invalid languages', () => {
       expect(validateLanguage('fr-FR')).toBe(false);
       expect(validateLanguage(null)).toBe(false);
+      expect(validateLanguage(undefined)).toBe(false);
+      expect(validateLanguage('')).toBe(false);
+      expect(validateLanguage(123)).toBe(false);
+      expect(validateLanguage({})).toBe(false);
+      expect(validateLanguage([])).toBe(false);
     });
   });
 
