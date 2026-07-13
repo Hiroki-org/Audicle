@@ -65,6 +65,14 @@ describe("usePlaylistSelection hooks", () => {
             expect(global.fetch).not.toHaveBeenCalled();
         });
 
+        it("should not fetch when itemId is empty string", () => {
+            const { result } = renderHook(() => usePlaylistItemPlaylists(""), { wrapper });
+
+            expect(result.current.isPending).toBe(true);
+            expect(result.current.fetchStatus).toBe("idle");
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
+
         it("should respect options.enabled", () => {
             const { result } = renderHook(() => usePlaylistItemPlaylists("item123", { enabled: false }), { wrapper });
 
@@ -82,6 +90,18 @@ describe("usePlaylistSelection hooks", () => {
 
             await waitFor(() => expect(result.current.isError).toBe(true));
             expect(result.current.error?.message).toBe("プレイリストアイテムが所属するプレイリストの取得に失敗しました");
+        });
+
+        it("should fetch when options.enabled is explicitly true even if userEmail is undefined", async () => {
+            const { useSession } = require("next-auth/react");
+            useSession.mockReturnValue({ data: null, status: "unauthenticated" });
+            (global.fetch as jest.Mock).mockResolvedValueOnce({
+                ok: true,
+                json: async () => [],
+            });
+
+            renderHook(() => usePlaylistItemPlaylists("item123", { enabled: true }), { wrapper });
+            await waitFor(() => expect(global.fetch).toHaveBeenCalled());
         });
     });
 
@@ -111,6 +131,14 @@ describe("usePlaylistSelection hooks", () => {
             expect(global.fetch).not.toHaveBeenCalled();
         });
 
+        it("should not fetch when articleId is empty string", () => {
+            const { result } = renderHook(() => useArticlePlaylists(""), { wrapper });
+
+            expect(result.current.isPending).toBe(true);
+            expect(result.current.fetchStatus).toBe("idle");
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
+
         it("should respect options.enabled", () => {
             const { result } = renderHook(() => useArticlePlaylists("article123", { enabled: false }), { wrapper });
 
@@ -128,6 +156,18 @@ describe("usePlaylistSelection hooks", () => {
 
             await waitFor(() => expect(result.current.isError).toBe(true));
             expect(result.current.error?.message).toBe("Failed to fetch playlists");
+        });
+
+        it("should fetch when options.enabled is explicitly true even if articleId is empty", async () => {
+            const { useSession } = require("next-auth/react");
+            useSession.mockReturnValue(mockSession);
+            (global.fetch as jest.Mock).mockResolvedValueOnce({
+                ok: true,
+                json: async () => [],
+            });
+
+            renderHook(() => useArticlePlaylists("", { enabled: true }), { wrapper });
+            await waitFor(() => expect(global.fetch).toHaveBeenCalled());
         });
     });
 
