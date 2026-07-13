@@ -5,7 +5,6 @@ import {
   validateColorTheme,
   validateUserSettings,
 } from '../settingsValidator';
-// Removed unused imports: VOICE_MODELS and COLOR_THEMES
 
 jest.mock('@/types/settings', () => ({
   ...jest.requireActual('@/types/settings'),
@@ -33,6 +32,7 @@ describe('settingsValidator', () => {
       expect(validatePlaybackSpeed(3.1)).toBe(false);
       expect(validatePlaybackSpeed('1.0')).toBe(false);
       expect(validatePlaybackSpeed(null)).toBe(false);
+      expect(validatePlaybackSpeed(undefined)).toBe(false);
     });
   });
 
@@ -45,6 +45,7 @@ describe('settingsValidator', () => {
     it('should return false for invalid voice models', () => {
       expect(validateVoiceModel('invalid-model')).toBe(false);
       expect(validateVoiceModel(123)).toBe(false);
+      expect(validateVoiceModel(undefined)).toBe(false);
     });
   });
 
@@ -57,6 +58,7 @@ describe('settingsValidator', () => {
     it('should return false for invalid languages', () => {
       expect(validateLanguage('fr-FR')).toBe(false);
       expect(validateLanguage(null)).toBe(false);
+      expect(validateLanguage(undefined)).toBe(false);
     });
   });
 
@@ -70,6 +72,7 @@ describe('settingsValidator', () => {
     it('should return false for invalid color themes', () => {
       expect(validateColorTheme('blue')).toBe(false);
       expect(validateColorTheme(1)).toBe(false);
+      expect(validateColorTheme(undefined)).toBe(false);
     });
   });
 
@@ -90,6 +93,12 @@ describe('settingsValidator', () => {
       expect(validateUserSettings({ ...validSettings, voice_model: 'invalid' })).toBe(false);
       expect(validateUserSettings({ ...validSettings, language: 'xx-XX' })).toBe(false);
       expect(validateUserSettings({ ...validSettings, color_theme: 'rainbow' })).toBe(false);
+    });
+
+    it('should return false for partial settings objects', () => {
+      expect(validateUserSettings({ playback_speed: 1.0, voice_model: 'ja-JP-Neural2-B', language: 'ja-JP' })).toBe(false);
+      expect(validateUserSettings({ voice_model: 'ja-JP-Neural2-B', language: 'ja-JP', color_theme: 'dark' })).toBe(false);
+      expect(validateUserSettings({ playback_speed: 1.0, color_theme: 'dark' })).toBe(false);
     });
 
     it('should return false for malformed data', () => {
