@@ -24,6 +24,10 @@ describe('articleStorage', () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   const mockChunks: Chunk[] = [
     { text: 'Hello world', start: 0, end: 11 },
   ];
@@ -43,10 +47,8 @@ describe('articleStorage', () => {
 
       expect(() => articleStorage.add(mockArticleInput)).toThrow('QuotaExceededError');
 
-      const { logger } = require('@/lib/logger');
+      const { logger } = jest.requireMock('@/lib/logger');
       expect(logger.error).toHaveBeenCalledWith('Failed to add article', error);
-
-      jest.restoreAllMocks();
     });
 
     it('should add an article and separate content from index', () => {
