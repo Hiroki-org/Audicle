@@ -37,6 +37,9 @@ describe('Share Target Route Handlers', () => {
     beforeEach(() => {
         jest.clearAllMocks()
         delete process.env.NEXT_PUBLIC_SUPABASE_URL
+        delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        delete process.env.AUTH_ENV
+        delete process.env.NEXT_PUBLIC_AUTH_ENV
     })
 
     describe('GET handler', () => {

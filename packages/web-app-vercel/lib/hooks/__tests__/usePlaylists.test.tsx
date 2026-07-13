@@ -128,6 +128,54 @@ describe("usePlaylists hooks", () => {
     });
   });
 
+  describe("usePlaylistDetail retry behavior", () => {
+    it("should retry on network errors and eventually succeed", async () => {
+      const playlistId = "playlist123";
+      const mockData = { id: playlistId, name: "Retry Success Detail" };
+      (global.fetch as jest.Mock)
+        .mockRejectedValueOnce(new Error("fetch failed with ECONNRESET"))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockData,
+        });
+
+      const { result } = renderHook(() => usePlaylistDetail(playlistId), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), {
+        timeout: 3000,
+      });
+      expect(result.current.data).toEqual(mockData);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(global.fetch).toHaveBeenCalledWith(`/api/playlists/${playlistId}`);
+    });
+
+    it("should throw error immediately for non-network errors", async () => {
+      const playlistId = "playlist123";
+      (global.fetch as jest.Mock).mockRejectedValueOnce(
+        new Error("Some other error"),
+      );
+
+      const { result } = renderHook(() => usePlaylistDetail(playlistId), { wrapper });
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.error).toBeDefined();
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("should fail after max retries for network errors", async () => {
+      const playlistId = "playlist123";
+      (global.fetch as jest.Mock).mockRejectedValue(
+        new Error("fetch failed with ECONNRESET"),
+      );
+
+      const { result } = renderHook(() => usePlaylistDetail(playlistId), { wrapper });
+
+      await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 4000 });
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(result.current.error).toBeDefined();
+    });
+  });
+
   describe("usePlaylistDetail", () => {
     it("should fetch playlist detail successfully", async () => {
       const playlistId = "playlist123";
