@@ -4,6 +4,9 @@ import * as supabaseLocal from '../supabaseLocal';
 import { supabase } from '../supabase';
 
 const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const ORIGINAL_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const ORIGINAL_AUTH_ENV = process.env.AUTH_ENV;
+const ORIGINAL_NEXT_PUBLIC_AUTH_ENV = process.env.NEXT_PUBLIC_AUTH_ENV;
 
 // supabaseLocalモジュールのモック
 jest.mock('../supabaseLocal', () => ({
@@ -37,6 +40,21 @@ describe('getOrCreateDefaultPlaylist', () => {
       process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGINAL_SUPABASE_URL;
     } else {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    }
+    if (typeof ORIGINAL_SUPABASE_ANON_KEY === "string") {
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = ORIGINAL_SUPABASE_ANON_KEY;
+    } else {
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    }
+    if (typeof ORIGINAL_AUTH_ENV === "string") {
+      process.env.AUTH_ENV = ORIGINAL_AUTH_ENV;
+    } else {
+      delete process.env.AUTH_ENV;
+    }
+    if (typeof ORIGINAL_NEXT_PUBLIC_AUTH_ENV === "string") {
+      process.env.NEXT_PUBLIC_AUTH_ENV = ORIGINAL_NEXT_PUBLIC_AUTH_ENV;
+    } else {
+      delete process.env.NEXT_PUBLIC_AUTH_ENV;
     }
   });
 
@@ -128,6 +146,9 @@ describe('getOrCreateDefaultPlaylist', () => {
     const userEmail = 'test@example.com';
     beforeEach(() => {
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://test-supabase-url';
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+      delete process.env.AUTH_ENV;
+      delete process.env.NEXT_PUBLIC_AUTH_ENV;
     });
 
     it('should return existing default playlist from Supabase', async () => {
@@ -255,6 +276,39 @@ describe('getOrCreateDefaultPlaylist', () => {
 
       expect(playlist).toBeUndefined();
       expect(error).toBe('Failed to find default playlist');
+    });
+  });
+
+  describe('test auth runtime with Supabase config', () => {
+    const userEmail = 'test@example.com';
+
+    beforeEach(() => {
+      process.env.AUTH_ENV = 'test';
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://test-supabase-url';
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+    });
+
+    it('uses the local fallback instead of contacting Supabase', async () => {
+      const existingPlaylist = {
+        id: 'local-test-playlist',
+        is_default: true,
+        playlist_items: [],
+        owner_email: userEmail,
+        name: 'Default Playlist',
+        description: 'Default playlist description',
+        visibility: 'private' as const,
+        allow_fork: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      mockedSupabaseLocal.getPlaylistsForOwner.mockResolvedValue([existingPlaylist]);
+
+      const { playlist, error } = await getOrCreateDefaultPlaylist(userEmail);
+
+      expect(error).toBeUndefined();
+      expect(playlist?.id).toBe('local-test-playlist');
+      expect(mockedSupabaseLocal.getPlaylistsForOwner).toHaveBeenCalledWith(userEmail);
+      expect(mockedSupabase.from).not.toHaveBeenCalled();
     });
   });
 });
