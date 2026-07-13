@@ -68,6 +68,11 @@ describe('articleStorage', () => {
   });
 
   describe('getAll', () => {
+    it('should handle invalid JSON in index and return empty array', () => {
+      localStorage.setItem('audicle_articles_index', 'invalid-json');
+      expect(articleStorage.getAll()).toEqual([]);
+    });
+
     it('should return empty array when storage is empty', () => {
       expect(articleStorage.getAll()).toEqual([]);
     });
