@@ -28,4 +28,16 @@ describe('getHostnameFromUrl', () => {
     expect(getHostnameFromUrl('chrome-extension://abcdefghijklmnopqrstuvwxyz/')).toBe('abcdefghijklmnopqrstuvwxyz');
     expect(getHostnameFromUrl('file:///C:/path/to/file')).toBe(''); // file protocol doesn't typically have a hostname
   });
+
+  it('should log an error and return empty string when a malformed string is provided', () => {
+    const errorSpy = jest.spyOn(console, 'error');
+    const result = getHostnameFromUrl('malformed string');
+
+    expect(result).toBe('');
+    // Ensure console.error was called with expected start arguments
+    expect(errorSpy).toHaveBeenCalled();
+    expect(errorSpy.mock.calls[0][0]).toBe('Invalid URL:');
+    expect(errorSpy.mock.calls[0][1]).toBe('malformed string');
+    expect(errorSpy.mock.calls[0][2].constructor.name).toBe('TypeError');
+  });
 });
