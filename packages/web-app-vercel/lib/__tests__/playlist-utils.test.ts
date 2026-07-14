@@ -1,5 +1,6 @@
 // packages/web-app-vercel/lib/__tests__/playlist-utils.test.ts
-import { getOrCreateDefaultPlaylist } from '../playlist-utils';
+import { getOrCreateDefaultPlaylist, getPlaylistSortKey, setPlaylistSortKey } from '../playlist-utils';
+import { STORAGE_KEYS } from '../constants';
 import * as supabaseLocal from '../supabaseLocal';
 import { supabase } from '../supabase';
 
@@ -310,5 +311,60 @@ describe('getOrCreateDefaultPlaylist', () => {
       expect(mockedSupabaseLocal.getPlaylistsForOwner).toHaveBeenCalledWith(userEmail);
       expect(mockedSupabase.from).not.toHaveBeenCalled();
     });
+  });
+});
+
+
+describe('getPlaylistSortKey', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+
+
+  it('should return "position" when localStorage returns null', () => {
+    jest.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
+    expect(getPlaylistSortKey('playlist-1')).toBe('position');
+    expect(localStorage.getItem).toHaveBeenCalledWith(`${STORAGE_KEYS.PLAYLIST_SORT_PREFIX}playlist-1`);
+  });
+
+  it('should return the stored sort key from localStorage', () => {
+    jest.spyOn(Storage.prototype, 'getItem').mockReturnValue('title-desc');
+    expect(getPlaylistSortKey('playlist-1')).toBe('title-desc');
+    expect(localStorage.getItem).toHaveBeenCalledWith(`${STORAGE_KEYS.PLAYLIST_SORT_PREFIX}playlist-1`);
+  });
+});
+
+describe('setPlaylistSortKey', () => {
+  let consoleWarnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+
+
+  it('should save the sort key to localStorage', () => {
+    const setItemSpy = jest.spyOn(Storage.prototype, 'setItem');
+
+    setPlaylistSortKey('playlist-1', 'title');
+
+    expect(setItemSpy).toHaveBeenCalledWith(`${STORAGE_KEYS.PLAYLIST_SORT_PREFIX}playlist-1`, 'title');
+  });
+
+  it('should catch error and log a warning if localStorage.setItem fails', () => {
+    const error = new Error('Quota exceeded');
+    const setItemSpy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw error;
+    });
+
+    setPlaylistSortKey('playlist-1', 'title');
+
+    expect(setItemSpy).toHaveBeenCalledWith(`${STORAGE_KEYS.PLAYLIST_SORT_PREFIX}playlist-1`, 'title');
+    expect(consoleWarnSpy).toHaveBeenCalledWith("Failed to save playlist sort key:", error);
   });
 });
