@@ -1,0 +1,18 @@
+--- packages/web-app-vercel/lib/playlist-utils.ts
++++ packages/web-app-vercel/lib/playlist-utils.ts
+@@ -15,10 +15,15 @@
+  * @returns sortKey (例: "position", "title", "title-desc" など)
+  */
+ export function getPlaylistSortKey(playlistId: string): string {
+     if (typeof window === "undefined") return "position";
++    if (!playlistId) return "position";
+     const storageKey = `${STORAGE_KEYS.PLAYLIST_SORT_PREFIX}${playlistId}`;
+-    return localStorage.getItem(storageKey) || "position";
++    try {
++        return localStorage.getItem(storageKey) || "position";
++    } catch (e) {
++        return "position";
++    }
+ }
+
+ /**
