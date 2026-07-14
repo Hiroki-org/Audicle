@@ -42,7 +42,6 @@ export async function initializeNewUser(userId: string, userEmail: string): Prom
 
         // 既に存在する場合はスキップ
         if (existingSettings) {
-            console.log(`User settings already exist for user: ${userId}`)
             return { success: true }
         }
 
