@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { articleStorage } from '../storage';
 import { Chunk } from '@/types/api';
 
@@ -43,7 +44,7 @@ describe('articleStorage', () => {
 
       expect(() => articleStorage.add(mockArticleInput)).toThrow('QuotaExceededError');
 
-      const { logger } = require('@/lib/logger');
+
       expect(logger.error).toHaveBeenCalledWith('Failed to add article', error);
 
       jest.restoreAllMocks();
