@@ -91,38 +91,6 @@ Specify the engine to use in `config.json` under `synthesizerType`.
 
 3. **Reload Extension**: Update the Chrome extension.
 
----
-
-### 3. Test Synthesizer (For Development)
-
-**Value**: `"test"`
-
-```json
-{
-  "synthesizerType": "test"
-}
-```
-
-**Features**:
-
-- 🔧 **Dev Only**: For testing and debugging purposes.
-- ✅ **Offline**: No internet connection required.
-- ✅ **Fast**: Immediate response.
-- ⚠️ **Fixed Audio**: Always plays the same sample audio.
-- ❌ **Ignores Text**: Does not read the actual text content.
-
-**Use Cases**:
-
-- Testing extension functionality.
-- Development in offline environments.
-- Debugging audio playback features.
-
-**Technical Details**:
-
-- Audio File: Uses `sample.mp3`
-- Audio Format: MP3
-- Response: Fixed
-
 ## 🔧 Configuration
 
 ### 1. Edit Configuration File
@@ -131,7 +99,7 @@ Edit `packages/chrome-extension/config.json`:
 
 ```json
 {
-  "synthesizerType": "google_tts" // or "api_server", "test"
+  "synthesizerType": "google_tts" // or "api_server"
 }
 ```
 
@@ -203,11 +171,6 @@ class SynthesizerFactory {
 
 - **Docker Required**: Docker and Docker Compose environment required.
 - **GCP Credentials**: Google Cloud service account key required.
-
-### When Using Test Synthesizer
-
-- **Not for Production**: Dedicated for development/testing.
-- **Audio Quality**: Actual reading quality cannot be verified.
 
 ### When Changing Settings
 
