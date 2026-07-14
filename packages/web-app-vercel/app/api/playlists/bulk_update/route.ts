@@ -47,7 +47,8 @@ export async function POST(request: Request) {
             }
 
             const localPlaylists = await supabaseLocal.getPlaylistsForOwner(userEmail)
-            const ownedPlaylistIds = new Set(localPlaylists.map((playlist) => playlist.id))
+            const playlistMap = new Map(localPlaylists.map(p => [p.id, p]))
+            const ownedPlaylistIds = new Set(playlistMap.keys())
             const allPlaylistIds = [...new Set([...addToPlaylistIds, ...removeFromPlaylistIds])]
 
             if (allPlaylistIds.some((playlistId) => !ownedPlaylistIds.has(playlistId))) {
@@ -61,8 +62,8 @@ export async function POST(request: Request) {
             let removedCount = 0
 
             for (const playlistId of addToPlaylistIds) {
-                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const alreadyExists = playlist?.playlist_items.some((item) => item.article_id === actualArticleId)
+                const playlist = playlistMap.get(playlistId)
+                const alreadyExists = playlist?.playlist_items?.some((item) => item.article_id === actualArticleId)
                 if (!alreadyExists) {
                     await supabaseLocal.addPlaylistItem(playlistId, actualArticleId)
                     addedCount += 1
@@ -70,8 +71,8 @@ export async function POST(request: Request) {
             }
 
             for (const playlistId of removeFromPlaylistIds) {
-                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const item = playlist?.playlist_items.find((candidate) => candidate.article_id === actualArticleId)
+                const playlist = playlistMap.get(playlistId)
+                const item = playlist?.playlist_items?.find((candidate) => candidate.article_id === actualArticleId)
                 if (item && await supabaseLocal.removePlaylistItem(playlistId, item.id)) {
                     removedCount += 1
                 }
