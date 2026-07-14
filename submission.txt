@@ -1,0 +1,14 @@
+🧪 [Add tests for auth-env runtime config checks]
+
+🎯 **What:** The testing gap addressed
+- Missing test for `isTestAuthRuntime` and related functions in `lib/auth-env.ts`.
+- These are pure functions checking environment variables.
+
+📊 **Coverage:** What scenarios are now tested
+- `isTestAuthRuntime` returning true when `AUTH_ENV` or `NEXT_PUBLIC_AUTH_ENV` is 'test', and false otherwise.
+- `hasSupabaseRuntimeConfig` correctly evaluating the presence of both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- `shouldUseLocalSupabaseFallback` evaluating combinations of test environment and missing Supabase configurations.
+
+✨ **Result:** The improvement in test coverage
+- Added a full test suite for `auth-env.ts` verifying all conditions.
+- Achieved 100% statement, branch, line, and function coverage for `packages/web-app-vercel/lib/auth-env.ts`.
