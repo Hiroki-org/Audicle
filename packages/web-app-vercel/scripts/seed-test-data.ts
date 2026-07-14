@@ -85,57 +85,6 @@ async function ensureTestUser() {
     return data.user.id;
 }
 
-async function runMigrations() {
-    console.log("マイグレーションを実行中...");
-
-    // articles テーブルの制約を修正
-    // owner_email, url の複合ユニーク制約が必要
-    const migrationSql = `
-        -- Drop existing constraint if exists (ignore error if not exists)
-        DO $$ BEGIN
-            ALTER TABLE public.articles DROP CONSTRAINT IF EXISTS articles_url_key;
-        EXCEPTION WHEN others THEN NULL; END $$;
-        
-        -- Add composite unique constraint (ignore if already exists)
-        DO $$ BEGIN
-            ALTER TABLE public.articles ADD CONSTRAINT articles_owner_email_url_key UNIQUE (owner_email, url);
-        EXCEPTION WHEN duplicate_table THEN NULL; END $$;
-        
-        -- Ensure playlist_items has correct constraint
-        DO $$ BEGIN
-            ALTER TABLE public.playlist_items DROP CONSTRAINT IF EXISTS playlist_items_playlist_id_article_id_key;
-        EXCEPTION WHEN others THEN NULL; END $$;
-        
-        DO $$ BEGIN
-            ALTER TABLE public.playlist_items ADD CONSTRAINT playlist_items_playlist_id_article_id_key UNIQUE (playlist_id, article_id);
-        EXCEPTION WHEN duplicate_table THEN NULL; END $$;
-    `;
-
-    const { error } = await supabase.rpc('exec_sql', { sql: migrationSql }).single();
-
-    // exec_sql RPC がない場合は直接SQLを実行（Supabase Dashboard経由で手動実行が必要な場合あり）
-    if (error) {
-        console.log("⚠️ RPC経由でのマイグレーション実行に失敗。直接クエリを試行...");
-        console.log("   エラー:", error.message);
-
-        // 代替: 個別のクエリで試行
-        try {
-            // 既存の制約を確認
-            const { data: constraints } = await supabase
-                .from('articles')
-                .select('id')
-                .limit(1);
-
-            if (constraints !== null) {
-                console.log("✓ articles テーブルにアクセス可能");
-            }
-        } catch {
-            console.log("⚠️ マイグレーションの手動実行が必要かもしれません");
-        }
-    } else {
-        console.log("✓ マイグレーションを完了しました");
-    }
-}
 
 async function seedTestData() {
     console.log("テストデータの投入を開始します...");
@@ -143,8 +92,6 @@ async function seedTestData() {
     // 0. ユーザーIDの確保
     const TEST_USER_ID = await ensureTestUser();
     
-    // マイグレーションを先に実行
-    await runMigrations();
 
     // 1. テストユーザーの設定
     console.log("1. ユーザー設定を作成中...");
