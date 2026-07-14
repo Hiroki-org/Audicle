@@ -27,13 +27,15 @@ export function getCorsHeaders(request: NextRequest): Record<string, string> {
         Vary: 'Origin',
     };
 
-    if (origin) {
-        if (allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
-            throw new CorsError('Origin not allowed');
-        } else if (allowedOrigins.includes(origin)) {
-            headers['Access-Control-Allow-Origin'] = origin;
-            headers['Access-Control-Allow-Credentials'] = 'true';
-        }
+    if (!origin) {
+        throw new CorsError('Origin header is missing');
+    }
+
+    if (allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
+        throw new CorsError('Origin not allowed');
+    } else if (allowedOrigins.includes(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin;
+        headers['Access-Control-Allow-Credentials'] = 'true';
     }
 
     return headers;

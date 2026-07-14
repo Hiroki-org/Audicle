@@ -30,7 +30,10 @@ describe('/api/extract route', () => {
         const mockRequest = new Request('http://localhost:3000/api/extract', {
             method: 'POST',
             body: JSON.stringify({}),
-            headers: { 'Content-Type': 'application/json' }
+            headers: new Headers({
+                'Content-Type': 'application/json',
+                'origin': 'http://localhost:3000'
+            })
         })
         const res = await routeModule.POST(mockRequest)
         expect(res.status).toBe(400)
@@ -46,7 +49,10 @@ describe('/api/extract route', () => {
         const mockRequest = new Request('http://localhost:3000/api/extract', {
             method: 'POST',
             body: JSON.stringify({ url: 'https://example.com' }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: new Headers({
+                'Content-Type': 'application/json',
+                'origin': 'http://localhost:3000'
+            })
         })
         const res = await routeModule.POST(mockRequest)
         expect(res.status).toBe(200)
@@ -65,7 +71,10 @@ describe('/api/extract route', () => {
         const mockRequest = new Request('http://localhost:3000/api/extract', {
             method: 'POST',
             body: JSON.stringify({ url: 'https://auth-required-site.com' }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: new Headers({
+                'Content-Type': 'application/json',
+                'origin': 'http://localhost:3000'
+            })
         })
         const res = await routeModule.POST(mockRequest)
         expect(res.status).toBe(401)
@@ -83,7 +92,10 @@ describe('/api/extract route', () => {
         const mockRequest = new Request('http://localhost:3000/api/extract', {
             method: 'POST',
             body: JSON.stringify({ url: 'https://forbidden-site.com' }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: new Headers({
+                'Content-Type': 'application/json',
+                'origin': 'http://localhost:3000'
+            })
         })
         const res = await routeModule.POST(mockRequest)
         expect(res.status).toBe(403)
@@ -98,7 +110,10 @@ describe('/api/extract route', () => {
         const mockRequest = new Request('http://localhost:3000/api/extract', {
             method: 'POST',
             body: JSON.stringify({ url: 'http://internal-server/' }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: new Headers({
+                'Content-Type': 'application/json',
+                'origin': 'http://localhost:3000'
+            })
         });
 
         const res = await routeModule.POST(mockRequest);

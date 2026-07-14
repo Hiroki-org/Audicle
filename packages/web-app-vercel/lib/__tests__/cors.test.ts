@@ -24,18 +24,12 @@ describe("getCorsHeaders", () => {
     } as unknown as NextRequest;
   }
 
-  it("should return default headers when no origin is provided", () => {
+  it("should throw CorsError when no origin is provided", () => {
     process.env.ALLOWED_ORIGINS = "http://localhost:3000";
     const request = createMockRequest(null);
 
-    const headers = getCorsHeaders(request);
-
-    expect(headers).toEqual({
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      Vary: "Origin",
-    });
-    expect(headers["Access-Control-Allow-Origin"]).toBeUndefined();
+    expect(() => getCorsHeaders(request)).toThrow(CorsError);
+    expect(() => getCorsHeaders(request)).toThrow("Origin header is missing");
   });
 
   it("should throw CorsError when origin is not in ALLOWED_ORIGINS", () => {
