@@ -315,3 +315,71 @@ export async function removePlaylistItem(playlistId: string, itemId: string) {
     inMemoryDB.playlist_items.splice(idx, 1);
     return true;
 }
+
+export async function removePlaylistItemsByArticleId(ownerEmail: string | null, playlistIds: string[], articleId: string) {
+    const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
+    const validPlaylistIds = new Set(
+        inMemoryDB.playlists
+            .filter(p => playlistIds.includes(p.id) && p.owner_email === normalizedOwnerEmail)
+            .map(p => p.id)
+    );
+
+    const playlistIdSet = validPlaylistIds;
+    let removedCount = 0;
+    const newItems = [];
+    for (const item of inMemoryDB.playlist_items) {
+        if (playlistIdSet.has(item.playlist_id) && item.article_id === articleId) {
+            removedCount++;
+        } else {
+            newItems.push(item);
+        }
+    }
+    inMemoryDB.playlist_items = newItems;
+    return removedCount;
+}
+
+export async function addPlaylistItemsByArticleId(ownerEmail: string | null, playlistIds: string[], articleId: string) {
+    const normalizedOwnerEmail = normalizeOwnerEmail(ownerEmail);
+    const validPlaylistIds = new Set(
+        inMemoryDB.playlists
+            .filter(p => playlistIds.includes(p.id) && p.owner_email === normalizedOwnerEmail)
+            .map(p => p.id)
+    );
+
+    const playlistIdSet = validPlaylistIds;
+    let addedCount = 0;
+
+    // Check existing
+    for (const item of inMemoryDB.playlist_items) {
+        if (item.article_id === articleId && playlistIdSet.has(item.playlist_id)) {
+            playlistIdSet.delete(item.playlist_id);
+        }
+    }
+
+    const maxPositions = new Map<string, number>();
+    if (playlistIdSet.size > 0) {
+        for (const item of inMemoryDB.playlist_items) {
+            if (playlistIdSet.has(item.playlist_id)) {
+                const max = maxPositions.get(item.playlist_id) || 0;
+                if (item.position > max) {
+                    maxPositions.set(item.playlist_id, item.position);
+                }
+            }
+        }
+    }
+
+    const now = new Date().toISOString();
+    for (const playlistId of playlistIdSet) {
+        const maxPos = maxPositions.get(playlistId) || 0;
+        inMemoryDB.playlist_items.push({
+            id: crypto.randomUUID(),
+            playlist_id: playlistId,
+            article_id: articleId,
+            position: maxPos + 1,
+            added_at: now,
+        });
+        addedCount++;
+    }
+
+    return addedCount;
+}
