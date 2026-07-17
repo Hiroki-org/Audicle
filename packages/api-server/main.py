@@ -229,7 +229,7 @@ async def _synthesize_to_bytes(text: str, voice: str) -> bytes:
 
 @app.get("/")
 async def root():
-    return {"message": "Audicle API Server is running", "version": "1.0.0"}
+    return {"status": "ok", "service": "audicle-api"}
 
 
 @app.post("/extract", response_model=ExtractResponse)
