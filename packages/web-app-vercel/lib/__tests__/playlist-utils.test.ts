@@ -1,5 +1,5 @@
 // packages/web-app-vercel/lib/__tests__/playlist-utils.test.ts
-import { getOrCreateDefaultPlaylist } from '../playlist-utils';
+import { getOrCreateDefaultPlaylist, getPlaylistSortKey, setPlaylistSortKey } from '../playlist-utils';
 import * as supabaseLocal from '../supabaseLocal';
 import { supabase } from '../supabase';
 
@@ -309,6 +309,78 @@ describe('getOrCreateDefaultPlaylist', () => {
       expect(playlist?.id).toBe('local-test-playlist');
       expect(mockedSupabaseLocal.getPlaylistsForOwner).toHaveBeenCalledWith(userEmail);
       expect(mockedSupabase.from).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('getPlaylistSortKey / setPlaylistSortKey', () => {
+  const originalWindow = global.window;
+
+  beforeEach(() => {
+    // Mock localStorage
+    const localStorageMock = (() => {
+      let store: Record<string, string> = {};
+      return {
+        getItem: jest.fn((key: string) => store[key] || null),
+        setItem: jest.fn((key: string, value: string) => {
+          if (key === 'audicle-playlist-sort-error-id') {
+             throw new Error('Storage error');
+          }
+          store[key] = value?.toString() ?? '';
+        }),
+        clear: jest.fn(() => {
+          store = {};
+        }),
+      };
+    })();
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+    });
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    // Restore original window
+    global.window = originalWindow;
+  });
+
+  describe('getPlaylistSortKey', () => {
+    it('should return default sort key when localStorage is empty', () => {
+      expect(getPlaylistSortKey('test-id')).toBe('position');
+    });
+
+    it('should return stored sort key from localStorage', () => {
+      window.localStorage.setItem('audicle-playlist-sort-test-id', 'title');
+      expect(getPlaylistSortKey('test-id')).toBe('title');
+    });
+
+    it('should handle undefined window', () => {
+      // @ts-ignore - simulating server side
+      delete global.window;
+      expect(getPlaylistSortKey('test-id')).toBe('position');
+    });
+
+    it('should return default if playlistId is invalid', () => {
+        expect(getPlaylistSortKey('')).toBe('position');
+    });
+  });
+
+  describe('setPlaylistSortKey', () => {
+    it('should store sort key in localStorage', () => {
+      setPlaylistSortKey('test-id', 'title-desc');
+      expect(window.localStorage.getItem('audicle-playlist-sort-test-id')).toBe('title-desc');
+    });
+
+    it('should handle undefined window', () => {
+      // @ts-ignore - simulating server side
+      delete global.window;
+      expect(() => setPlaylistSortKey('test-id', 'title-desc')).not.toThrow();
+    });
+
+    it('should catch error on localStorage.setItem', () => {
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(() => setPlaylistSortKey('error-id', 'title')).not.toThrow();
+      consoleSpy.mockRestore();
     });
   });
 });
