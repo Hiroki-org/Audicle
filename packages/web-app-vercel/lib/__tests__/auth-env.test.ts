@@ -1,18 +1,15 @@
 import { hasSupabaseRuntimeConfig, isTestAuthRuntime, shouldUseLocalSupabaseFallback } from '../auth-env';
 
 describe('auth-env', () => {
-    const originalEnv = { ...process.env };
+    const originalEnv = process.env;
 
     beforeEach(() => {
+        jest.resetModules();
         process.env = { ...originalEnv };
-        delete process.env.AUTH_ENV;
-        delete process.env.NEXT_PUBLIC_AUTH_ENV;
-        delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-        delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     });
 
     afterAll(() => {
-        process.env = { ...originalEnv };
+        process.env = originalEnv;
     });
 
     describe('isTestAuthRuntime', () => {
