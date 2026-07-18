@@ -297,8 +297,8 @@ describe('POST /api/playlists/bulk_update', () => {
         process.env.AUTH_ENV = 'test'
 
         ;(supabaseLocal.getPlaylistsForOwner as jest.Mock).mockResolvedValue([
-            { id: 'playlist-1', owner_email: mockUserEmail },
-            { id: 'playlist-2', owner_email: mockUserEmail },
+            { id: 'playlist-1', owner_email: mockUserEmail, playlist_items: [] },
+            { id: 'playlist-2', owner_email: mockUserEmail, playlist_items: [{ id: 'item-old', article_id: actualArticleId }] },
         ])
         ;(supabaseLocal.addPlaylistItem as jest.Mock).mockResolvedValue({
             id: 'item-new',
@@ -338,7 +338,7 @@ describe('POST /api/playlists/bulk_update', () => {
         process.env.AUTH_ENV = 'test'
 
         ;(supabaseLocal.getPlaylistsForOwner as jest.Mock).mockResolvedValue([
-            { id: 'playlist-1', owner_email: mockUserEmail },
+            { id: 'playlist-1', owner_email: mockUserEmail, playlist_items: [{ id: 'item-existing', article_id: actualArticleId }] },
         ])
         ;(supabaseLocal.getPlaylistWithItems as jest.Mock).mockResolvedValue({
             playlist_items: [{ id: 'item-existing', article_id: actualArticleId }],
