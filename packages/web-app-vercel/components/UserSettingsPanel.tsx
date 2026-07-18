@@ -36,14 +36,22 @@ export default function UserSettingsPanel() {
   const [debouncedTheme] = useDebounce(previewTheme, 1000);
 
   // Keep refs to the latest values for unmount flush
-  const latestPreviewRef = useRef(previewTheme);
-  const latestSettingsRef = useRef(settings);
+  const latestValuesRef = useRef({
+    previewTheme,
+    settings,
+    hasChanged,
+    session,
+    mutateAsync: updateSettingsMutation.mutateAsync,
+  });
   useEffect(() => {
-    latestPreviewRef.current = previewTheme;
-  }, [previewTheme]);
-  useEffect(() => {
-    latestSettingsRef.current = settings;
-  }, [settings]);
+    latestValuesRef.current = {
+      previewTheme,
+      settings,
+      hasChanged,
+      session,
+      mutateAsync: updateSettingsMutation.mutateAsync,
+    };
+  }, [previewTheme, settings, hasChanged, session, updateSettingsMutation.mutateAsync]);
 
   // originalSettingsが変わったら、ローカル変更がない場合は同期
   useEffect(() => {
@@ -100,17 +108,18 @@ export default function UserSettingsPanel() {
   // Auto-save theme to DB when debounced theme changes
   useEffect(() => {
     if (!hasChanged) return;
+    const { settings: currentSettings, mutateAsync } = latestValuesRef.current;
 
     const saveTheme = async () => {
       try {
         if (session?.user?.email) {
           // Logged in user: save to DB
-          const newSettings = { ...settings, color_theme: debouncedTheme };
-          await updateSettingsMutation.mutateAsync(newSettings);
+          const newSettings = { ...currentSettings, color_theme: debouncedTheme };
+          await mutateAsync(newSettings);
           setSettings(newSettings);
         } else {
           // Guest user: save to localStorage
-          const newSettings = { ...settings, color_theme: debouncedTheme };
+          const newSettings = { ...currentSettings, color_theme: debouncedTheme };
           localStorage.setItem(
             "audicle-user-settings",
             JSON.stringify(newSettings)
@@ -133,15 +142,15 @@ export default function UserSettingsPanel() {
   // On unmount: flush any unsaved theme changes immediately
   useEffect(() => {
     return () => {
+      const { hasChanged, previewTheme: finalPreview, settings: finalSettings, session, mutateAsync } = latestValuesRef.current;
       if (!hasChanged) return;
-      const finalPreview = latestPreviewRef.current;
-      const finalSettings = latestSettingsRef.current;
+
       if (finalPreview !== finalSettings.color_theme) {
         // Fire and forget; it's fine to call async from cleanup
         (async () => {
           try {
             if (session?.user?.email) {
-              await updateSettingsMutation.mutateAsync({
+              await mutateAsync({
                 ...finalSettings,
                 color_theme: finalPreview,
               });
@@ -158,7 +167,6 @@ export default function UserSettingsPanel() {
         })();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = async () => {
