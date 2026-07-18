@@ -3,8 +3,14 @@
   "version": "1.0.1",
   "description": "A browser extension to read articles aloud.",
   "manifest_version": 3,
-  "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://*.google.com/", "http://localhost:8001/*"],
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://*.google.com/",
+    "http://localhost:8001/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -13,8 +19,13 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content-extract/rules.js", "content.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content-extract/rules.js",
+        "content.js"
+      ]
     }
   ],
   "icons": {
@@ -27,10 +38,11 @@
       "resources": [
         "styles.css",
         "lib/Readability.js",
-        "config.json",
-        "sample.mp3"
+        "config.json"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

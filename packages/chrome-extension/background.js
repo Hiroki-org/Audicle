@@ -78,25 +78,6 @@ class GoogleTTSSynthesizer extends AudioSynthesizer {
   }
 }
 
-// テスト用TTS実装（常にsample.mp3を返す）
-class TestSynthesizer extends AudioSynthesizer {
-  constructor() {
-    super();
-  }
-
-  async synthesize(text) {
-    console.log(
-      `[TestSynthesizer] Request for text: "${text}" - returning sample.mp3`
-    );
-
-    const sampleUrl = chrome.runtime.getURL("sample.mp3");
-    const response = await fetch(sampleUrl);
-    const blob = await response.blob();
-
-    return await blobToDataURL(blob);
-  }
-}
-
 // Edge TTS実装（Python TTS Serverを使用）
 class EdgeTTSSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
@@ -147,8 +128,6 @@ class SynthesizerFactory {
     switch (type) {
       case "google_tts":
         return new GoogleTTSSynthesizer();
-      case "test":
-        return new TestSynthesizer();
       case "edge_tts":
         return new EdgeTTSSynthesizer(config);
       case "edge_tts_docker":
