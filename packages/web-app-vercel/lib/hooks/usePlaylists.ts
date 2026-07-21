@@ -16,7 +16,8 @@ async function retryFetch<T>(fetchFn: () => Promise<Response>, maxRetries: numbe
                 throw error;
             }
             // ECONNRESET などのネットワークエラー時はリトライ
-            if (error instanceof Error && (error.message.includes('ECONNRESET') || error.message.includes('aborted') || error.message.includes('fetch'))) {
+            const errorMessage = typeof error === 'object' && error !== null ? (error as any).message || (error as any).cause || String(error) : String(error);
+            if (errorMessage.includes('ECONNRESET') || errorMessage.includes('aborted') || errorMessage.includes('fetch')) {
                 console.warn(`Fetch attempt ${attempt} failed, retrying in ${delay}ms:`, error.message);
                 await new Promise(resolve => setTimeout(resolve, delay));
             } else {
