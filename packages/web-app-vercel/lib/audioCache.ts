@@ -148,7 +148,7 @@ export class AudioCache {
     return url;
   }
 
-  // 複数の音声を先読み（並行数を制限）
+    // 複数の音声を一括で先読み（APIを一括呼び出し）
   async prefetch(
     texts: string[],
     voiceModel: string = DEFAULT_VOICE,
@@ -156,27 +156,114 @@ export class AudioCache {
   ): Promise<void> {
     logger.info(`🔄 先読み開始: ${texts.length}件`);
 
-    const MAX_CONCURRENT_PREFETCH = 3;
-    const executing = new Set<Promise<void>>();
+    if (texts.length === 0) return;
 
-    for (const text of texts) {
-      const p = (async () => {
-        try {
-          await this.get(text, voiceModel, articleUrl);
-        } catch (error) {
-          logger.error(`先読みエラー: ${text.substring(0, 30)}...`, error);
+    const uncachedTexts: string[] = [];
+    const uncachedIndices: number[] = [];
+    const keys: string[] = [];
+    const resolveFns: ((_url: string) => void)[] = [];
+    const rejectFns: ((_err: any) => void)[] = [];
+    const waitPromises: Promise<any>[] = [];
+
+    // 1. キャッシュチェック
+    for (let i = 0; i < texts.length; i++) {
+      const text = texts[i];
+      const key = this.getCacheKey(text, voiceModel, articleUrl);
+      keys.push(key);
+
+      const inFlight = this.inFlightRequests.get(key);
+      if (inFlight) {
+        waitPromises.push(inFlight.catch(e => {
+          logger.error(`先読みエラー(待機中): ${text.substring(0, 30)}...`, e);
+        }));
+        continue;
+      }
+
+      const cached = this.cache.get(key);
+      let isCached = false;
+      if (cached) {
+        const age = Date.now() - cached.timestamp;
+        if (age < CACHE_EXPIRY) {
+          isCached = true;
+          logger.cache("HIT", `${text.substring(0, 30)}...`);
         }
-      })();
+      }
 
-      executing.add(p);
-      p.then(() => executing.delete(p));
+      if (!isCached) {
+        uncachedTexts.push(text);
+        uncachedIndices.push(i);
 
-      if (executing.size >= MAX_CONCURRENT_PREFETCH) {
-        await Promise.race(executing);
+        const promise = new Promise<string>((resolve, reject) => {
+          resolveFns.push(resolve);
+          rejectFns.push(reject);
+        });
+
+        waitPromises.push(promise.catch(e => {
+          logger.error(`先読みエラー: ${text.substring(0, 30)}...`, e);
+        }));
+
+        this.inFlightRequests.set(key, promise);
       }
     }
 
-    await Promise.all(executing);
+    // 2. 未キャッシュのテキストがあれば一括リクエスト
+    if (uncachedTexts.length > 0) {
+      // 非同期で一括リクエストを開始
+      const bulkFetch = async () => {
+        try {
+          const blobs = await synthesizeSpeechBulk(uncachedTexts, undefined, voiceModel, articleUrl);
+
+          // 3. 結果をキャッシュに保存
+          for (let j = 0; j < uncachedTexts.length; j++) {
+            const key = keys[uncachedIndices[j]];
+            const blob = blobs[j];
+
+            if (!blob) {
+              rejectFns[j](new Error("Missing blob in response"));
+              this.inFlightRequests.delete(key);
+              continue;
+            }
+
+            const url = URL.createObjectURL(blob);
+
+            if (!this.cache.has(key) && this.cache.size >= MAX_CACHE_SIZE) {
+              const oldestKey = this.cache.keys().next().value;
+              if (oldestKey) {
+                logger.cache("EVICT", `LRU evicting ${oldestKey}`);
+                this.revoke(oldestKey);
+              }
+            }
+
+            const oldEntry = this.cache.get(key);
+            if (oldEntry) {
+              URL.revokeObjectURL(oldEntry.url);
+              this.cache.delete(key);
+            }
+
+            this.cache.set(key, {
+              blob,
+              url,
+              timestamp: Date.now(),
+            });
+
+            logger.cache("STORE", key);
+            resolveFns[j](url);
+            this.inFlightRequests.delete(key);
+          }
+        } catch (error) {
+          logger.error(`一括先読みエラー: ${uncachedTexts.length}件`, error);
+          for (let j = 0; j < uncachedTexts.length; j++) {
+            const key = keys[uncachedIndices[j]];
+            this.inFlightRequests.delete(key);
+            rejectFns[j](error);
+          }
+        }
+      };
+
+      bulkFetch();
+    }
+
+    await Promise.all(waitPromises);
     logger.success(`✅ 先読み完了: ${texts.length}件`);
   }
 

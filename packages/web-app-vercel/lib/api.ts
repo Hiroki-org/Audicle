@@ -185,3 +185,74 @@ export async function synthesizeSpeech(
   // Pending Map を経由してリクエストを管理
   return getAudio(text, voice, voiceModel, articleUrl);
 }
+
+
+/**
+ * 一括で複数のテキストを音声に変換する（Pending Map 非対応）
+ * @returns 音声データのBlob配列を返す
+ */
+export async function synthesizeSpeechBulk(
+  texts: string[],
+  voice?: string,
+  voiceModel?: string,
+  articleUrl?: string
+): Promise<Blob[]> {
+  const request: SynthesizeRequest = {
+    chunks: texts.map(text => ({ text })),
+  };
+  if (voice) {
+    request.voice = voice;
+  }
+  if (voiceModel) {
+    request.voice_model = voiceModel;
+  }
+  if (articleUrl) {
+    request.articleUrl = articleUrl;
+  }
+
+  logger.apiRequest("POST", "/api/synthesize (bulk)", {
+    chunksCount: texts.length,
+    voice,
+    voiceModel,
+    articleUrl,
+  });
+
+  const response = await fetch("/api/synthesize", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const errorMessage = parseApiErrorMessage(errorText, "音声一括合成に失敗しました");
+    logger.error(`音声一括合成エラー: ${errorMessage}`);
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+
+  if (!data.audioUrls || !Array.isArray(data.audioUrls)) {
+    throw new Error("Invalid response from server: audioUrls missing");
+  }
+
+  const blobs = await Promise.all(data.audioUrls.map(async (url: string) => {
+    if (url.startsWith('data:')) {
+      const base64 = url.split(',')[1];
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: 'audio/mpeg' });
+    } else {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch audio from url");
+      return await res.blob();
+    }
+  }));
+
+  return blobs;
+}
