@@ -310,6 +310,204 @@ class TTSError extends Error {
     }
 }
 
+
+type LogFunction = (level: 'info' | 'warn' | 'error', message: string, data?: Record<string, unknown>) => void;
+
+async function processArticleMetadata(
+    kv: any,
+    articleUrl: string | undefined,
+    chunks: any[] | undefined,
+    textChunks: string[],
+    voiceToUse: string,
+    chunkIndex: number | undefined,
+    log: LogFunction
+) {
+    let isPopularArticle = false;
+    let metadata = null;
+
+    if (!kv || !articleUrl) return { isPopularArticle, metadata };
+
+    const metadataKey = `article:${articleUrl}:${voiceToUse}`;
+
+    if (chunks && Array.isArray(chunks)) {
+        const currentHash = calculateArticleHash(textChunks);
+        const totalChunks = textChunks.length;
+
+        try {
+            const metadataHash = await kv.hgetall(metadataKey);
+            metadata = parseArticleMetadata(metadataHash);
+
+            if (!metadata || metadata.articleHash !== currentHash) {
+                await kv.hset(metadataKey, serializeArticleMetadata({
+                    articleUrl,
+                    articleHash: currentHash,
+                    voice: voiceToUse,
+                    totalChunks,
+                    completedPlayback: false,
+                    readCount: 0,
+                    lastUpdated: new Date().toISOString(),
+                    lastAccessed: new Date().toISOString()
+                }));
+                log('info', '記事メタデータを初期化しました', { articleUrl, totalChunks });
+            }
+        } catch (kvError) {
+            log('error', '記事メタデータの初期化に失敗しました', { error: kvError });
+        }
+    }
+
+    try {
+        const metadataHash = await kv.hgetall(metadataKey);
+        metadata = parseArticleMetadata(metadataHash);
+
+        if (metadata && metadata.readCount >= POPULAR_ARTICLE_READ_COUNT_THRESHOLD && metadata.completedPlayback === true) {
+            isPopularArticle = true;
+            log('info', '人気記事を検出しました', {
+                articleUrl,
+                readCount: metadata.readCount,
+                completedPlayback: metadata.completedPlayback,
+                threshold: POPULAR_ARTICLE_READ_COUNT_THRESHOLD
+            });
+        }
+
+        await kv.hincrby(metadataKey, 'readCount', 1);
+        await kv.hset(metadataKey, {
+            lastAccessed: new Date().toISOString(),
+            lastPlayedChunk: chunkIndex ?? 0
+        });
+        log('info', 'アクセスメタデータを更新しました', { articleUrl });
+    } catch (kvError) {
+        log('error', 'アクセスメタデータの更新に失敗しました', { error: kvError });
+    }
+
+    log('info', '記事メタデータ', {
+        articleUrl,
+        readCount: metadata?.readCount ?? 0,
+        completedPlayback: metadata?.completedPlayback ?? false,
+        isPopular: isPopularArticle
+    });
+
+    return { isPopularArticle, metadata };
+}
+
+async function checkAndGetCachedAudio(
+    cacheKey: string,
+    textHash: string,
+    voiceToUse: string,
+    articleUrl: string | undefined,
+    isPopularArticle: boolean,
+    cacheIndex: any,
+    isCachedByIndex: boolean,
+    storage: any,
+    signedUrlTtlSeconds: number,
+    currentIndex: number,
+    log: LogFunction
+): Promise<{ url: string; headSkipped: boolean } | null> {
+    let headSkipped = false;
+
+    const recordCachedHit = async (): Promise<string | null> => {
+        try {
+            return await storage.generatePresignedGetUrl(cacheKey, signedUrlTtlSeconds);
+        } catch (urlError) {
+            log('warn', '署名付きGET URLの発行に失敗しました', {
+                cacheKey,
+                error: urlError instanceof Error ? urlError.message : urlError,
+            });
+            return null;
+        }
+    };
+
+    const checkHeadObject = async (): Promise<boolean> => {
+        log('info', `R2キャッシュをチェック中 (headObject): ${cacheKey}`);
+        const result = await storage.headObject(cacheKey).catch((error: unknown) => {
+            log('error', `キー ${cacheKey} のキャッシュチェックに失敗しました`, { error });
+            return null;
+        });
+        return result?.exists ?? false;
+    };
+
+    if (isPopularArticle) {
+        log('info', `人気記事のためhead()をスキップ: チャンク ${currentIndex + 1}`);
+        headSkipped = true;
+        const url = await recordCachedHit();
+        if (url) return { url, headSkipped };
+        log('warn', '人気記事の署名付きURLの取得に失敗しました。通常のフローにフォールバックします。');
+    }
+
+    let objectExists = false;
+
+    if (cacheIndex) {
+        if (isCachedByIndex) {
+            log('info', `✅ R2キャッシュヒット (Supabase Index): ${cacheKey}のためhead()をスキップ`);
+            headSkipped = true;
+            const url = await recordCachedHit();
+            if (url) return { url, headSkipped };
+
+            log('warn', '署名付きURLの取得に失敗しました。head()チェックにフォールバックします。');
+            objectExists = await checkHeadObject();
+            if (objectExists) {
+                const fallbackUrl = await recordCachedHit();
+                if (fallbackUrl) return { url: fallbackUrl, headSkipped };
+            }
+        } else {
+            log('info', `❌ R2キャッシュミス (Supabase Index): ${cacheKey}`);
+        }
+    }
+
+    if (!cacheIndex || !isCachedByIndex) {
+        objectExists = await checkHeadObject();
+    }
+
+    if (objectExists) {
+        log('info', `✅ R2キャッシュヒット (headObject): ${cacheKey}`);
+        const url = await recordCachedHit();
+        if (url) {
+            if (articleUrl && cacheIndex && !isCachedByIndex) {
+                addCachedChunk(articleUrl, voiceToUse, textHash)
+                    .then(() => log('info', '既存のキャッシュのインデックスをバックフィルしました', { textHash }))
+                    .catch((error) => log('error', 'インデックスのバックフィルに失敗しました', { textHash, error }));
+            }
+            return { url, headSkipped };
+        }
+    }
+
+    return null;
+}
+
+async function generateAndCacheTTS(
+    cleanedChunkText: string,
+    voiceToUse: string,
+    speakingRate: number,
+    cacheKey: string,
+    textHash: string,
+    articleUrl: string | undefined,
+    storage: any,
+    signedUrlTtlSeconds: number,
+    log: LogFunction
+): Promise<{ audioBuffer: Buffer; audioUrl: string }> {
+    log('info', `❌ R2キャッシュミス: ${cacheKey}。Google TTS APIを呼び出します。`);
+    const audioBuffer = await synthesizeToBuffer(cleanedChunkText, voiceToUse, speakingRate);
+
+    let audioUrl: string;
+    try {
+        audioUrl = await storage.uploadObject(cacheKey, audioBuffer, 'audio/mpeg', signedUrlTtlSeconds);
+        log('info', `音声を作成しR2キャッシュに保存しました: ${cacheKey}`);
+
+        if (articleUrl) {
+            try {
+                await addCachedChunk(articleUrl, voiceToUse, textHash);
+                log('info', 'チャンクをSupabaseインデックスに追加しました', { textHash });
+            } catch {
+                // ignore
+            }
+        }
+    } catch (putError) {
+        log('error', `音声のキャッシュへの保存に失敗しました。base64にフォールバックします: ${cacheKey}`, { error: putError });
+        audioUrl = `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
+    }
+
+    return { audioBuffer, audioUrl };
+}
+
 export async function OPTIONS(request: NextRequest) {
     try {
         const headers = getCorsHeaders(request);
@@ -385,80 +583,10 @@ export async function POST(request: NextRequest) {
         const voiceToUse = body.voice || body.voice_model || 'ja-JP-Standard-B';
         const { articleUrl, chunks, chunkIndex } = body;
 
-        // 記事メタデータ処理
-        let isPopularArticle = false;
-        let metadata = null;
         const kv = await getKv();
-
-        if (kv) {
-            const metadataKey = `article:${articleUrl}:${voiceToUse}`;
-
-            // ステップ1: 記事レベルのメタデータ（body.chunks存在時のみ）
-            if (articleUrl && chunks && Array.isArray(chunks)) {
-                const currentHash = calculateArticleHash(textChunks);
-                const totalChunks = textChunks.length;
-
-                try {
-                    // 既存メタデータを確認
-                    const metadataHash = await kv.hgetall(metadataKey);
-                    metadata = parseArticleMetadata(metadataHash);
-
-                    // 新規 or 記事編集時のみハッシュ/totalChunksを保存
-                    if (!metadata || metadata.articleHash !== currentHash) {
-                        await kv.hset(metadataKey, serializeArticleMetadata({
-                            articleUrl,
-                            articleHash: currentHash,
-                            voice: voiceToUse,
-                            totalChunks,
-                            completedPlayback: false,
-                            readCount: 0,
-                            lastUpdated: new Date().toISOString(),
-                            lastAccessed: new Date().toISOString()
-                        }));
-                        log('info', '記事メタデータを初期化しました', { articleUrl, totalChunks });
-                    }
-                } catch (kvError) {
-                    log('error', '記事メタデータの初期化に失敗しました', { error: kvError });
-                }
-            }
-
-            // ステップ2: アクセスレベルのメタデータ（articleUrl存在時は常に）
-            if (articleUrl) {
-                try {
-                    // アクセスメタデータを取得（人気記事判定用）
-                    const metadataHash = await kv.hgetall(metadataKey);
-                    metadata = parseArticleMetadata(metadataHash);
-
-                    // 人気記事判定（記事レベルメタデータから）
-                    if (metadata && metadata.readCount >= POPULAR_ARTICLE_READ_COUNT_THRESHOLD && metadata.completedPlayback === true) {
-                        isPopularArticle = true;
-                        log('info', '人気記事を検出しました', {
-                            articleUrl,
-                            readCount: metadata.readCount,
-                            completedPlayback: metadata.completedPlayback,
-                            threshold: POPULAR_ARTICLE_READ_COUNT_THRESHOLD
-                        });
-                    }
-
-                    // アクセスカウントと最終アクセス時刻を更新
-                    await kv.hincrby(metadataKey, 'readCount', 1);
-                    await kv.hset(metadataKey, {
-                        lastAccessed: new Date().toISOString(),
-                        lastPlayedChunk: chunkIndex ?? 0
-                    });
-                    log('info', 'アクセスメタデータを更新しました', { articleUrl });
-                } catch (kvError) {
-                    log('error', 'アクセスメタデータの更新に失敗しました', { error: kvError });
-                }
-            }
-        }
-
-        log('info', '記事メタデータ', {
-            articleUrl,
-            readCount: metadata?.readCount ?? 0,
-            completedPlayback: metadata?.completedPlayback ?? false,
-            isPopular: isPopularArticle
-        });
+        const { isPopularArticle, metadata } = await processArticleMetadata(
+            kv, articleUrl, chunks, textChunks, voiceToUse, chunkIndex, log
+        );
 
         // Supabaseキャッシュインデックスを取得（articleUrlがある場合）
         let cacheIndex = null;
@@ -493,124 +621,25 @@ export async function POST(request: NextRequest) {
             const cacheKey = `${textHash}:${voiceToUse}.mp3`;
             const isCachedByIndex = cacheIndex ? isCachedInIndex(cacheIndex, textHash) : false;
 
-            const recordCachedHit = async (): Promise<boolean> => {
-                try {
-                    const url = await storage.generatePresignedGetUrl(cacheKey, signedUrlTtlSeconds);
-                    cacheHits++;
-                    audioUrls.push(url);
-                    audioBuffers.push(Buffer.alloc(0));
-                    return true;
-                } catch (urlError) {
-                    log('warn', '署名付きGET URLの発行に失敗しました', {
-                        cacheKey,
-                        error: urlError instanceof Error ? urlError.message : urlError,
-                    });
-                    return false;
-                }
-            };
+            const cacheResult = await checkAndGetCachedAudio(
+                cacheKey, textHash, voiceToUse, articleUrl, isPopularArticle, cacheIndex, isCachedByIndex,
+                storage, signedUrlTtlSeconds, audioUrls.length, log
+            );
 
-            const checkHeadObject = async (): Promise<boolean> => {
-                log('info', `R2キャッシュをチェック中 (headObject): ${cacheKey}`);
-                const result = await storage.headObject(cacheKey).catch((error: unknown) => {
-                    log('error', `キー ${cacheKey} のキャッシュチェックに失敗しました`, { error });
-                    return null;
-                });
-                return result?.exists ?? false;
-            };
-
-            // 人気記事の場合：全チャンクがキャッシュ済みと仮定してhead()をスキップ
-            if (isPopularArticle) {
-                log('info', `人気記事のためhead()をスキップ: チャンク ${audioUrls.length + 1}`);
-                headOperationsSkipped++;
-
-                const hitRecorded = await recordCachedHit();
-                if (hitRecorded) {
-                    continue;
-                }
-
-                log('warn', '人気記事の署名付きURLの取得に失敗しました。通常のフローにフォールバックします。');
+            if (cacheResult) {
+                cacheHits++;
+                headOperationsSkipped += cacheResult.headSkipped ? 1 : 0;
+                audioUrls.push(cacheResult.url);
+                audioBuffers.push(Buffer.alloc(0));
+                continue;
             }
 
-            let objectExists = false;
-
-            if (cacheIndex) {
-                if (isCachedByIndex) {
-                    // Supabaseインデックスにキャッシュ済み → head()スキップ！
-                    log('info', `✅ R2キャッシュヒット (Supabase Index): ${cacheKey}のためhead()をスキップ`);
-                    headOperationsSkipped++;
-
-                    const hitRecorded = await recordCachedHit();
-                    if (hitRecorded) {
-                        continue;
-                    }
-
-                    log('warn', '署名付きURLの取得に失敗しました。head()チェックにフォールバックします。');
-                    objectExists = await checkHeadObject();
-                    if (objectExists) {
-                        const fallbackHit = await recordCachedHit();
-                        if (fallbackHit) {
-                            continue;
-                        }
-                    }
-                } else {
-                    // Supabaseインデックスになし → キャッシュミス確定
-                    log('info', `❌ R2キャッシュミス (Supabase Index): ${cacheKey}`);
-                }
-            }
-
-            // 通常フロー or Supabaseインデックスなし or ミス → head()でチェック
-            if (!cacheIndex || !isCachedByIndex) {
-                objectExists = await checkHeadObject();
-            }
-
-            if (objectExists) {
-                log('info', `✅ R2キャッシュヒット (headObject): ${cacheKey}`);
-
-                const hitRecorded = await recordCachedHit();
-                if (hitRecorded) {
-                    // インデックスにはないが Blob に存在する場合：遅延インデックス作成
-                    if (articleUrl && cacheIndex && !isCachedByIndex) {
-                        addCachedChunk(articleUrl, voiceToUse, textHash)
-                            .then(() => {
-                                log('info', '既存のキャッシュのインデックスをバックフィルしました', { textHash });
-                            })
-                            .catch((error) => {
-                                log('error', 'インデックスのバックフィルに失敗しました', { textHash, error });
-                            });
-                    }
-
-                    continue;
-                }
-            }
-
-            // 2. キャッシュミス：TTS生成
-            log('info', `❌ R2キャッシュミス: ${cacheKey}。Google TTS APIを呼び出します。`);
             cacheMisses++;
-            const audioBuffer = await synthesizeToBuffer(cleanedChunkText, voiceToUse, speakingRate);
-
-            // 音声バッファを保存
+            const { audioBuffer, audioUrl } = await generateAndCacheTTS(
+                cleanedChunkText, voiceToUse, speakingRate, cacheKey, textHash, articleUrl, storage, signedUrlTtlSeconds, log
+            );
             audioBuffers.push(audioBuffer);
-
-            // 3. ストレージに保存（失敗時はbase64にフォールバック）
-            try {
-                const storedUrl = await storage.uploadObject(cacheKey, audioBuffer, 'audio/mpeg', signedUrlTtlSeconds);
-                audioUrls.push(storedUrl);
-                log('info', `音声を作成しR2キャッシュに保存しました: ${cacheKey}`);
-
-                // 4. Supabaseインデックスに追加（articleUrlがある場合）
-                if (articleUrl) {
-                    try {
-                        await addCachedChunk(articleUrl, voiceToUse, textHash);
-                        log('info', 'チャンクをSupabaseインデックスに追加しました', { textHash });
-                    } catch {
-                        // addCachedChunk関数内で既にエラーログが出力されているため、ここではログ出力しない
-                    }
-                }
-            } catch (putError) {
-                log('error', `音声のキャッシュへの保存に失敗しました。base64にフォールバックします: ${cacheKey}`, { error: putError });
-                const base64Audio = audioBuffer.toString('base64');
-                audioUrls.push(`data:audio/mpeg;base64,${base64Audio}`);
-            }
+            audioUrls.push(audioUrl);
         }        // キャッシュヒット率を計算
         const totalChunks = textChunks.length;
         const hitRate = totalChunks > 0 ? cacheHits / totalChunks : 0;
