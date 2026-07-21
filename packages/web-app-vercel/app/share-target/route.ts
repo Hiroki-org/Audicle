@@ -17,15 +17,19 @@ export async function GET(request: NextRequest) {
 
     // URLパラメータが存在しない場合はホームへリダイレクト
     if (!sharedUrl) {
-        return NextResponse.redirect(new URL('/', request.url))
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/'
+        redirectUrl.search = ''
+        return NextResponse.redirect(redirectUrl)
     }
 
     // URL検証
     if (!validateUrl(sharedUrl)) {
         console.error('Invalid URL scheme or format:', sharedUrl)
-        return NextResponse.redirect(
-            new URL(`/share-target/error?message=${encodeURIComponent('無効なURLです')}`, request.url)
-        )
+        const errorUrl = request.nextUrl.clone()
+        errorUrl.pathname = '/share-target/error'
+        errorUrl.searchParams.set('message', '無効なURLです')
+        return NextResponse.redirect(errorUrl)
     }
 
     // 認証チェック
@@ -34,13 +38,14 @@ export async function GET(request: NextRequest) {
     if (!session || !session.user?.email) {
         // 未ログインの場合はログインページへリダイレクト
         const returnUrl = `/share-target?url=${encodeURIComponent(sharedUrl)}${sharedTitle ? `&title=${encodeURIComponent(sharedTitle)}` : ''}`
-        return NextResponse.redirect(
-            new URL(`/auth/signin?callbackUrl=${encodeURIComponent(returnUrl)}`, request.url)
-        )
+        const signInUrl = request.nextUrl.clone()
+        signInUrl.pathname = '/auth/signin'
+        signInUrl.searchParams.set('callbackUrl', returnUrl)
+        return NextResponse.redirect(signInUrl)
     }
 
     // 処理を共有関数に委譲
-    return await handleShareTarget(sharedUrl, sharedTitle, session.user.email, request.url)
+    return await handleShareTarget(sharedUrl, sharedTitle, session.user.email, request.nextUrl.origin)
 }
 
 /**
@@ -54,15 +59,19 @@ export async function POST(request: NextRequest) {
 
         // URLパラメータが存在しない場合はホームへリダイレクト
         if (!sharedUrl) {
-            return NextResponse.redirect(new URL('/', request.url))
+            const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/'
+        redirectUrl.search = ''
+        return NextResponse.redirect(redirectUrl)
         }
 
         // URL検証
         if (!validateUrl(sharedUrl)) {
             console.error('Invalid URL scheme or format:', sharedUrl)
-            return NextResponse.redirect(
-                new URL(`/share-target/error?message=${encodeURIComponent('無効なURLです')}`, request.url)
-            )
+            const errorUrl = request.nextUrl.clone()
+        errorUrl.pathname = '/share-target/error'
+        errorUrl.searchParams.set('message', '無効なURLです')
+        return NextResponse.redirect(errorUrl)
         }
 
         // 認証チェック
@@ -71,18 +80,20 @@ export async function POST(request: NextRequest) {
         if (!session || !session.user?.email) {
             // 未ログインの場合はログインページへリダイレクト
             const returnUrl = `/share-target?url=${encodeURIComponent(sharedUrl)}${sharedTitle ? `&title=${encodeURIComponent(sharedTitle)}` : ''}`
-            return NextResponse.redirect(
-                new URL(`/auth/signin?callbackUrl=${encodeURIComponent(returnUrl)}`, request.url)
-            )
+            const signInUrl = request.nextUrl.clone()
+        signInUrl.pathname = '/auth/signin'
+        signInUrl.searchParams.set('callbackUrl', returnUrl)
+        return NextResponse.redirect(signInUrl)
         }
 
         // 処理を共有関数に委譲
-        return await handleShareTarget(sharedUrl, sharedTitle, session.user.email, request.url)
+        return await handleShareTarget(sharedUrl, sharedTitle, session.user.email, request.nextUrl.origin)
     } catch (error) {
         console.error('Error parsing POST request:', error)
-        return NextResponse.redirect(
-            new URL(`/share-target/error?message=${encodeURIComponent('リクエストの処理に失敗しました')}`, request.url)
-        )
+        const errorUrl = request.nextUrl.clone()
+        errorUrl.pathname = '/share-target/error'
+        errorUrl.searchParams.set('message', 'リクエストの処理に失敗しました')
+        return NextResponse.redirect(errorUrl)
     }
 }
 
@@ -102,9 +113,9 @@ async function handleShareTarget(
 
         if (defaultPlaylistResult.error || !defaultPlaylistResult.playlist) {
             console.error('Failed to get default playlist:', defaultPlaylistResult.error)
-            return NextResponse.redirect(
-                new URL(`/share-target/error?message=${encodeURIComponent('プレイリストの取得に失敗しました')}`, baseUrl)
-            )
+            const errorUrl = new URL('/share-target/error', baseUrl)
+        errorUrl.searchParams.set('message', 'プレイリストの取得に失敗しました')
+        return NextResponse.redirect(errorUrl)
         }
 
         const playlistId = defaultPlaylistResult.playlist.id
@@ -176,9 +187,9 @@ async function handleShareTarget(
 
         if (!article) {
             console.error('Failed to create or fetch article')
-            return NextResponse.redirect(
-                new URL(`/share-target/error?message=${encodeURIComponent('記事の追加に失敗しました')}`, baseUrl)
-            )
+            const errorUrl = new URL('/share-target/error', baseUrl)
+        errorUrl.searchParams.set('message', '記事の追加に失敗しました')
+        return NextResponse.redirect(errorUrl)
         }
 
         // プレイリストに追加（既に存在する場合はスキップ）
@@ -212,8 +223,8 @@ async function handleShareTarget(
     } catch (error) {
         console.error('Error in share-target:', error)
 
-        return NextResponse.redirect(
-            new URL(`/share-target/error?message=${encodeURIComponent('記事の追加に失敗しました')}`, baseUrl)
-        )
+        const errorUrl = new URL('/share-target/error', baseUrl)
+        errorUrl.searchParams.set('message', '記事の追加に失敗しました')
+        return NextResponse.redirect(errorUrl)
     }
 }
