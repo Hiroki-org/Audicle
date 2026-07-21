@@ -13,7 +13,8 @@ os.environ["CORS_ALLOWED_ORIGINS"] = "http://localhost"
 # Add parent directory to path to import main
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from main import _split_text, MAX_TTS_BYTES
+from main import _split_text, _split_and_merge, MAX_TTS_BYTES
+import re
 
 class TestSplitText(unittest.TestCase):
     def test_short_text(self):
@@ -120,6 +121,38 @@ class TestSplitText(unittest.TestCase):
         # Second chunk
         self.assertEqual(len(chunks[1].encode('utf-8')), 1002)
         self.assertEqual(chunks[1], "あ" * 334)
+
+
+class TestSplitAndMerge(unittest.TestCase):
+    def test_basic_split(self):
+        text = "Hello. World."
+        pattern = re.compile(r"(\.+)")
+        result = _split_and_merge(text, pattern)
+        self.assertEqual(result, ['Hello.', ' World.'])
+
+    def test_multiple_delimiters(self):
+        text = "Wait... what?!"
+        pattern = re.compile(r"([.!?]+)")
+        result = _split_and_merge(text, pattern)
+        self.assertEqual(result, ['Wait...', ' what?!'])
+
+    def test_starts_with_delimiter(self):
+        text = ".Hello"
+        pattern = re.compile(r"(\.+)")
+        result = _split_and_merge(text, pattern)
+        self.assertEqual(result, ['.', 'Hello'])
+
+    def test_empty_string(self):
+        text = ""
+        pattern = re.compile(r"(\.+)")
+        result = _split_and_merge(text, pattern)
+        self.assertEqual(result, [])
+
+    def test_no_delimiters(self):
+        text = "Hello World"
+        pattern = re.compile(r"(\.+)")
+        result = _split_and_merge(text, pattern)
+        self.assertEqual(result, ['Hello World'])
 
 if __name__ == '__main__':
     unittest.main()
