@@ -315,3 +315,44 @@ export async function removePlaylistItem(playlistId: string, itemId: string) {
     inMemoryDB.playlist_items.splice(idx, 1);
     return true;
 }
+
+
+export async function bulkUpdatePlaylistItems(
+    articleId: string,
+    addToPlaylistIds: string[],
+    removeFromPlaylistIds: string[]
+) {
+    let added_count = 0;
+    let removed_count = 0;
+
+    // Remove duplicates
+    const addIds = [...new Set(addToPlaylistIds)];
+    const removeIds = [...new Set(removeFromPlaylistIds)];
+    const now = new Date().toISOString();
+
+    for (const playlistId of addIds) {
+        const existing = inMemoryDB.playlist_items.find(pi => pi.playlist_id === playlistId && pi.article_id === articleId);
+        if (!existing) {
+            const items = inMemoryDB.playlist_items.filter(i => i.playlist_id === playlistId);
+            const maxPos = items.length === 0 ? 0 : Math.max(...items.map(i => i.position ?? 0));
+            inMemoryDB.playlist_items.push({
+                id: crypto.randomUUID(),
+                playlist_id: playlistId,
+                article_id: articleId,
+                position: maxPos + 1,
+                added_at: now,
+            });
+            added_count++;
+        }
+    }
+
+    for (const playlistId of removeIds) {
+        const idx = inMemoryDB.playlist_items.findIndex(i => i.article_id === articleId && i.playlist_id === playlistId);
+        if (idx !== -1) {
+            inMemoryDB.playlist_items.splice(idx, 1);
+            removed_count++;
+        }
+    }
+
+    return { added_count, removed_count };
+}
