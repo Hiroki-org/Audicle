@@ -1,6 +1,6 @@
 // 音声キャッシュ管理
 
-import { synthesizeSpeech } from "./api";
+import { synthesizeSpeech, synthesizeSpeechBulk } from "./api";
 import { logger } from "./logger";
 
 interface CacheEntry {
