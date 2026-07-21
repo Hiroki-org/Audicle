@@ -143,5 +143,11 @@ class TestSynthesizeSpeech(unittest.TestCase):
         self.assertEqual(response.headers["x-fallback"], "true")
         self.assertIn("Complete synthesis failure", response.headers["x-error"])
 
+
+    def test_empty_text(self):
+        response = self.client.post("/synthesize", json={"text": "", "voice": "test-voice"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"detail": "Text cannot be empty"})
+
 if __name__ == '__main__':
     unittest.main()

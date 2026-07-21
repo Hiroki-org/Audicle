@@ -287,6 +287,8 @@ async def extract_content(request: ExtractRequest):
 @app.post("/synthesize")
 async def synthesize_speech(request: SynthesizeRequest):
     """テキストを音声化してMP3を返す"""
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
     try:
         logger.info("Synthesizing text: %s...", request.text[:100])
         logger.info("Using voice: %s", request.voice)
