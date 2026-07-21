@@ -1,0 +1,5 @@
+<<<<<<< SEARCH
+import * as supabaseLocal from '@/lib/supabaseLocal'
+=======
+import * as supabaseLocal from '@/lib/supabaseLocal'
+>>>>>>> REPLACE

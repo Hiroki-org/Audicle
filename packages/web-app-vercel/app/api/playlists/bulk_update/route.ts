@@ -57,34 +57,25 @@ export async function POST(request: Request) {
                 )
             }
 
-            let addedCount = 0
-            let removedCount = 0
+            try {
+                const result = await supabaseLocal.bulkUpdatePlaylistItems(
+                    actualArticleId,
+                    addToPlaylistIds,
+                    removeFromPlaylistIds
+                )
 
-            for (const playlistId of addToPlaylistIds) {
-                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const alreadyExists = playlist?.playlist_items.some((item) => item.article_id === actualArticleId)
-                if (!alreadyExists) {
-                    await supabaseLocal.addPlaylistItem(playlistId, actualArticleId)
-                    addedCount += 1
-                }
+                return NextResponse.json(
+                    {
+                        message: 'Bulk update completed',
+                        addedCount: result?.addedCount || 0,
+                        removedCount: result?.removedCount || 0,
+                    },
+                    { status: 200 }
+                )
+            } catch (error) {
+                console.error("Local bulk update error:", error);
+                throw error;
             }
-
-            for (const playlistId of removeFromPlaylistIds) {
-                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const item = playlist?.playlist_items.find((candidate) => candidate.article_id === actualArticleId)
-                if (item && await supabaseLocal.removePlaylistItem(playlistId, item.id)) {
-                    removedCount += 1
-                }
-            }
-
-            return NextResponse.json(
-                {
-                    message: 'Bulk update completed',
-                    addedCount,
-                    removedCount,
-                },
-                { status: 200 }
-            )
         }
 
         // articleId が UUID か article_hash かを判定し、必要に応じて変換

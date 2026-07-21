@@ -1,0 +1,18 @@
+<<<<<<< SEARCH
+        ;(supabaseLocal.addPlaylistItem as jest.Mock).mockResolvedValue({
+            id: 'item-new',
+            playlist_id: 'playlist-1',
+            article_id: actualArticleId,
+        })
+        ;(supabaseLocal.getPlaylistWithItems as jest.Mock)
+            .mockResolvedValueOnce({ playlist_items: [] })
+            .mockResolvedValueOnce({
+                playlist_items: [{ id: 'item-old', article_id: actualArticleId }],
+            })
+        ;(supabaseLocal.removePlaylistItem as jest.Mock).mockResolvedValue(true)
+=======
+        ;(supabaseLocal.bulkUpdatePlaylistItems as jest.Mock).mockResolvedValue({
+            addedCount: 1,
+            removedCount: 1,
+        })
+>>>>>>> REPLACE

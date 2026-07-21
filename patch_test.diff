@@ -1,0 +1,123 @@
+<<<<<<< SEARCH
+    it('uses local fallback in test auth mode even with Supabase config', async () => {
+        process.env.AUTH_ENV = 'test'
+
+        ;(supabaseLocal.getPlaylistsForOwner as jest.Mock).mockResolvedValue([
+            { id: 'playlist-1', owner_email: mockUserEmail },
+            { id: 'playlist-2', owner_email: mockUserEmail },
+        ])
+        ;(supabaseLocal.addPlaylistItem as jest.Mock).mockResolvedValue({
+            id: 'item-new',
+            playlist_id: 'playlist-1',
+            article_id: actualArticleId,
+        })
+        ;(supabaseLocal.getPlaylistWithItems as jest.Mock)
+            .mockResolvedValueOnce({ playlist_items: [] })
+            .mockResolvedValueOnce({
+                playlist_items: [{ id: 'item-old', article_id: actualArticleId }],
+            })
+        ;(supabaseLocal.removePlaylistItem as jest.Mock).mockResolvedValue(true)
+
+        const request = createRequest({
+            articleId: mockArticleId,
+            addToPlaylistIds: ['playlist-1'],
+            removeFromPlaylistIds: ['playlist-2'],
+        })
+
+        const response = await POST(request)
+        expect(response.status).toBe(200)
+
+        const data = await response.json()
+        expect(data).toMatchObject({
+            addedCount: 1,
+            removedCount: 1,
+        })
+    })
+
+    it('does not increment local addedCount when the article already exists in the target playlist', async () => {
+        process.env.AUTH_ENV = 'test'
+
+        ;(supabaseLocal.getPlaylistsForOwner as jest.Mock).mockResolvedValue([
+            { id: 'playlist-1', owner_email: mockUserEmail },
+        ])
+        ;(supabaseLocal.getPlaylistWithItems as jest.Mock).mockResolvedValue({
+            playlist_items: [{ id: 'item-existing', article_id: actualArticleId }],
+        })
+
+        const request = createRequest({
+            articleId: mockArticleId,
+            addToPlaylistIds: ['playlist-1'],
+            removeFromPlaylistIds: [],
+        })
+
+        const response = await POST(request)
+        expect(response.status).toBe(200)
+
+        const data = await response.json()
+        expect(data).toMatchObject({
+            addedCount: 0,
+            removedCount: 0,
+        })
+        expect(supabaseLocal.addPlaylistItem).not.toHaveBeenCalled()
+    })
+=======
+    it('uses local fallback in test auth mode even with Supabase config', async () => {
+        process.env.AUTH_ENV = 'test'
+
+        ;(supabaseLocal.getPlaylistsForOwner as jest.Mock).mockResolvedValue([
+            { id: 'playlist-1', owner_email: mockUserEmail },
+            { id: 'playlist-2', owner_email: mockUserEmail },
+        ])
+        ;(supabaseLocal.bulkUpdatePlaylistItems as jest.Mock).mockResolvedValue({
+            addedCount: 1,
+            removedCount: 1,
+        })
+
+        const request = createRequest({
+            articleId: mockArticleId,
+            addToPlaylistIds: ['playlist-1'],
+            removeFromPlaylistIds: ['playlist-2'],
+        })
+
+        const response = await POST(request)
+        expect(response.status).toBe(200)
+
+        const data = await response.json()
+        expect(data).toMatchObject({
+            addedCount: 1,
+            removedCount: 1,
+        })
+    })
+
+    it('does not increment local addedCount when the article already exists in the target playlist', async () => {
+        process.env.AUTH_ENV = 'test'
+
+        ;(supabaseLocal.getPlaylistsForOwner as jest.Mock).mockResolvedValue([
+            { id: 'playlist-1', owner_email: mockUserEmail },
+        ])
+        ;(supabaseLocal.bulkUpdatePlaylistItems as jest.Mock).mockResolvedValue({
+            addedCount: 0,
+            removedCount: 0,
+        })
+
+        const request = createRequest({
+            articleId: mockArticleId,
+            addToPlaylistIds: ['playlist-1'],
+            removeFromPlaylistIds: [],
+        })
+
+        const response = await POST(request)
+        expect(response.status).toBe(200)
+
+        const data = await response.json()
+        expect(data).toMatchObject({
+            addedCount: 0,
+            removedCount: 0,
+        })
+        expect(supabaseLocal.bulkUpdatePlaylistItems).toHaveBeenCalledWith(
+            actualArticleId,
+            ['playlist-1'],
+            []
+        )
+    })
+>>>>>>> REPLACE

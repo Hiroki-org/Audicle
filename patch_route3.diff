@@ -1,0 +1,87 @@
+<<<<<<< SEARCH
+        if (shouldUseLocalSupabaseFallback()) {
+            let actualArticleId: string
+            try {
+                actualArticleId = await supabaseLocal.resolveArticleId(userEmail, articleId)
+            } catch (error) {
+                return NextResponse.json(
+                    { error: error instanceof Error ? error.message : 'Article resolution failed' },
+                    { status: 404 }
+                )
+            }
+
+            const localPlaylists = await supabaseLocal.getPlaylistsForOwner(userEmail)
+            const ownedPlaylistIds = new Set(localPlaylists.map((playlist) => playlist.id))
+            const allPlaylistIds = [...new Set([...addToPlaylistIds, ...removeFromPlaylistIds])]
+
+            if (allPlaylistIds.some((playlistId) => !ownedPlaylistIds.has(playlistId))) {
+                return NextResponse.json(
+                    { error: 'One or more playlist IDs are invalid or not owned by the user' },
+                    { status: 403 }
+                )
+            }
+
+            try {
+                const { addedCount, removedCount } = await supabaseLocal.bulkUpdatePlaylistItems(
+                    actualArticleId,
+                    addToPlaylistIds,
+                    removeFromPlaylistIds
+                )
+
+                return NextResponse.json(
+                    {
+                        message: 'Bulk update completed',
+                        addedCount,
+                        removedCount,
+                    },
+                    { status: 200 }
+                )
+            } catch (error) {
+                console.error("Local bulk update error:", error);
+                throw error;
+            }
+        }
+=======
+        if (shouldUseLocalSupabaseFallback()) {
+            let actualArticleId: string
+            try {
+                actualArticleId = await supabaseLocal.resolveArticleId(userEmail, articleId)
+            } catch (error) {
+                return NextResponse.json(
+                    { error: error instanceof Error ? error.message : 'Article resolution failed' },
+                    { status: 404 }
+                )
+            }
+
+            const localPlaylists = await supabaseLocal.getPlaylistsForOwner(userEmail)
+            const ownedPlaylistIds = new Set(localPlaylists.map((playlist) => playlist.id))
+            const allPlaylistIds = [...new Set([...addToPlaylistIds, ...removeFromPlaylistIds])]
+
+            if (allPlaylistIds.some((playlistId) => !ownedPlaylistIds.has(playlistId))) {
+                return NextResponse.json(
+                    { error: 'One or more playlist IDs are invalid or not owned by the user' },
+                    { status: 403 }
+                )
+            }
+
+            try {
+                const result = await supabaseLocal.bulkUpdatePlaylistItems(
+                    actualArticleId,
+                    addToPlaylistIds,
+                    removeFromPlaylistIds
+                )
+
+                return NextResponse.json(
+                    {
+                        message: 'Bulk update completed',
+                        addedCount: result?.addedCount || 0,
+                        removedCount: result?.removedCount || 0,
+                    },
+                    { status: 200 }
+                )
+            } catch (error) {
+                console.error("Local bulk update error:", error);
+                throw error;
+            }
+        }
+>>>>>>> REPLACE

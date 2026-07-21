@@ -1,0 +1,11 @@
+<<<<<<< SEARCH
+        ;(supabaseLocal.bulkUpdatePlaylistItems as jest.Mock).mockImplementation(() => Promise.resolve({
+            addedCount: 1,
+            removedCount: 1,
+        }))
+=======
+        ;(supabaseLocal.bulkUpdatePlaylistItems as jest.Mock).mockResolvedValue({
+            addedCount: 1,
+            removedCount: 1,
+        })
+>>>>>>> REPLACE
