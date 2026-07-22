@@ -277,8 +277,7 @@ export async function getPlaylistWithItems(ownerEmail: string | null, id: string
     const sortField = sort?.field || 'position';
     const sortOrder = sort?.order || 'asc';
 
-    let sorted = [...items];
-
+    let sorted;
     if (sortField === 'title') {
         sorted = [...items].sort((a, b) => {
             const at = a.article?.title || '';
@@ -314,4 +313,47 @@ export async function removePlaylistItem(playlistId: string, itemId: string) {
     if (idx === -1) return false;
     inMemoryDB.playlist_items.splice(idx, 1);
     return true;
+}
+
+export async function bulkUpdatePlaylistItems(articleId: string, addPlaylistIds: string[], removePlaylistIds: string[]) {
+    let addedCount = 0;
+    let removedCount = 0;
+    const now = new Date().toISOString();
+
+    // Remove logic
+    inMemoryDB.playlist_items = inMemoryDB.playlist_items.filter(item => {
+        if (item.article_id === articleId && removePlaylistIds.includes(item.playlist_id)) {
+            removedCount++;
+            return false;
+        }
+        return true;
+    });
+
+    // Add logic
+    const existingPairs = new Set(
+        inMemoryDB.playlist_items
+            .filter(item => item.article_id === articleId)
+            .map(item => item.playlist_id)
+    );
+
+    const uniqueAddPlaylistIds = [...new Set(addPlaylistIds)];
+    for (const playlistId of uniqueAddPlaylistIds) {
+        if (!existingPairs.has(playlistId)) {
+            // Determine position: find max position for playlist
+            const items = inMemoryDB.playlist_items.filter(i => i.playlist_id === playlistId);
+            const maxPos = items.length === 0 ? 0 : Math.max(...items.map(i => i.position ?? 0));
+
+            const item: PlaylistItem = {
+                id: crypto.randomUUID(),
+                playlist_id: playlistId,
+                article_id: articleId,
+                position: maxPos + 1,
+                added_at: now,
+            };
+            inMemoryDB.playlist_items.push(item);
+            addedCount++;
+        }
+    }
+
+    return { addedCount, removedCount };
 }
