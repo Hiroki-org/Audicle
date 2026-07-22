@@ -6,7 +6,7 @@ describe('calculateTextHash', () => {
         const index = 1;
         const hash = calculateTextHash(text, index);
         expect(typeof hash).toBe('string');
-        expect(hash.length).toBe(32); // MD5 hash length
+        expect(hash.length).toBe(64); // SHA256 hash length
     });
 
     it('should produce consistent results for the same input', () => {
@@ -33,20 +33,20 @@ describe('calculateTextHash', () => {
     it('should handle empty string', () => {
         const hash = calculateTextHash('', 0);
         expect(typeof hash).toBe('string');
-        expect(hash.length).toBe(32);
+        expect(hash.length).toBe(64);
     });
 
     it('should handle long string', () => {
         const longText = 'a'.repeat(10000);
         const hash = calculateTextHash(longText, 1);
         expect(typeof hash).toBe('string');
-        expect(hash.length).toBe(32);
+        expect(hash.length).toBe(64);
     });
 
     it('should handle special characters', () => {
         const specialText = '特殊文字: !@#$%^&*()';
         const hash = calculateTextHash(specialText, 1);
         expect(typeof hash).toBe('string');
-        expect(hash.length).toBe(32);
+        expect(hash.length).toBe(64);
     });
 });
