@@ -34,6 +34,12 @@ export async function GET(request: NextRequest) {
     if (!session || !session.user?.email) {
         // 未ログインの場合はログインページへリダイレクト
         const returnUrl = `/share-target?url=${encodeURIComponent(sharedUrl)}${sharedTitle ? `&title=${encodeURIComponent(sharedTitle)}` : ''}`
+
+        // URLパラメータの検証（オープンリダイレクト対策）
+        if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+            console.error('Invalid callback URL generated:', returnUrl)
+            return NextResponse.redirect(new URL('/', request.url))
+        }
         return NextResponse.redirect(
             new URL(`/auth/signin?callbackUrl=${encodeURIComponent(returnUrl)}`, request.url)
         )
@@ -71,6 +77,12 @@ export async function POST(request: NextRequest) {
         if (!session || !session.user?.email) {
             // 未ログインの場合はログインページへリダイレクト
             const returnUrl = `/share-target?url=${encodeURIComponent(sharedUrl)}${sharedTitle ? `&title=${encodeURIComponent(sharedTitle)}` : ''}`
+
+        // URLパラメータの検証（オープンリダイレクト対策）
+        if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+            console.error('Invalid callback URL generated:', returnUrl)
+            return NextResponse.redirect(new URL('/', request.url))
+        }
             return NextResponse.redirect(
                 new URL(`/auth/signin?callbackUrl=${encodeURIComponent(returnUrl)}`, request.url)
             )
