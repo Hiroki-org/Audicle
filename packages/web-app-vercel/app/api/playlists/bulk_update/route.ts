@@ -57,25 +57,11 @@ export async function POST(request: Request) {
                 )
             }
 
-            let addedCount = 0
-            let removedCount = 0
-
-            for (const playlistId of addToPlaylistIds) {
-                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const alreadyExists = playlist?.playlist_items.some((item) => item.article_id === actualArticleId)
-                if (!alreadyExists) {
-                    await supabaseLocal.addPlaylistItem(playlistId, actualArticleId)
-                    addedCount += 1
-                }
-            }
-
-            for (const playlistId of removeFromPlaylistIds) {
-                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const item = playlist?.playlist_items.find((candidate) => candidate.article_id === actualArticleId)
-                if (item && await supabaseLocal.removePlaylistItem(playlistId, item.id)) {
-                    removedCount += 1
-                }
-            }
+            const { added_count: addedCount, removed_count: removedCount } = await supabaseLocal.bulkUpdatePlaylistItems(
+                actualArticleId,
+                addToPlaylistIds,
+                removeFromPlaylistIds
+            )
 
             return NextResponse.json(
                 {

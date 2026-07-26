@@ -26,6 +26,7 @@ jest.mock('@/lib/supabaseLocal', () => ({
     getPlaylistWithItems: jest.fn(),
     getPlaylistsForOwner: jest.fn(),
     removePlaylistItem: jest.fn(),
+    bulkUpdatePlaylistItems: jest.fn(),
     resolveArticleId: jest.fn(),
 }))
 
@@ -300,17 +301,10 @@ describe('POST /api/playlists/bulk_update', () => {
             { id: 'playlist-1', owner_email: mockUserEmail },
             { id: 'playlist-2', owner_email: mockUserEmail },
         ])
-        ;(supabaseLocal.addPlaylistItem as jest.Mock).mockResolvedValue({
-            id: 'item-new',
-            playlist_id: 'playlist-1',
-            article_id: actualArticleId,
+        ;(supabaseLocal.bulkUpdatePlaylistItems as jest.Mock).mockResolvedValue({
+            added_count: 1,
+            removed_count: 1,
         })
-        ;(supabaseLocal.getPlaylistWithItems as jest.Mock)
-            .mockResolvedValueOnce({ playlist_items: [] })
-            .mockResolvedValueOnce({
-                playlist_items: [{ id: 'item-old', article_id: actualArticleId }],
-            })
-        ;(supabaseLocal.removePlaylistItem as jest.Mock).mockResolvedValue(true)
 
         const request = createRequest({
             articleId: mockArticleId,
@@ -330,8 +324,7 @@ describe('POST /api/playlists/bulk_update', () => {
         expect(resolveArticleId).not.toHaveBeenCalled()
         expect(supabase.rpc).not.toHaveBeenCalled()
         expect(supabaseLocal.resolveArticleId).toHaveBeenCalledWith(mockUserEmail, mockArticleId)
-        expect(supabaseLocal.addPlaylistItem).toHaveBeenCalledWith('playlist-1', actualArticleId)
-        expect(supabaseLocal.removePlaylistItem).toHaveBeenCalledWith('playlist-2', 'item-old')
+        expect(supabaseLocal.bulkUpdatePlaylistItems).toHaveBeenCalledWith(actualArticleId, ['playlist-1'], ['playlist-2'])
     })
 
     it('does not increment local addedCount when the article already exists in the target playlist', async () => {
@@ -340,8 +333,9 @@ describe('POST /api/playlists/bulk_update', () => {
         ;(supabaseLocal.getPlaylistsForOwner as jest.Mock).mockResolvedValue([
             { id: 'playlist-1', owner_email: mockUserEmail },
         ])
-        ;(supabaseLocal.getPlaylistWithItems as jest.Mock).mockResolvedValue({
-            playlist_items: [{ id: 'item-existing', article_id: actualArticleId }],
+        ;(supabaseLocal.bulkUpdatePlaylistItems as jest.Mock).mockResolvedValue({
+            added_count: 0,
+            removed_count: 0,
         })
 
         const request = createRequest({
@@ -359,7 +353,7 @@ describe('POST /api/playlists/bulk_update', () => {
             addedCount: 0,
             removedCount: 0,
         })
-        expect(supabaseLocal.addPlaylistItem).not.toHaveBeenCalled()
+        expect(supabaseLocal.bulkUpdatePlaylistItems).toHaveBeenCalledWith(actualArticleId, ['playlist-1'], [])
     })
 
     it('should return 500 for generic unhandled exceptions', async () => {
