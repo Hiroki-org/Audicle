@@ -143,5 +143,30 @@ class TestSynthesizeSpeech(unittest.TestCase):
         self.assertEqual(response.headers["x-fallback"], "true")
         self.assertIn("Complete synthesis failure", response.headers["x-error"])
 
+
+    @patch('main.GoogleAPICallError', Exception)
+    @patch('main.RetryError', Exception)
+    @patch('main._get_client')
+    @patch('main.os.path.exists')
+    @patch('aiofiles.open')
+    def test_tts_client_exception_triggers_fallback(self, mock_aiofiles_open, mock_exists, mock_get_client):
+
+        mock_client_instance = MagicMock()
+        mock_client_instance.synthesize_speech.side_effect = Exception("TTS API failed")
+        mock_get_client.return_value = mock_client_instance
+
+        mock_exists.return_value = True
+        mock_file_context = MagicMock()
+        mock_file_context.read = AsyncMock(return_value=b"fallback_audio_from_client_error")
+        mock_aiofiles_open.return_value.__aenter__ = AsyncMock(return_value=mock_file_context)
+        mock_aiofiles_open.return_value.__aexit__ = AsyncMock()
+
+        response = self.client.post("/synthesize", json={"text": "Hello client error", "voice": "test-voice"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"fallback_audio_from_client_error")
+        self.assertEqual(response.headers["content-disposition"], "attachment; filename=fallback.mp3")
+        self.assertEqual(response.headers["x-fallback"], "true")
+
 if __name__ == '__main__':
     unittest.main()
