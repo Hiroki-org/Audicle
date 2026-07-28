@@ -70,7 +70,7 @@ export async function POST(request: Request) {
                 return 0
             })
             const addResults = await Promise.all(addPromises)
-            addedCount += addResults.reduce((sum, count) => sum + count, 0)
+            addedCount += addResults.reduce((sum: number, count) => sum + count, 0)
 
             const removePromises = removeFromPlaylistIds.map(async (playlistId) => {
                 const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
                 return 0
             })
             const removeResults = await Promise.all(removePromises)
-            removedCount += removeResults.reduce((sum, count) => sum + count, 0)
+            removedCount += removeResults.reduce((sum: number, count) => sum + count, 0)
 
             return NextResponse.json(
                 {
