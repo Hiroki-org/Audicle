@@ -6,10 +6,13 @@ import path from 'path'
 dotenv.config({ path: path.resolve(__dirname, '.env.local') })
 
 // .env.test.localを読み込む（テスト専用の環境変数，優先される）
-dotenv.config({ path: path.resolve(__dirname, '.env.test.local') })
+dotenv.config({ path: path.resolve(__dirname, '.env.test.local'), override: true })
+
+const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000';
+const isRemote = baseURL !== 'http://localhost:3000';
 
 
-export default defineConfig({
+const config = defineConfig({
     testDir: './tests',
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
@@ -19,7 +22,7 @@ export default defineConfig({
     timeout: 120000,
     expect: { timeout: 30000 },
     use: {
-        baseURL: 'http://localhost:3000',
+        baseURL: baseURL,
         trace: 'on-first-retry',
         // storageStateはここから削除
     },
@@ -29,7 +32,7 @@ export default defineConfig({
             name: 'setup',
             testMatch: /.*\.setup\.ts/,
             use: {
-                baseURL: 'http://localhost:3000',
+                baseURL: baseURL,
             },
         },
 
@@ -64,8 +67,8 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: process.env.CI_WEB_SERVER_COMMAND || 'AUTH_ENV=test npm run dev',
-        url: 'http://localhost:3000',
+        command: isRemote ? '' : (process.env.CI_WEB_SERVER_COMMAND || 'AUTH_ENV=test npm run dev'),
+        url: baseURL,
         reuseExistingServer: !process.env.CI,
         // Increase timeout to allow the Next.js dev server (and turbopack) to
         // finish compilation and bind to the port in CI environments.
@@ -76,7 +79,7 @@ export default defineConfig({
             NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
             NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
             NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || '',
-            NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+            NEXTAUTH_URL: process.env.NEXTAUTH_URL || baseURL,
             AUTH_ENV: process.env.AUTH_ENV || '',
             NEXT_PUBLIC_AUTH_ENV: process.env.NEXT_PUBLIC_AUTH_ENV || (process.env.AUTH_ENV === 'test' ? 'test' : ''),
             // Ensure TEST_USER_EMAIL has a fallback to match auth.setup.ts and lib/auth.ts
@@ -97,4 +100,10 @@ export default defineConfig({
             STORAGE_PROVIDER: process.env.STORAGE_PROVIDER || 'r2',
         },
     },
-})
+});
+
+if (isRemote) {
+    delete config.webServer;
+}
+
+export default config;

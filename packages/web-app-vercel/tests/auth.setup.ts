@@ -18,7 +18,7 @@ setup('authenticate', async ({ page }) => {
     console.log('[SETUP DIAGNOSTIC] TEST_USER_EMAIL:', process.env.TEST_USER_EMAIL)
     console.log('[SETUP DIAGNOSTIC] TEST_USER_PASSWORD:', process.env.TEST_USER_PASSWORD ? 'SET' : 'NOT SET')
 
-    await page.goto('http://localhost:3000/auth/signin')
+    await page.goto('/auth/signin')
 
     // デバッグ: ページの状態を確認
     console.log('[AUTH SETUP] Current URL:', page.url())
