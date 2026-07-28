@@ -12,18 +12,12 @@ import { createReaderUrl } from "@/lib/urlBuilder";
 import { STORAGE_KEYS } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import type { PlaylistItemWithArticle } from "@/types/playlist";
+import { truncateText } from "@/lib/formatters";
 
-/**
- * リピートモード:
- * - "off"  : リピートなし（プレイリスト末尾で停止）
- * - "one"  : 1記事リピート（同じ記事を繰り返し再生）
- * - "all"  : プレイリストリピート（末尾到達後、先頭に戻る）
- */
-export type RepeatMode = "off" | "one" | "all";
+
 
 // デバッグログ用の定数
 const DEBUG_QUEUE_PREVIEW_COUNT = 5; // キュー順序ログに出力するアイテム数
-const DEBUG_TITLE_MAX_LENGTH = 30; // タイトルの最大文字数
 
 /**
  * デバッグ用: キュー順序を表すオブジェクト配列を生成
@@ -32,17 +26,19 @@ function createQueueOrderLog(items: PlaylistItemWithArticle[], count: number = D
   return items.slice(0, count).map((item, idx) => ({
     index: idx,
     articleId: item.article_id,
-    title: item.article?.title?.substring(0, DEBUG_TITLE_MAX_LENGTH),
+    title: truncateText(item.article?.title),
     position: item.position,
   }));
 }
 
+
 /**
- * デバッグ用: 記事タイトルを安全に切り詰める
+ * リピートモード:
+ * - "off"  : リピートなし（プレイリスト末尾で停止）
+ * - "one"  : 1記事リピート（同じ記事を繰り返し再生）
+ * - "all"  : プレイリストリピート（末尾到達後、先頭に戻る）
  */
-function truncateTitle(title: string | undefined): string | undefined {
-  return title?.substring(0, DEBUG_TITLE_MAX_LENGTH);
-}
+export type RepeatMode = "off" | "one" | "all";
 
 export interface PlaylistPlaybackState {
   playlistId: string | null;
@@ -349,7 +345,7 @@ export function PlaylistPlaybackProvider({
         repeatMode: prevState.repeatMode,
         shuffle: prevState.shuffle,
         currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
-        currentArticleTitle: truncateTitle(prevState.items[prevState.currentIndex]?.article?.title),
+        currentArticleTitle: truncateText(prevState.items[prevState.currentIndex]?.article?.title),
       });
 
       if (!prevState.isPlaylistMode || prevState.items.length === 0) {
@@ -403,7 +399,7 @@ export function PlaylistPlaybackProvider({
         nextIndex,
         totalCount: prevState.items.length,
         nextArticleId: nextItem?.article_id,
-        nextArticleTitle: truncateTitle(nextItem?.article?.title),
+        nextArticleTitle: truncateText(nextItem?.article?.title),
         articleUrl: nextItem?.article?.url,
       });
 
@@ -445,7 +441,7 @@ export function PlaylistPlaybackProvider({
         repeatMode: prevState.repeatMode,
         shuffle: prevState.shuffle,
         currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
-        currentArticleTitle: truncateTitle(prevState.items[prevState.currentIndex]?.article?.title),
+        currentArticleTitle: truncateText(prevState.items[prevState.currentIndex]?.article?.title),
       });
 
       if (!prevState.isPlaylistMode || prevState.items.length === 0) {
@@ -488,7 +484,7 @@ export function PlaylistPlaybackProvider({
         prevIndex,
         totalCount: prevState.items.length,
         prevArticleId: prevItem?.article_id,
-        prevArticleTitle: truncateTitle(prevItem?.article?.title),
+        prevArticleTitle: truncateText(prevItem?.article?.title),
         articleUrl: prevItem?.article?.url,
       });
 
@@ -547,7 +543,7 @@ export function PlaylistPlaybackProvider({
         repeatMode: prevState.repeatMode,
         shuffle: prevState.shuffle,
         currentArticleId: prevState.items[prevState.currentIndex]?.article_id,
-        currentArticleTitle: truncateTitle(prevState.items[prevState.currentIndex]?.article?.title),
+        currentArticleTitle: truncateText(prevState.items[prevState.currentIndex]?.article?.title),
       });
 
       if (!prevState.isPlaylistMode) {
@@ -616,7 +612,7 @@ export function PlaylistPlaybackProvider({
           nextIndex,
           totalCount: prevState.items.length,
           nextArticleId: nextItem?.article_id,
-          nextArticleTitle: truncateTitle(nextItem?.article?.title),
+          nextArticleTitle: truncateText(nextItem?.article?.title),
           articleUrl: nextItem?.article?.url,
         });
 

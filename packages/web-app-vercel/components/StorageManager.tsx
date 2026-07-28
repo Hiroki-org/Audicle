@@ -10,32 +10,8 @@ import {
 } from "@/lib/indexedDB";
 import { logger } from "@/lib/logger";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import { formatBytes, formatDate } from "@/lib/formatters";
 
-/**
- * バイト数を人間が読みやすい形式に変換
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-}
-
-/**
- * タイムスタンプを日付文字列に変換
- */
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default function StorageManager() {
   const [articles, setArticles] = useState<DownloadedArticle[]>([]);
