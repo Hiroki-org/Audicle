@@ -57,6 +57,7 @@ export interface PlaylistPlaybackState {
   repeatMode: RepeatMode;
   shuffle: boolean;
   shuffledIndices: number[]; // シャッフル時のインデックス順序
+  currentShufflePosition: number;
 }
 
 export interface PlaylistPlaybackContextType {
@@ -154,6 +155,7 @@ function savePlaybackState(state: PlaylistPlaybackState): void {
           repeatMode: state.repeatMode,
           shuffle: state.shuffle,
           shuffledIndices: state.shuffledIndices,
+          currentShufflePosition: state.currentShufflePosition,
         })
       );
     } catch (error) {
@@ -199,6 +201,13 @@ export function PlaylistPlaybackProvider({
       ? rawShuffledIndices.filter((v): v is number => typeof v === "number")
       : [];
 
+    const rawCurrentShufflePosition = (saved as PlaylistPlaybackState | null)?.currentShufflePosition;
+    let currentShufflePosition = typeof rawCurrentShufflePosition === "number" ? rawCurrentShufflePosition : 0;
+    const savedCurrentIndex = saved?.currentIndex || 0;
+    if (shuffle && shuffledIndices.length > 0 && shuffledIndices[currentShufflePosition] !== savedCurrentIndex) {
+      currentShufflePosition = Math.max(0, shuffledIndices.indexOf(savedCurrentIndex));
+    }
+
     return {
       playlistId: saved?.playlistId || null,
       playlistName: saved?.playlistName || null,
@@ -212,6 +221,7 @@ export function PlaylistPlaybackProvider({
       repeatMode,
       shuffle,
       shuffledIndices,
+      currentShufflePosition,
     };
   });
 
@@ -277,6 +287,7 @@ export function PlaylistPlaybackProvider({
           repeatMode: prev.repeatMode,
           shuffle,
           shuffledIndices,
+          currentShufflePosition: 0,
         };
       });
 
@@ -300,16 +311,22 @@ export function PlaylistPlaybackProvider({
   /**
    * シャッフルモードで次のインデックスを取得するヘルパー
    */
-  const getNextShuffleIndex = useCallback((prevState: PlaylistPlaybackState): number | null => {
-    const { shuffledIndices, currentIndex } = prevState;
+  const getNextShufflePosition = useCallback((prevState: PlaylistPlaybackState): number | null => {
+    const { shuffledIndices, currentShufflePosition } = prevState;
     if (shuffledIndices.length === 0) return null;
-    const currentShufflePos = shuffledIndices.indexOf(currentIndex);
-    if (currentShufflePos === -1) {
-      // currentIndexがシャッフル配列にない場合は先頭から
-      return shuffledIndices[0];
+
+    // Ensure position is valid
+    let currentPos = currentShufflePosition;
+    if (currentPos < 0 || currentPos >= shuffledIndices.length || shuffledIndices[currentPos] !== prevState.currentIndex) {
+      currentPos = shuffledIndices.indexOf(prevState.currentIndex);
     }
-    const nextShufflePos = currentShufflePos + 1;
-    if (nextShufflePos >= shuffledIndices.length) {
+
+    if (currentPos === -1) {
+      return 0; // if missing entirely, return position 0
+    }
+
+    const nextPos = currentPos + 1;
+    if (nextPos >= shuffledIndices.length) {
       // シャッフルリストの終端
       if (prevState.repeatMode === "all") {
         // リピートall: 新しいシャッフル順を生成して先頭から
@@ -317,26 +334,33 @@ export function PlaylistPlaybackProvider({
       }
       return null; // 終端
     }
-    return shuffledIndices[nextShufflePos];
+    return nextPos;
   }, []);
-
   /**
    * シャッフルモードで前のインデックスを取得するヘルパー
    */
-  const getPrevShuffleIndex = useCallback((prevState: PlaylistPlaybackState): number | null => {
-    const { shuffledIndices, currentIndex } = prevState;
+  const getPrevShufflePosition = useCallback((prevState: PlaylistPlaybackState): number | null => {
+    const { shuffledIndices, currentShufflePosition } = prevState;
     if (shuffledIndices.length === 0) return null;
-    const currentShufflePos = shuffledIndices.indexOf(currentIndex);
-    if (currentShufflePos <= 0) {
+
+    // Ensure position is valid
+    let currentPos = currentShufflePosition;
+    if (currentPos < 0 || currentPos >= shuffledIndices.length || shuffledIndices[currentPos] !== prevState.currentIndex) {
+      currentPos = shuffledIndices.indexOf(prevState.currentIndex);
+    }
+    if (currentPos === -1) {
+      currentPos = 0; // if missing, assume pos 0
+    }
+
+    if (currentPos <= 0) {
       // 先頭 → リピートallなら末尾、そうでなければnull
       if (prevState.repeatMode === "all") {
-        return shuffledIndices[shuffledIndices.length - 1];
+        return shuffledIndices.length - 1;
       }
       return null;
     }
-    return shuffledIndices[currentShufflePos - 1];
+    return currentPos - 1;
   }, []);
-
   const playNext = useCallback(() => {
     setState((prevState) => {
       // デバッグ: 次曲決定ロジックの入力値を出力
@@ -365,14 +389,17 @@ export function PlaylistPlaybackProvider({
       }
 
       let nextIndex: number;
+      let newShufflePos = prevState.currentShufflePosition;
+      let newShuffled = prevState.shuffledIndices;
 
       if (prevState.shuffle) {
         // シャッフルモード
-        const next = getNextShuffleIndex(prevState);
-        if (next === null) {
+        const nextPos = getNextShufflePosition(prevState);
+        if (nextPos === null) {
           if (prevState.repeatMode === "all") {
             // 再シャッフルして先頭から
-            const newShuffled = generateShuffledIndices(prevState.items.length);
+            newShuffled = generateShuffledIndices(prevState.items.length);
+            newShufflePos = 0;
             nextIndex = newShuffled[0];
             const nextItem = prevState.items[nextIndex];
             if (nextItem?.article?.url && prevState.playlistId) {
@@ -382,14 +409,20 @@ export function PlaylistPlaybackProvider({
                 playlistIndex: nextIndex,
                 autoplay: true,
               }));
-              return { ...prevState, currentIndex: nextIndex, shuffledIndices: newShuffled };
+              return { ...prevState, currentIndex: nextIndex, shuffledIndices: newShuffled, currentShufflePosition: newShufflePos };
             }
             return prevState;
           }
           // シャッフルリスト終端 & repeatモードがoffの場合: wrap-aroundで循環
-          nextIndex = prevState.shuffledIndices[0] ?? ((prevState.currentIndex + 1) % prevState.items.length);
+          if (prevState.shuffledIndices.length > 0) {
+              newShufflePos = 0;
+              nextIndex = prevState.shuffledIndices[0];
+          } else {
+              nextIndex = (prevState.currentIndex + 1) % prevState.items.length;
+          }
         } else {
-          nextIndex = next;
+          newShufflePos = nextPos;
+          nextIndex = prevState.shuffledIndices[nextPos];
         }
       } else {
         // 通常モード: wrap-around
@@ -419,6 +452,7 @@ export function PlaylistPlaybackProvider({
         return {
           ...prevState,
           currentIndex: nextIndex,
+          currentShufflePosition: prevState.shuffle ? newShufflePos : prevState.currentShufflePosition,
         };
       }
 
@@ -431,7 +465,7 @@ export function PlaylistPlaybackProvider({
 
       return prevState;
     });
-  }, [router, getNextShuffleIndex]);
+  }, [router, getNextShufflePosition]);
 
   const playPrevious = useCallback(() => {
     setState((prevState) => {
@@ -460,19 +494,22 @@ export function PlaylistPlaybackProvider({
       }
 
       let prevIndex: number;
+      let newShufflePos = prevState.currentShufflePosition;
 
       if (prevState.shuffle) {
         // シャッフルモード
-        const prev = getPrevShuffleIndex(prevState);
-        if (prev === null) {
+        const prevPos = getPrevShufflePosition(prevState);
+        if (prevPos === null) {
           // 先頭: シャッフルキューの最後へ wrap-around
           if (prevState.shuffledIndices.length > 0) {
-            prevIndex = prevState.shuffledIndices[prevState.shuffledIndices.length - 1];
+            newShufflePos = prevState.shuffledIndices.length - 1;
+            prevIndex = prevState.shuffledIndices[newShufflePos];
           } else {
             prevIndex = (prevState.currentIndex - 1 + prevState.items.length) % prevState.items.length;
           }
         } else {
-          prevIndex = prev;
+          newShufflePos = prevPos;
+          prevIndex = prevState.shuffledIndices[prevPos];
         }
       } else {
         // 通常モード: wrap-around
@@ -504,6 +541,7 @@ export function PlaylistPlaybackProvider({
         return {
           ...prevState,
           currentIndex: prevIndex,
+          currentShufflePosition: prevState.shuffle ? newShufflePos : prevState.currentShufflePosition,
         };
       }
 
@@ -516,7 +554,7 @@ export function PlaylistPlaybackProvider({
 
       return prevState;
     });
-  }, [router, getPrevShuffleIndex]);
+  }, [router, getPrevShufflePosition]);
 
   const stopPlaylistPlayback = useCallback(() => {
     setState({
@@ -532,6 +570,7 @@ export function PlaylistPlaybackProvider({
       repeatMode: "off",
       shuffle: false,
       shuffledIndices: [],
+      currentShufflePosition: 0,
     });
   }, []);
 
@@ -581,14 +620,16 @@ export function PlaylistPlaybackProvider({
       if (prevState.items.length > 0) {
         let nextIndex: number;
         let newShuffledIndices = prevState.shuffledIndices;
+        let newShufflePos = prevState.currentShufflePosition;
 
         if (prevState.shuffle) {
           // シャッフルモード
-          const next = getNextShuffleIndex(prevState);
-          if (next === null) {
+          const nextPos = getNextShufflePosition(prevState);
+          if (nextPos === null) {
             if (prevState.repeatMode === "all") {
               // リピートall + シャッフル: 新シャッフル順で先頭から
               newShuffledIndices = generateShuffledIndices(prevState.items.length);
+              newShufflePos = 0;
               nextIndex = newShuffledIndices[0];
             } else {
               // リピートoff + シャッフル: プレイリスト終了
@@ -596,7 +637,8 @@ export function PlaylistPlaybackProvider({
               return prevState;
             }
           } else {
-            nextIndex = next;
+            newShufflePos = nextPos;
+            nextIndex = prevState.shuffledIndices[nextPos];
           }
         } else {
           // 通常モード
@@ -637,7 +679,7 @@ export function PlaylistPlaybackProvider({
           });
         }
 
-        return { ...prevState, currentIndex: nextIndex, shuffledIndices: newShuffledIndices };
+        return { ...prevState, currentIndex: nextIndex, shuffledIndices: newShuffledIndices, currentShufflePosition: prevState.shuffle ? newShufflePos : prevState.currentShufflePosition };
       }
 
       // プレイリストの最後に到達
@@ -646,7 +688,7 @@ export function PlaylistPlaybackProvider({
       });
       return prevState;
     });
-  }, [router, getNextShuffleIndex]);
+  }, [router, getNextShufflePosition]);
 
   /**
    * 記事URLからプレイリストを自動検出して初期化
@@ -742,6 +784,7 @@ export function PlaylistPlaybackProvider({
         shuffledIndices: prev.shuffle
           ? generateShuffledIndices(items.length, currentIndex)
           : [],
+        currentShufflePosition: 0,
       }));
     } catch (error) {
       logger.error("プレイリスト初期化エラー", error);
@@ -812,6 +855,7 @@ export function PlaylistPlaybackProvider({
                 shuffledIndices: prev.shuffle
                   ? generateShuffledIndices(prev.items.length, index)
                   : prev.shuffledIndices,
+                currentShufflePosition: prev.shuffle ? 0 : prev.currentShufflePosition,
               };
             }
             return prev;
@@ -856,6 +900,7 @@ export function PlaylistPlaybackProvider({
           shuffledIndices: prev.shuffle
             ? generateShuffledIndices(items.length, index)
             : [],
+          currentShufflePosition: 0,
         }));
       } catch (error) {
         logger.error("initializeFromPlaylist error", error);
@@ -898,6 +943,7 @@ export function PlaylistPlaybackProvider({
         shuffledIndices: newShuffle
           ? generateShuffledIndices(prev.items.length, prev.currentIndex)
           : [],
+        currentShufflePosition: 0,
       };
     });
   }, []);
