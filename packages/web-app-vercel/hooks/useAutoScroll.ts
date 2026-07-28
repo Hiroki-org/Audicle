@@ -38,6 +38,50 @@ export interface AutoScrollProps {
     delay?: number;
 }
 
+function calculateContainerScrollTop(container: HTMLDivElement, element: Element): number {
+    const elementRect = element.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return (
+        container.scrollTop +
+        elementRect.top -
+        containerRect.top -
+        containerRect.height / 2 +
+        elementRect.height / 2
+    );
+}
+
+function scrollToContainer(container: HTMLDivElement, element: Element): void {
+    const scrollTop = calculateContainerScrollTop(container, element);
+    container.scrollTo({
+        top: scrollTop,
+        behavior: "smooth",
+        left: 0,
+    });
+}
+
+function scrollToWindow(element: Element): void {
+    // windowをスクロール対象とする場合
+    // scrollIntoViewを使用（Chrome拡張版と同等）
+    element.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+    });
+}
+
+function handleScrollFallback(element: Element, error: unknown): void {
+    console.warn(`[useAutoScroll] スクロール失敗:`, error);
+    // フォールバック: 古いブラウザ対応
+    try {
+        element.scrollIntoView(true);
+    } catch (fallbackError) {
+        console.error(
+            `[useAutoScroll] フォールバックスクロール失敗:`,
+            fallbackError
+        );
+    }
+}
+
 /**
  * 共通のスクロール実行関数
  * useAutoScrollとuseAutoScrollWithCacheで重複するロジックを共通化
@@ -45,49 +89,16 @@ export interface AutoScrollProps {
 function scrollElementIntoView(
     element: Element,
     containerRef?: React.RefObject<HTMLDivElement | null>,
-    chunkId?: string
+    _chunkId?: string
 ): void {
     try {
         if (containerRef?.current) {
-            const container = containerRef.current;
-            const elementRect = element.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-
-            // コンテナの中央に要素を配置するためのスクロール位置を計算
-            const scrollTop =
-                container.scrollTop +
-                elementRect.top -
-                containerRect.top -
-                containerRect.height / 2 +
-                elementRect.height / 2;
-
-            container.scrollTo({
-                top: scrollTop,
-                behavior: "smooth",
-                left: 0,
-            });
-
+            scrollToContainer(containerRef.current, element);
         } else {
-            // windowをスクロール対象とする場合
-            // scrollIntoViewを使用（Chrome拡張版と同等）
-            element.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-                inline: "nearest",
-            });
-
+            scrollToWindow(element);
         }
     } catch (error) {
-        console.warn(`[useAutoScroll] スクロール失敗:`, error);
-        // フォールバック: 古いブラウザ対応
-        try {
-            element.scrollIntoView(true);
-        } catch (fallbackError) {
-            console.error(
-                `[useAutoScroll] フォールバックスクロール失敗:`,
-                fallbackError
-            );
-        }
+        handleScrollFallback(element, error);
     }
 }
 
