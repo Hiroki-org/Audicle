@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { Button } from "@/components/ui/button";
 
 interface ConfirmDialogProps {
   title: string;
@@ -29,22 +30,12 @@ export function ConfirmDialog({
         </h2>
         <p className="text-gray-700 dark:text-gray-300">{message}</p>
         <div className="flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          >
+          <Button variant="secondary" onClick={onCancel}>
             {cancelText}
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`px-4 py-2 rounded-lg text-white transition-colors ${
-              isDangerous
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-blue-600 hover:bg-blue-700"
-            }`}
-          >
+          </Button>
+          <Button variant={isDangerous ? "destructive" : "default"} onClick={onConfirm}>
             {confirmText}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
