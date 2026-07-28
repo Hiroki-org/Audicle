@@ -1138,18 +1138,12 @@ function buildQueueWithRulesManager() {
   return [];
 }
 
-// 新しいブロック形式を既存のキュー形式に変換
-function convertBlocksToQueue(blocks) {
-  debugLog(`[RulesManager] Converting ${blocks.length} blocks to queue format`);
-
+function extractQueueFromBlocks(blocks) {
   const queue = [];
-  const styleTasks = [];
+  const chunkSize = config.chunkSize || 200;
 
-  blocks.forEach((block, index) => {
-    // 各ブロックのテキストをchunkSize文字ごとに分割
-    const chunkSize = config.chunkSize || 200;
+  blocks.forEach((block) => {
     const text = block.text;
-
     for (let i = 0; i < text.length; i += chunkSize) {
       const chunk = text.slice(i, i + chunkSize).trim();
       if (chunk) {
@@ -1159,14 +1153,16 @@ function convertBlocksToQueue(blocks) {
         });
       }
     }
-
-    // 要素にIDとクラスを設定（ハイライト用）
-    if (block.element) {
-      styleTasks.push({ element: block.element, id: block.id });
-    }
   });
 
-  // Batch process styles
+  return queue;
+}
+
+function applyStylesToBlocks(blocks) {
+  const styleTasks = blocks
+    .filter((block) => block.element)
+    .map((block) => ({ element: block.element, id: block.id }));
+
   const cache = new Map();
   const styleResults = styleTasks.map((task) => ({
     task,
@@ -1176,6 +1172,14 @@ function convertBlocksToQueue(blocks) {
   styleResults.forEach(({ task, palette }) => {
     applyClickableStyles(task.element, task.id, palette);
   });
+}
+
+// 新しいブロック形式を既存のキュー形式に変換
+function convertBlocksToQueue(blocks) {
+  debugLog(`[RulesManager] Converting ${blocks.length} blocks to queue format`);
+
+  const queue = extractQueueFromBlocks(blocks);
+  applyStylesToBlocks(blocks);
 
   debugLog(`[RulesManager] Converted to ${queue.length} queue chunks`);
   return queue;
