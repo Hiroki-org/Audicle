@@ -101,7 +101,7 @@ class TestSynthesizer extends AudioSynthesizer {
 class EdgeTTSSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
     super(
-      config.serverUrls?.edge_tts || "http://localhost:8001",
+      config.serverUrls?.edge_tts || process.env.EDGE_TTS_URL || "http://localhost:8001",
       "/synthesize/simple",
       "EdgeTTSSynthesizer"
     );
@@ -112,7 +112,7 @@ class EdgeTTSSynthesizer extends RemoteAudioSynthesizer {
 class EdgeTTSDockerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
     super(
-      config.serverUrls?.edge_tts_docker || "http://localhost:8001",
+      config.serverUrls?.edge_tts_docker || process.env.EDGE_TTS_DOCKER_URL || "http://localhost:8001",
       "/synthesize/simple",
       "EdgeTTSDockerSynthesizer"
     );
@@ -123,7 +123,7 @@ class EdgeTTSDockerSynthesizer extends RemoteAudioSynthesizer {
 class GoogleCloudTTSDockerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
     super(
-      config.serverUrls?.google_cloud_tts_docker || "http://localhost:8002",
+      config.serverUrls?.google_cloud_tts_docker || process.env.GOOGLE_CLOUD_TTS_DOCKER_URL || "http://localhost:8002",
       "/synthesize/simple",
       "GoogleCloudTTSDockerSynthesizer"
     );
@@ -134,7 +134,7 @@ class GoogleCloudTTSDockerSynthesizer extends RemoteAudioSynthesizer {
 class APIServerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
     super(
-      config.serverUrls?.api_server || "http://localhost:8000",
+      config.serverUrls?.api_server || process.env.API_SERVER_URL || "http://localhost:8000",
       "/synthesize",
       "APIServerSynthesizer"
     );
