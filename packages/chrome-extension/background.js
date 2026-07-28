@@ -68,7 +68,7 @@ class GoogleTTSSynthesizer extends AudioSynthesizer {
   async synthesize(text) {
     const cleanedText = cleanText(text);
     const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
-      cleanedText
+      cleanedText,
     )}&tl=ja`;
 
     const response = await fetch(ttsUrl);
@@ -86,7 +86,7 @@ class TestSynthesizer extends AudioSynthesizer {
 
   async synthesize(text) {
     console.log(
-      `[TestSynthesizer] Request for text: "${text}" - returning sample.mp3`
+      `[TestSynthesizer] Request for text: "${text}" - returning sample.mp3`,
     );
 
     const sampleUrl = chrome.runtime.getURL("sample.mp3");
@@ -101,9 +101,11 @@ class TestSynthesizer extends AudioSynthesizer {
 class EdgeTTSSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
     super(
-      config.serverUrls?.edge_tts || "http://localhost:8001",
+      process.env.EDGE_TTS_URL ||
+        config.serverUrls?.edge_tts ||
+        "http://localhost:8001",
       "/synthesize/simple",
-      "EdgeTTSSynthesizer"
+      "EdgeTTSSynthesizer",
     );
   }
 }
@@ -112,9 +114,11 @@ class EdgeTTSSynthesizer extends RemoteAudioSynthesizer {
 class EdgeTTSDockerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
     super(
-      config.serverUrls?.edge_tts_docker || "http://localhost:8001",
+      process.env.EDGE_TTS_DOCKER_URL ||
+        config.serverUrls?.edge_tts_docker ||
+        "http://localhost:8001",
       "/synthesize/simple",
-      "EdgeTTSDockerSynthesizer"
+      "EdgeTTSDockerSynthesizer",
     );
   }
 }
@@ -123,9 +127,11 @@ class EdgeTTSDockerSynthesizer extends RemoteAudioSynthesizer {
 class GoogleCloudTTSDockerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
     super(
-      config.serverUrls?.google_cloud_tts_docker || "http://localhost:8002",
+      process.env.GOOGLE_CLOUD_TTS_DOCKER_URL ||
+        config.serverUrls?.google_cloud_tts_docker ||
+        "http://localhost:8002",
       "/synthesize/simple",
-      "GoogleCloudTTSDockerSynthesizer"
+      "GoogleCloudTTSDockerSynthesizer",
     );
   }
 }
@@ -134,9 +140,11 @@ class GoogleCloudTTSDockerSynthesizer extends RemoteAudioSynthesizer {
 class APIServerSynthesizer extends RemoteAudioSynthesizer {
   constructor(config) {
     super(
-      config.serverUrls?.api_server || "http://localhost:8000",
+      process.env.API_SERVER_URL ||
+        config.serverUrls?.api_server ||
+        "http://localhost:8000",
       "/synthesize",
-      "APIServerSynthesizer"
+      "APIServerSynthesizer",
     );
   }
 }
@@ -192,7 +200,7 @@ function cleanText(text) {
   // 特殊文字を除去（句読点以外）
   text = text.replace(
     /[^\w\s\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g,
-    ""
+    "",
   );
   // 連続する空白を1つに
   text = text.replace(/\s+/g, " ").trim();
@@ -236,7 +244,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const synthesizer = SynthesizerFactory.create(
           config.synthesizerType,
-          config
+          config,
         );
         const audioDataUrl = await synthesizer.synthesize(message.text);
 
@@ -266,7 +274,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const synthesizer = SynthesizerFactory.create(
           config.synthesizerType,
-          config
+          config,
         );
         const audioDataUrl = await synthesizer.synthesize(message.text);
         sendResponse({ audioDataUrl: audioDataUrl });
@@ -284,7 +292,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     loadConfig().then(async (config) => {
       const synthesizer = SynthesizerFactory.create(
         config.synthesizerType,
-        config
+        config,
       );
 
       const promises = message.batch.map(async ({ index, text }) => {
@@ -310,7 +318,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     loadConfig().then(async (config) => {
       const synthesizer = SynthesizerFactory.create(
         config.synthesizerType,
-        config
+        config,
       );
 
       const promises = message.batch.map(async ({ index, text }) => {
