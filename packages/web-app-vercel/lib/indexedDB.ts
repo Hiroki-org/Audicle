@@ -101,6 +101,48 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 /**
+ * Helper to wrap write transactions with promise resolution and error handling
+ */
+function withWriteTransaction(
+    db: IDBDatabase,
+    operationName: string,
+    action: (_store: IDBObjectStore, _rejectOnce: (_msg: string, _err: unknown) => void, _isSettled: () => boolean) => void
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        let settled = false;
+
+        const rejectOnce = (message: string, error: unknown) => {
+            if (settled) return;
+            settled = true;
+            const finalError = error || new Error(message);
+            logger.error(message, finalError);
+            reject(finalError);
+        };
+
+        transaction.onerror = () => {
+            rejectOnce(`${operationName} transaction error`, transaction.error);
+        };
+
+        transaction.onabort = () => {
+            rejectOnce(`${operationName} transaction aborted`, transaction.error);
+        };
+
+        transaction.oncomplete = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+        };
+
+        const store = transaction.objectStore(STORE_NAME);
+        action(store, rejectOnce, () => settled);
+    });
+}
+
+
+
+
+/**
  * 音声データを保存
  */
 export async function saveAudioChunk(entry: Omit<AudioCacheEntry, 'key'>): Promise<void> {
@@ -112,40 +154,12 @@ export async function saveAudioChunk(entry: Omit<AudioCacheEntry, 'key'>): Promi
         key,
     };
 
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        let isSettled = false;
-
-        const rejectOnce = (message: string, error: unknown) => {
-            if (isSettled) return;
-            isSettled = true;
-            const finalError = error || new Error(message);
-            logger.error(message, finalError);
-            reject(finalError);
-        };
-
-        transaction.onerror = () => {
-            rejectOnce('Save transaction error', transaction.error);
-        };
-
-        transaction.onabort = () => {
-            rejectOnce('Save transaction aborted', transaction.error);
-        };
-
-        transaction.oncomplete = () => {
-            if (isSettled) return;
-            isSettled = true;
-            logger.info(`Saved chunk ${entry.chunkIndex + 1}/${entry.totalChunks} for ${entry.articleUrl}`);
-            resolve();
-        };
-
-        const store = transaction.objectStore(STORE_NAME);
+    await withWriteTransaction(db, 'Save', (store, rejectOnce) => {
         const request = store.put(cacheEntry);
-
-        request.onerror = () => {
-            rejectOnce('Save error', request.error);
-        };
+        request.onerror = () => rejectOnce('Save error', request.error);
     });
+
+    logger.info(`Saved chunk ${entry.chunkIndex + 1}/${entry.totalChunks} for ${entry.articleUrl}`);
 }
 
 /**
@@ -216,32 +230,12 @@ export async function getArticleChunks(articleUrl: string): Promise<AudioCacheEn
 export async function deleteArticle(articleUrl: string): Promise<void> {
     const db = await openDB();
 
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        let isSettled = false;
-
-        const rejectOnce = (message: string, error: unknown) => {
-            if (isSettled) return;
-            isSettled = true;
-            const finalError = error || new Error(message);
-            logger.error(message, finalError);
-            reject(finalError);
-        };
-
-        transaction.onerror = () => {
-            rejectOnce('Delete transaction error', transaction.error);
-        };
-
-        transaction.onabort = () => {
-            rejectOnce('Delete transaction aborted', transaction.error);
-        };
-
-        const store = transaction.objectStore(STORE_NAME);
+    await withWriteTransaction(db, 'Delete', (store, rejectOnce, isSettled) => {
         const index = store.index('articleUrl');
         const request = index.openCursor(IDBKeyRange.only(articleUrl));
 
         request.onsuccess = (event) => {
-            if (isSettled) return;
+            if (isSettled()) return;
             const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
             if (cursor) {
                 cursor.delete();
@@ -249,17 +243,10 @@ export async function deleteArticle(articleUrl: string): Promise<void> {
             }
         };
 
-        request.onerror = () => {
-            rejectOnce('Delete error', request.error);
-        };
-
-        transaction.oncomplete = () => {
-            if (isSettled) return;
-            isSettled = true;
-            logger.info(`Deleted all chunks for ${articleUrl}`);
-            resolve();
-        };
+        request.onerror = () => rejectOnce('Delete error', request.error);
     });
+
+    logger.info(`Deleted all chunks for ${articleUrl}`);
 }
 
 /**
@@ -268,40 +255,12 @@ export async function deleteArticle(articleUrl: string): Promise<void> {
 export async function clearAll(): Promise<void> {
     const db = await openDB();
 
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        let isSettled = false;
-
-        const rejectOnce = (message: string, error: unknown) => {
-            if (isSettled) return;
-            isSettled = true;
-            const finalError = error || new Error(message);
-            logger.error(message, finalError);
-            reject(finalError);
-        };
-
-        transaction.onerror = () => {
-            rejectOnce('Clear transaction error', transaction.error);
-        };
-
-        transaction.onabort = () => {
-            rejectOnce('Clear transaction aborted', transaction.error);
-        };
-
-        transaction.oncomplete = () => {
-            if (isSettled) return;
-            isSettled = true;
-            logger.info('Cleared all cache');
-            resolve();
-        };
-
-        const store = transaction.objectStore(STORE_NAME);
+    await withWriteTransaction(db, 'Clear', (store, rejectOnce) => {
         const request = store.clear();
-
-        request.onerror = () => {
-            rejectOnce('Clear error', request.error);
-        };
+        request.onerror = () => rejectOnce('Clear error', request.error);
     });
+
+    logger.info('Cleared all cache');
 }
 
 /**
