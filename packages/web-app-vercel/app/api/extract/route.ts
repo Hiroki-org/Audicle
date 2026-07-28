@@ -135,7 +135,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error("Extract error:", error);
+    const errorMessage = error instanceof Error ? `${error.message}
+${error.stack || ''}` : "Unknown error";
+    console.error(`[Extract API] Error: ${errorMessage}`);
     return NextResponse.json(
       { error: "Failed to extract content" },
       { status: 500, headers: corsHeaders },
