@@ -88,17 +88,7 @@ export default function PlaylistDetailPage() {
     });
   }, [playlist?.items, sortOption]);
 
-
-  const sortedItemsIndexMap = useMemo(() => {
-    const map = new Map<string, number>();
-    sortedItems.forEach((item, index) => {
-      map.set(item.id, index);
-    });
-    return map;
-  }, [sortedItems]);
-
   const firstPlayableIndex = useMemo(
-
     () => sortedItems.findIndex((item) => Boolean(item.article?.url)),
     [sortedItems]
   );
@@ -198,7 +188,7 @@ export default function PlaylistDetailPage() {
     (playlistItem: PlaylistItemWithArticle) => {
       if (!playlist?.id) return;
 
-      const index = sortedItemsIndexMap.get(playlistItem.id) ?? -1;
+      const index = sortedItems.findIndex((item) => item.id === playlistItem.id);
       const item = index >= 0 ? sortedItems[index] : playlistItem;
       if (index < 0 || !item.article?.url) {
         logger.warn("プレイリスト記事クリックをスキップ: 再生可能なURLがありません", {
@@ -218,7 +208,7 @@ export default function PlaylistDetailPage() {
         sortOption
       );
     },
-    [startPlaylistPlayback, playlist?.id, playlist?.name, sortedItems, sortOption, sortedItemsIndexMap]
+    [startPlaylistPlayback, playlist?.id, playlist?.name, sortedItems, sortOption]
   );
 
   if (isLoading) {
