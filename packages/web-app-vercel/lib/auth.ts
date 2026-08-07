@@ -2,15 +2,18 @@ import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { initializeNewUser } from "./user-initialization";
+import { logger } from "./logger";
 
 // デバッグログは開発/テスト環境のみ
 const IS_DEBUG = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
 
 // 診断ログ
-console.log('[AUTH DIAGNOSTIC] NODE_ENV:', process.env.NODE_ENV)
-console.log('[AUTH DIAGNOSTIC] IS_DEBUG:', IS_DEBUG)
-console.log('[AUTH DIAGNOSTIC] TEST_USER_EMAIL:', process.env.TEST_USER_EMAIL ? 'SET' : 'NOT SET')
-console.log('[AUTH DIAGNOSTIC] TEST_USER_PASSWORD:', process.env.TEST_USER_PASSWORD ? 'SET' : 'NOT SET')
+logger.info('[AUTH DIAGNOSTIC] Environment Info:', {
+    nodeEnv: process.env.NODE_ENV,
+    isDebug: IS_DEBUG,
+    testEmailSet: !!process.env.TEST_USER_EMAIL,
+    testPasswordSet: !!process.env.TEST_USER_PASSWORD
+})
 
 const allowedUsers = process.env.ALLOWED_USERS?.split(',').map(email => email.trim()) || [];
 
@@ -37,9 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     },
                     async authorize(credentials) {
                         if (IS_DEBUG) {
-                            console.log('[AUTH DEBUG] Test credentials provider called')
-                            console.log('[AUTH DEBUG] Credentials Provider check')
-                            console.log('[AUTH DEBUG] NODE_ENV === "test":', process.env.NODE_ENV === 'test')
+                            logger.info('[AUTH DEBUG] Test credentials provider called', { isTestEnv: process.env.NODE_ENV === 'test' })
                         }
 
                         // テスト用の固定認証
@@ -51,7 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                             credentials?.password === expectedPassword
                         ) {
                             if (IS_DEBUG) {
-                                console.log('[AUTH DEBUG] Login SUCCESS')
+                                logger.success('[AUTH DEBUG] Login SUCCESS')
                             }
                             return {
                                 id: 'test-user-id-123',
@@ -60,7 +61,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                             }
                         }
                         if (IS_DEBUG) {
-                            console.log('[AUTH DEBUG] Login FAILED')
+                            logger.warn('[AUTH DEBUG] Login FAILED')
                         }
                         return null
                     }
@@ -73,7 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // テスト用ユーザーはホワイトリストチェックをスキップ
             if (process.env.AUTH_ENV === 'test' && user.id === 'test-user-id-123') {
                 if (IS_DEBUG) {
-                    console.log('[AUTH DEBUG] Test user - skipping whitelist check')
+                    logger.info('[AUTH DEBUG] Test user - skipping whitelist check')
                 }
                 // テスト用ユーザーの初期化処理
                 await initializeNewUser(user.id, user.email || '');
@@ -86,7 +87,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
             const isAllowed = allowedUsers.includes(email);
             if (IS_DEBUG) {
-                console.log('[AUTH DEBUG] SignIn attempt:', email, 'Allowed:', isAllowed)
+                logger.info('[AUTH DEBUG] SignIn attempt:', { email, isAllowed })
             }
 
             if (!isAllowed) {
