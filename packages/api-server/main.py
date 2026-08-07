@@ -23,12 +23,18 @@ app = FastAPI(title="Audicle API Server", version="1.0.0")
 cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS")
 allow_origins = []
 if cors_origins_env:
-    allow_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    allow_origins = [
+        origin.strip() for origin in cors_origins_env.split(",") if origin.strip()
+    ]
     if "*" in allow_origins:
-        raise ValueError("CORS_ALLOWED_ORIGINS に '*' は使用できません。allow_credentials=True と組み合わせると起動に失敗します。")
+        raise ValueError(
+            "CORS_ALLOWED_ORIGINS に '*' は使用できません。allow_credentials=True と組み合わせると起動に失敗します。"
+        )
 
 if not allow_origins:
-    raise ValueError("CORS_ALLOWED_ORIGINS 環境変数が設定されていないか、有効なオリジンがありません。フロントエンドからのアクセスを許可するために、有効なオリジンを指定してください。")
+    raise ValueError(
+        "CORS_ALLOWED_ORIGINS 環境変数が設定されていないか、有効なオリジンがありません。フロントエンドからのアクセスを許可するために、有効なオリジンを指定してください。"
+    )
 
 logger.info("CORS許可オリジン: %s", allow_origins)
 
@@ -58,9 +64,7 @@ def _get_client() -> texttospeech.TextToSpeechClient:
         )
 
     if not os.path.exists(credentials_path):
-        raise RuntimeError(
-            f"Credentials file not found at '{credentials_path}'."
-        )
+        raise RuntimeError(f"Credentials file not found at '{credentials_path}'.")
 
     logger.info("Initialising Google Cloud Text-to-Speech client")
     _client = texttospeech.TextToSpeechClient()
@@ -95,8 +99,8 @@ MAX_CONCURRENT_TTS_REQUESTS = int(os.getenv("MAX_CONCURRENT_TTS_REQUESTS", "10")
 _tts_semaphore = None
 
 # Pre-compiled regex patterns for text splitting
-SENTENCE_SPLIT_REGEX = re.compile(r'([。！？\n])')
-COMMA_SPLIT_REGEX = re.compile(r'(、)')
+SENTENCE_SPLIT_REGEX = re.compile(r"([。！？\n])")
+COMMA_SPLIT_REGEX = re.compile(r"(、)")
 
 
 def _force_split(text: str, limit: int) -> List[str]:
@@ -109,7 +113,7 @@ def _force_split(text: str, limit: int) -> List[str]:
         end = low
         while low <= high:
             mid = (low + high) // 2
-            if len(text[start:mid].encode('utf-8')) <= limit:
+            if len(text[start:mid].encode("utf-8")) <= limit:
                 end = mid
                 low = mid + 1
             else:
@@ -144,7 +148,7 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
         separators: A list of regex patterns to split by, in order of priority.
                     Patterns should capture the delimiter (e.g., r'([。])') so it can be preserved.
     """
-    if len(text.encode('utf-8')) <= limit:
+    if len(text.encode("utf-8")) <= limit:
         return [text]
 
     if not separators:
@@ -160,15 +164,15 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
     current_chunk_len = 0
 
     for part in parts:
-        part_len = len(part.encode('utf-8'))
+        part_len = len(part.encode("utf-8"))
         if current_chunk_len + part_len > limit:
-             if current_chunk:
-                 chunks.append((current_chunk, current_chunk_len))
-             current_chunk = part
-             current_chunk_len = part_len
+            if current_chunk:
+                chunks.append((current_chunk, current_chunk_len))
+            current_chunk = part
+            current_chunk_len = part_len
         else:
-             current_chunk += part
-             current_chunk_len += part_len
+            current_chunk += part
+            current_chunk_len += part_len
 
     if current_chunk:
         chunks.append((current_chunk, current_chunk_len))
@@ -181,6 +185,7 @@ def _chunk_text(text: str, limit: int, separators: List[Pattern]) -> List[str]:
             final_chunks.append(chunk_text)
 
     return final_chunks
+
 
 def _split_text(text: str) -> List[str]:
     """テキストをGoogle Cloud TTS APIの制限内に分割する"""
@@ -218,10 +223,7 @@ async def _synthesize_to_bytes(text: str, voice: str) -> bytes:
         return await asyncio.to_thread(_call_api)
     except (GoogleAPICallError, RetryError) as exc:
         logger.error("Google Cloud TTS API error: %s", exc)
-        raise HTTPException(
-            status_code=502,
-            detail=f"Google Cloud TTS error: {exc}"
-        )
+        raise HTTPException(status_code=502, detail=f"Google Cloud TTS error: {exc}")
     except Exception as exc:
         logger.error("Unexpected synthesis error: %s", exc)
         raise HTTPException(status_code=500, detail=f"Unexpected error: {exc}")
@@ -239,9 +241,11 @@ async def extract_content(request: ExtractRequest):
         url_str = str(request.url)
         # Node.jsスクリプトを実行してReadability.jsで本文抽出
         proc = await asyncio.create_subprocess_exec(
-            "node", "readability_script.js", url_str,
+            "node",
+            "readability_script.js",
+            url_str,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
 
         try:
@@ -250,37 +254,134 @@ async def extract_content(request: ExtractRequest):
             proc.kill()
             await proc.communicate()
             raise subprocess.TimeoutExpired(
-                ["node", "readability_script.js", url_str],
-                30
+                ["node", "readability_script.js", url_str], 30
             )
 
         if proc.returncode != 0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Extraction failed: {stderr.decode('utf-8', errors='replace')}"
+                detail=f"Extraction failed: {stderr.decode('utf-8', errors='replace')}",
             )
 
         # JSONレスポンスをパース
-        extracted_data = json.loads(stdout.decode('utf-8', errors='replace'))
+        extracted_data = json.loads(stdout.decode("utf-8", errors="replace"))
 
         return ExtractResponse(
             title=extracted_data.get("title", ""),
-            chunks=extracted_data.get("chunks", [])
+            chunks=extracted_data.get("chunks", []),
         )
 
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=408, detail="Extraction timeout")
     except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to parse extraction result"
-        )
+        raise HTTPException(status_code=500, detail="Failed to parse extraction result")
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+async def _process_synthesis(text: str, voice: str) -> bytes:
+    logger.info("Synthesizing text: %s...", text[:100])
+    logger.info("Using voice: %s", voice)
+
+    text_chunks = await asyncio.to_thread(_split_text, text)
+    logger.info("Split text into %d chunks", len(text_chunks))
+
+    logger.info("Synthesizing %d chunks in parallel", len(text_chunks))
+
+    # Limit concurrency to avoid thread pool exhaustion
+    # Default to 5 concurrent requests
+    global _tts_semaphore
+    if _tts_semaphore is None:
+        max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
+        _tts_semaphore = asyncio.Semaphore(max_concurrency)
+
+    async def _synthesize_chunk(
+        chunk_text: str, voice_name: str, index: int, total: int
+    ) -> bytes:
+        async with _tts_semaphore:
+            logger.info("Synthesizing chunk %d/%d", index + 1, total)
+            result = await _synthesize_to_bytes(chunk_text, voice_name)
+            logger.debug("Chunk %d/%d completed", index + 1, total)
+            return result
+
+    tasks = [
+        _synthesize_chunk(chunk, voice, i, len(text_chunks))
+        for i, chunk in enumerate(text_chunks)
+    ]
+
+    # Use return_exceptions=True so we can log all failures and provide
+    # better diagnostics while still failing the whole request.
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    errors = [r for r in results if isinstance(r, Exception)]
+    if errors:
+        # Log all individual chunk errors for better diagnostics
+        for idx, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(
+                    "Error synthesizing chunk %d: %s",
+                    idx + 1,
+                    str(result),
+                )
+        # Raise a summarized error so the outer exception handler
+        # can trigger the existing fallback behavior.
+        raise RuntimeError(
+            f"Synthesis failed for {len(errors)} out of {len(results)} chunks: "
+            + "; ".join(
+                f"{type(e).__name__}: {e}" for e in errors[:3]
+            )  # Limit to first 3 errors
+            + (f" (and {len(errors) - 3} more)" if len(errors) > 3 else "")
+        )
+
+    # All results are successful chunk bytes at this point
+    audio_chunks = results
+    return b"".join(audio_chunks)
+
+
+async def _handle_fallback(e: Exception) -> Response:
+    # フォールバック処理
+    try:
+        logger.info("Attempting fallback: returning test audio file")
+
+        fallback_path = FALLBACK_PATH
+        fallback_exists = await asyncio.to_thread(os.path.exists, fallback_path)
+        if fallback_exists:
+            async with aiofiles.open(fallback_path, "rb") as fallback_file:
+                fallback_audio = await fallback_file.read()
+
+            content_disposition = "attachment; filename=fallback.mp3"
+            return Response(
+                content=fallback_audio,
+                media_type="audio/mpeg",
+                headers={
+                    "Content-Disposition": content_disposition,
+                    "X-Fallback": "true",
+                    "X-Error": str(e),
+                },
+            )
+        else:
+            logger.warning("Fallback audio file not found, returning empty response")
+            content_disposition_empty = "attachment; filename=empty.mp3"
+            return Response(
+                content=b"",
+                media_type="audio/mpeg",
+                headers={
+                    "Content-Disposition": content_disposition_empty,
+                    "X-Fallback": "true",
+                    "X-Error": str(e),
+                },
+            )
+
+    except Exception as fallback_error:
+        logger.error("Fallback also failed: %s", str(fallback_error))
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error: {str(e)}"
+            detail=(
+                f"Synthesis failed: {str(e)}. "
+                f"Fallback failed: {str(fallback_error)}"
+            ),
         )
 
 
@@ -288,116 +389,23 @@ async def extract_content(request: ExtractRequest):
 async def synthesize_speech(request: SynthesizeRequest):
     """テキストを音声化してMP3を返す"""
     try:
-        logger.info("Synthesizing text: %s...", request.text[:100])
-        logger.info("Using voice: %s", request.voice)
-
-        text_chunks = await asyncio.to_thread(_split_text, request.text)
-        logger.info("Split text into %d chunks", len(text_chunks))
-
-        logger.info("Synthesizing %d chunks in parallel", len(text_chunks))
-
-        # Limit concurrency to avoid thread pool exhaustion
-        # Default to 5 concurrent requests
-        global _tts_semaphore
-        if _tts_semaphore is None:
-            max_concurrency = int(os.getenv("TTS_MAX_CONCURRENCY", "5"))
-            _tts_semaphore = asyncio.Semaphore(max_concurrency)
-
-        async def _synthesize_chunk(chunk_text: str, voice_name: str, index: int, total: int) -> bytes:
-            async with _tts_semaphore:
-                logger.info("Synthesizing chunk %d/%d", index + 1, total)
-                result = await _synthesize_to_bytes(chunk_text, voice_name)
-                logger.debug("Chunk %d/%d completed", index + 1, total)
-                return result
-
-        tasks = [
-            _synthesize_chunk(chunk, request.voice, i, len(text_chunks))
-            for i, chunk in enumerate(text_chunks)
-        ]
-
-        # Use return_exceptions=True so we can log all failures and provide
-        # better diagnostics while still failing the whole request.
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        errors = [r for r in results if isinstance(r, Exception)]
-        if errors:
-            # Log all individual chunk errors for better diagnostics
-            for idx, result in enumerate(results):
-                if isinstance(result, Exception):
-                    logger.error(
-                        "Error synthesizing chunk %d: %s",
-                        idx + 1,
-                        str(result),
-                    )
-            # Raise a summarized error so the outer exception handler
-            # can trigger the existing fallback behavior.
-            raise RuntimeError(
-                f"Synthesis failed for {len(errors)} out of {len(results)} chunks: "
-                + "; ".join(f"{type(e).__name__}: {e}" for e in errors[:3])  # Limit to first 3 errors
-                + (f" (and {len(errors) - 3} more)" if len(errors) > 3 else "")
-            )
-
-        # All results are successful chunk bytes at this point
-        audio_chunks = results
-        full_audio = b"".join(audio_chunks)
+        full_audio = await _process_synthesis(request.text, request.voice)
 
         return Response(
             content=full_audio,
             media_type="audio/mpeg",
-            headers={"Content-Disposition": "attachment; filename=speech.mp3"}
+            headers={"Content-Disposition": "attachment; filename=speech.mp3"},
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Synthesis error: %s", str(e))
-
-        # フォールバック処理
-        try:
-            logger.info("Attempting fallback: returning test audio file")
-
-            fallback_path = FALLBACK_PATH
-            if os.path.exists(fallback_path):
-                async with aiofiles.open(fallback_path, "rb") as fallback_file:
-                    fallback_audio = await fallback_file.read()
-
-                content_disposition = "attachment; filename=fallback.mp3"
-                return Response(
-                    content=fallback_audio,
-                    media_type="audio/mpeg",
-                    headers={
-                        "Content-Disposition": content_disposition,
-                        "X-Fallback": "true",
-                        "X-Error": str(e)
-                    }
-                )
-            else:
-                logger.warning(
-                    "Fallback audio file not found, returning empty response"
-                )
-                content_disposition_empty = "attachment; filename=empty.mp3"
-                return Response(
-                    content=b"",
-                    media_type="audio/mpeg",
-                    headers={
-                        "Content-Disposition": content_disposition_empty,
-                        "X-Fallback": "true",
-                        "X-Error": str(e)
-                    }
-                )
-
-        except Exception as fallback_error:
-            logger.error("Fallback also failed: %s", str(fallback_error))
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    f"Synthesis failed: {str(e)}. "
-                    f"Fallback failed: {str(fallback_error)}"
-                )
-            )
+        return await _handle_fallback(e)
 
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port)
