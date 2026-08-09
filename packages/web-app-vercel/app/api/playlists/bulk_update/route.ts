@@ -57,25 +57,30 @@ export async function POST(request: Request) {
                 )
             }
 
-            let addedCount = 0
-            let removedCount = 0
+            const addResults = await Promise.all(
+                addToPlaylistIds.map(async (playlistId) => {
+                    const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
+                    const alreadyExists = playlist?.playlist_items.some((item) => item.article_id === actualArticleId)
+                    if (!alreadyExists) {
+                        await supabaseLocal.addPlaylistItem(playlistId, actualArticleId)
+                        return true
+                    }
+                    return false
+                })
+            )
+            const addedCount = addResults.filter(Boolean).length
 
-            for (const playlistId of addToPlaylistIds) {
-                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const alreadyExists = playlist?.playlist_items.some((item) => item.article_id === actualArticleId)
-                if (!alreadyExists) {
-                    await supabaseLocal.addPlaylistItem(playlistId, actualArticleId)
-                    addedCount += 1
-                }
-            }
-
-            for (const playlistId of removeFromPlaylistIds) {
-                const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
-                const item = playlist?.playlist_items.find((candidate) => candidate.article_id === actualArticleId)
-                if (item && await supabaseLocal.removePlaylistItem(playlistId, item.id)) {
-                    removedCount += 1
-                }
-            }
+            const removeResults = await Promise.all(
+                removeFromPlaylistIds.map(async (playlistId) => {
+                    const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
+                    const item = playlist?.playlist_items.find((candidate) => candidate.article_id === actualArticleId)
+                    if (item) {
+                        return await supabaseLocal.removePlaylistItem(playlistId, item.id)
+                    }
+                    return false
+                })
+            )
+            const removedCount = removeResults.filter(Boolean).length
 
             return NextResponse.json(
                 {
