@@ -358,7 +358,7 @@ function getCurrentHostname() {
 
 function cleanupInvalidUrlStates(urlStates) {
   const invalidKeys = Object.keys(urlStates).filter(
-    (k) => k === "" || k === "undefined" || k === null,
+    (k) => k === "" || k === "undefined" || k === "null",
   );
   if (invalidKeys.length > 0) {
     invalidKeys.forEach((k) => delete urlStates[k]);
