@@ -951,45 +951,57 @@ function buildQueueWithNewRulesManager() {
   return { queue, info };
 }
 
+function tryLegacyCustomRule(hostname) {
+  if (!customRules[hostname]) return null;
+
+  debugLog(`[LegacySystem] Using custom rule for ${hostname}`);
+  const queue = buildQueueWithCustomRule(customRules[hostname]);
+  if (queue.length === 0) return null;
+
+  return { queue, rule: `custom-${hostname}`, type: "site-specific" };
+}
+
+function tryLegacyReadability() {
+  try {
+    debugLog("[LegacySystem] Trying Readability extraction");
+    const queue = buildQueueWithReadability();
+    if (queue.length === 0) return null;
+
+    return { queue, rule: "readability", type: "library" };
+  } catch (e) {
+    console.error("Readability extraction failed:", e);
+    return null;
+  }
+}
+
+function tryLegacyFallback() {
+  debugLog("[LegacySystem] Using fallback extraction");
+  const queue = buildQueueWithFallback();
+  return { queue, rule: "fallback", type: "emergency" };
+}
+
 // レガシーシステムを使用したキュー構築
 function buildQueueWithLegacySystem() {
   debugLog("[LegacySystem] Building queue with legacy rules system");
 
   const hostname = window.location.hostname;
-  let queue = [];
-  let info = { rule: "unknown", domain: hostname };
+  const result =
+    tryLegacyCustomRule(hostname) ||
+    tryLegacyReadability() ||
+    tryLegacyFallback();
 
-  if (customRules[hostname]) {
-    debugLog(`[LegacySystem] Using custom rule for ${hostname}`);
-    queue = buildQueueWithCustomRule(customRules[hostname]);
-    info.rule = `custom-${hostname}`;
-    info.type = "site-specific";
-  }
+  const info = {
+    domain: hostname,
+    rule: result.rule,
+    type: result.type,
+    queueLength: result.queue.length,
+  };
 
-  if (queue.length === 0) {
-    try {
-      debugLog("[LegacySystem] Trying Readability extraction");
-      queue = buildQueueWithReadability();
-      info.rule = "readability";
-      info.type = "library";
-    } catch (e) {
-      console.error("Readability extraction failed:", e);
-    }
-  }
-
-  if (queue.length === 0) {
-    debugLog("[LegacySystem] Using fallback extraction");
-    queue = buildQueueWithFallback();
-    info.rule = "fallback";
-    info.type = "emergency";
-  }
-
-  info.queueLength = queue.length;
   debugLog(
-    `[LegacySystem] Built queue: ${queue.length} items using rule '${info.rule}'`,
+    `[LegacySystem] Built queue: ${result.queue.length} items using rule '${info.rule}'`,
   );
 
-  return { queue, info };
+  return { queue: result.queue, info };
 }
 
 // 現在のページで使用可能なルール情報を取得
