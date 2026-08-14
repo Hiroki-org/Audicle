@@ -9,9 +9,6 @@ sys.modules["google.api_core.exceptions"] = MagicMock()
 sys.modules["google.cloud"] = MagicMock()
 sys.modules["google.cloud.texttospeech"] = MagicMock()
 
-# Add parent directory to path to import main
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from fastapi.testclient import TestClient
 import main
 
