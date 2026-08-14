@@ -405,14 +405,11 @@ describe("recordArticleStats", () => {
     // start the promise
     const promise = recordArticleStats(mockParams);
 
-    // Wait for all microtasks to drain (so fetch is called and setTimeout is queued)
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-    jest.advanceTimersByTime(1000); // Trigger 1st retry
-
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-    jest.advanceTimersByTime(1000); // Trigger 2nd retry
-
-    for (let i = 0; i < 5; i++) await Promise.resolve();
+    // Since our optimized retryFetch uses setTimeout directly and Promise chain,
+    // we need to advance timers and let microtasks run recursively.
+    // However, jest's fake timers and Promises can be tricky.
+    // Instead of doing it step by step manually which can freeze, we can use runAllTimersAsync
+    await jest.runAllTimersAsync();
 
     await promise;
 

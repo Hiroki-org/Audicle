@@ -14,24 +14,26 @@ interface RecordStatsParams {
 }
 
 // リトライヘルパー関数
-async function retryFetch(fetchFn: () => Promise<Response>, maxRetries: number = 3, delay: number = 1000): Promise<Response> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            return await fetchFn();
-        } catch (error) {
-            if (attempt === maxRetries) {
-                throw error;
-            }
-            // ECONNRESET などのネットワークエラー時はリトライ
-            if (error instanceof Error && (error.message.includes('ECONNRESET') || error.message.includes('aborted'))) {
-                logger.warn(`Fetch attempt ${attempt} failed, retrying in ${delay}ms:`, error.message);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                throw error; // ネットワークエラー以外は即座に投げる
-            }
-        }
-    }
-    throw new Error('Max retries exceeded');
+function retryFetch(fetchFn: () => Promise<Response>, maxRetries: number = 3, delay: number = 1000): Promise<Response> {
+    return new Promise((resolve, reject) => {
+        const attemptFn = (currentAttempt: number) => {
+            // Promise.resolve().then wraps fetchFn() to safely catch synchronous errors inside the promise chain
+            Promise.resolve().then(fetchFn).then(resolve).catch(error => {
+                if (currentAttempt === maxRetries) {
+                    reject(error);
+                    return;
+                }
+                // ECONNRESET などのネットワークエラー時はリトライ
+                if (error instanceof Error && (error.message.includes('ECONNRESET') || error.message.includes('aborted'))) {
+                    logger.warn(`Fetch attempt ${currentAttempt} failed, retrying in ${delay}ms:`, error.message);
+                    setTimeout(() => attemptFn(currentAttempt + 1), delay);
+                } else {
+                    reject(error); // ネットワークエラー以外は即座に投げる
+                }
+            });
+        };
+        attemptFn(1);
+    });
 }
 
 /**
