@@ -12,6 +12,7 @@ import { calculateTextHash } from '@/lib/textHash';
 import { getStorageProvider } from '@/lib/storage';
 import { GoogleError } from 'google-gax';
 import { removeSeparatorCharacters } from '@/lib/textCleaner';
+import { hashEmail } from '@/lib/emailHash';
 
 // Node.js runtimeを明示的に指定（Google Cloud TTS SDKはEdge Runtimeで動作しない）
 export const runtime = 'nodejs';
@@ -350,7 +351,7 @@ export async function POST(request: NextRequest) {
 
         // 許可リストチェック
         if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(session.user.email)) {
-            log('warn', 'アクセスが拒否されました', { email: session.user.email });
+            log('warn', 'アクセスが拒否されました', { emailHash: hashEmail(session.user.email) });
             return NextResponse.json({ error: 'Access denied' }, { status: 403, headers: corsHeaders });
         }
 
