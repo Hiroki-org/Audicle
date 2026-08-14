@@ -123,7 +123,7 @@ describe("usePlaylists hooks", () => {
       await waitFor(() => expect(result.current.isError).toBe(true), {
         timeout: 4000,
       });
-      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(global.fetch).toHaveBeenCalledTimes(4);
       expect(result.current.error).toBeDefined();
     });
   });
@@ -171,7 +171,7 @@ describe("usePlaylists hooks", () => {
       const { result } = renderHook(() => usePlaylistDetail(playlistId), { wrapper });
 
       await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 4000 });
-      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(global.fetch).toHaveBeenCalledTimes(4);
       expect(result.current.error).toBeDefined();
     });
   });
