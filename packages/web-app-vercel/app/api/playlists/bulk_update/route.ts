@@ -57,25 +57,33 @@ export async function POST(request: Request) {
                 )
             }
 
-            let addedCount = 0
-            let removedCount = 0
+            let addedCount = 0;
+            let removedCount = 0;
 
-            for (const playlistId of addToPlaylistIds) {
+            const addPromises = addToPlaylistIds.map(async (playlistId) => {
                 const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
                 const alreadyExists = playlist?.playlist_items.some((item) => item.article_id === actualArticleId)
                 if (!alreadyExists) {
                     await supabaseLocal.addPlaylistItem(playlistId, actualArticleId)
-                    addedCount += 1
+                    return 1
                 }
-            }
+                return 0
+            })
 
-            for (const playlistId of removeFromPlaylistIds) {
+            const removePromises = removeFromPlaylistIds.map(async (playlistId) => {
                 const playlist = await supabaseLocal.getPlaylistWithItems(userEmail, playlistId)
                 const item = playlist?.playlist_items.find((candidate) => candidate.article_id === actualArticleId)
                 if (item && await supabaseLocal.removePlaylistItem(playlistId, item.id)) {
-                    removedCount += 1
+                    return 1
                 }
-            }
+                return 0
+            })
+
+            const addResults = await Promise.all(addPromises)
+            const removeResults = await Promise.all(removePromises)
+
+            addedCount = addResults.reduce((sum: number, count: number) => sum + count, 0)
+            removedCount = removeResults.reduce((sum: number, count: number) => sum + count, 0)
 
             return NextResponse.json(
                 {
