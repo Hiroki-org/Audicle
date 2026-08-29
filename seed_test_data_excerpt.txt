@@ -1,0 +1,106 @@
+219-            title: "人気記事3 - Supabase実践",
+220-            thumbnail_url: "https://via.placeholder.com/300",
+221-        },
+222-    ];
+223-
+224:    // select + insert/update パターンで記事を作成（upsertを避ける）
+225-    interface Article {
+226-        id: string;
+227-        owner_email: string;
+228-        url: string;
+229-        title: string;
+230-        thumbnail_url: string;
+231-    }
+232-    const urls = articles.map(a => a.url);
+233-
+234-    const emails = Array.from(new Set(articles.map(a => a.owner_email)));
+235-    // 既存の記事を一括検索 (urlとowner_emailでフィルタ)
+236-    const { data: existingData, error: selectError } = await supabase
+237-        .from("articles")
+238-        .select()
+239-        .in("url", urls)
+240-        .in("owner_email", emails);
+241-
+242-    if (selectError) {
+243-        console.error("記事の検索に失敗:", selectError);
+244-        process.exit(1);
+245-    }
+246-
+247-    const existingArticles = existingData || [];
+248-
+249-    // (owner_email, url)をキーにした既存記事のマップを作成
+250-    const existingMap = new Map();
+251-    for (const existing of existingArticles) {
+252-        existingMap.set(existing.owner_email + "||" + existing.url, existing);
+253-    }
+254-
+255-    const toInsert: typeof articles = [];
+256-    const toUpdate: typeof articles = [];
+257-
+258-    // 重複を避けるためのSet (owner_email + url)
+259-    const processedKeys = new Set();
+260-
+261-    for (const article of articles) {
+262-        const key = article.owner_email + "||" + article.url;
+263-        if (processedKeys.has(key)) continue;
+264-        processedKeys.add(key);
+265-
+266-        const existing = existingMap.get(key);
+267-        if (existing) {
+268-            toUpdate.push(article);
+269-        } else {
+270-            toInsert.push(article);
+271-        }
+272-    }
+273-
+274-    const createdArticlesMap = new Map<string, Article>();
+275-
+276-    // 新規記事を一括作成
+277-    if (toInsert.length > 0) {
+278-        const { data: created, error: createError } = await supabase
+279-            .from("articles")
+280-            .insert(toInsert)
+281-            .select();
+282-
+283-        if (createError) {
+284-            console.error("記事の一括作成に失敗:", createError);
+285-            process.exit(1);
+286-        }
+287-        if (created) {
+288-            for (const c of created) {
+289-                createdArticlesMap.set(c.owner_email + "||" + c.url, c as Article);
+290-            }
+291-        }
+292-    }
+293-
+294-    // 既存記事を更新
+295-    if (toUpdate.length > 0) {
+296-        const batchUpdateData = toUpdate.map((article) => {
+297-            const key = article.owner_email + "||" + article.url;
+298-            const existing = existingMap.get(key);
+299-
+300-            if (!existing) {
+301-                // This shouldn't happen due to the logic above, but added for safety and TS
+302-                return null;
+303-            }
+304-
+305-            return {
+306-                id: existing.id,
+307-                owner_email: article.owner_email,
+308-                title: article.title,
+309-                thumbnail_url: article.thumbnail_url,
+310-                url: article.url, // required if we are mapping createdArticlesMap with url below
+311-            };
+312-        }).filter((item) => item !== null) as { id: string; owner_email: string; title: string; thumbnail_url: string; url: string }[];
+313-
+314-        const { data: updatedItems, error: updateError } = await supabase
+315-            .from("articles")
+316-            .upsert(batchUpdateData, { onConflict: "id" })
+317-            .select();
+318-
+319-        if (updateError) {
+320-            console.error("記事の更新に失敗:", updateError);
+321-            process.exit(1);
+322-        }
+323-
+324-        if (updatedItems) {
