@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders, CorsError } from '@/lib/cors';
+import { requireAuth } from '@/lib/api-auth';
 import { Readability } from "@mozilla/readability";
 import { normalizeArticleText } from "@/lib/parseArticle";
 import { parseHTML } from "linkedom";
@@ -33,6 +34,16 @@ export async function POST(request: NextRequest) {
         }
         throw error;
     }
+
+  const { userEmail, response: authResponse } = await requireAuth();
+  if (authResponse) {
+    if (corsHeaders) {
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        authResponse.headers.set(key, value);
+      });
+    }
+    return authResponse;
+  }
 
   try {
     const { url } = await request.json();
