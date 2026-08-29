@@ -29,8 +29,8 @@ describe('articleStorage', () => {
     jest.restoreAllMocks();
   });
 
-  const mockChunks: Chunk[] = [
-    { text: 'Hello world', start: 0, end: 11 },
+  const mockChunks = [
+    { text: 'Hello world', start: 0, end: 11 } as unknown as Chunk,
   ];
 
   const mockArticleInput = {
