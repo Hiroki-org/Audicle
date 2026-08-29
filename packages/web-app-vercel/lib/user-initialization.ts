@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { getOrCreateDefaultPlaylist } from './playlist-utils'
 import { isTestAuthRuntime } from './auth-env'
+import { logger } from './logger'
 
 export interface UserInitializationResult {
     success: boolean
@@ -26,7 +27,7 @@ export async function initializeNewUser(userId: string, userEmail: string): Prom
             if (userEmail) {
                 const playlistResult = await getOrCreateDefaultPlaylist(userEmail);
                 if (playlistResult.error) {
-                    console.error('Failed to create default playlist:', playlistResult.error);
+                    logger.error('Failed to create default playlist:', playlistResult.error);
                 }
             }
 
@@ -42,13 +43,13 @@ export async function initializeNewUser(userId: string, userEmail: string): Prom
 
         // 既に存在する場合はスキップ
         if (existingSettings) {
-            console.log(`User settings already exist for user: ${userId}`)
+            logger.info(`User settings already exist for user: ${userId}`)
             return { success: true }
         }
 
         // PGRST116 = not found（正常な状態）
         if (checkError && checkError.code !== 'PGRST116') {
-            console.error('Error checking user settings:', checkError)
+            logger.error('Error checking user settings:', checkError)
             return { success: false, error: 'Failed to check user settings' }
         }
 
@@ -65,24 +66,24 @@ export async function initializeNewUser(userId: string, userEmail: string): Prom
             .single()
 
         if (createError) {
-            console.error('Error creating user settings:', createError)
+            logger.error('Error creating user settings:', createError)
             return { success: false, error: 'Failed to create user settings' }
         }
 
-        console.log(`User settings created for user: ${userId}`, newSettings)
+        logger.info(`User settings created for user: ${userId}`, newSettings)
 
         // デフォルトプレイリストを作成
         if (userEmail) {
             const playlistResult = await getOrCreateDefaultPlaylist(userEmail);
             if (playlistResult.error) {
-                console.error('Failed to create default playlist:', playlistResult.error);
+                logger.error('Failed to create default playlist:', playlistResult.error);
                 // エラーだが、user_settingsは作成済みなので success: true
             }
         }
 
         return { success: true }
     } catch (error) {
-        console.error('Unexpected error in initializeNewUser:', error)
+        logger.error('Unexpected error in initializeNewUser:', error)
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
