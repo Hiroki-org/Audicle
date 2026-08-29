@@ -19,15 +19,15 @@ jobs:
       cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
       playwright-cache-hit: ${{ steps.playwright-cache.outputs.cache-hit }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.1
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
 
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -41,7 +41,7 @@ jobs:
 
       - name: Restore Playwright cache
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -56,13 +56,13 @@ jobs:
     needs: setup
     runs-on: ubuntu-slim
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -79,8 +79,8 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Install dependencies
@@ -97,8 +97,8 @@ jobs:
     name: Check (api-server)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install dependencies
@@ -113,13 +113,13 @@ jobs:
     needs: setup
     runs-on: ubuntu-slim
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -138,13 +138,13 @@ jobs:
     needs: setup
     runs-on: ubuntu-slim
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Restore npm cache
         id: cache-deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -163,12 +163,12 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Restore npm cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -198,17 +198,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Restore npm cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
       - name: Restore Playwright cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
@@ -251,19 +251,19 @@ jobs:
         browser: [chromium, firefox]
         shard: [1, 2, 3]
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
 
       - name: Restore npm cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: packages/web-app-vercel/node_modules
           key: npm-deps-${{ runner.os }}-node-20-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
 
       - name: Restore Playwright cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('packages/web-app-vercel/package-lock.json') }}
