@@ -356,6 +356,17 @@ function getCurrentHostname() {
   }
 }
 
+function cleanupInvalidUrlStates(urlStates) {
+  const invalidKeys = Object.keys(urlStates).filter(
+    (k) => k === "" || k === "undefined" || k === "null",
+  );
+  if (invalidKeys.length > 0) {
+    invalidKeys.forEach((k) => delete urlStates[k]);
+    chrome.storage.local.set({ urlStates });
+    debugLog("content: cleaned up invalid urlStates keys:", invalidKeys);
+  }
+}
+
 // 現在のURLの有効/無効状態を取得する
 function loadCurrentUrlState(callback) {
   const hostname = getCurrentHostname();
@@ -363,15 +374,7 @@ function loadCurrentUrlState(callback) {
     let urlStates = result.urlStates || {};
 
     // マイグレーション/クリーンアップ: 無効キーが残っている場合は削除
-    const invalidKeys = Object.keys(urlStates).filter(
-      (k) => k === "" || k === "undefined" || k === null,
-    );
-    if (invalidKeys.length > 0) {
-      invalidKeys.forEach((k) => delete urlStates[k]);
-      // 保存してクリーンアップ
-      chrome.storage.local.set({ urlStates });
-      debugLog("content: cleaned up invalid urlStates keys:", invalidKeys);
-    }
+    cleanupInvalidUrlStates(urlStates);
 
     // ホスト名が取得できない場合はグローバルのenabledを使う
     if (!hostname) {
