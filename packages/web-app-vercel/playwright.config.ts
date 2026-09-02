@@ -19,7 +19,7 @@ export default defineConfig({
     timeout: 120000,
     expect: { timeout: 30000 },
     use: {
-        baseURL: 'http://localhost:3000',
+        baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
         trace: 'on-first-retry',
         // storageStateはここから削除
     },
@@ -29,7 +29,7 @@ export default defineConfig({
             name: 'setup',
             testMatch: /.*\.setup\.ts/,
             use: {
-                baseURL: 'http://localhost:3000',
+                baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
             },
         },
 
@@ -65,7 +65,7 @@ export default defineConfig({
     ],
     webServer: {
         command: process.env.CI_WEB_SERVER_COMMAND || 'AUTH_ENV=test npm run dev',
-        url: 'http://localhost:3000',
+        url: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
         reuseExistingServer: !process.env.CI,
         // Increase timeout to allow the Next.js dev server (and turbopack) to
         // finish compilation and bind to the port in CI environments.
@@ -76,7 +76,7 @@ export default defineConfig({
             NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
             NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
             NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || '',
-            NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+            NEXTAUTH_URL: process.env.NEXTAUTH_URL || process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
             AUTH_ENV: process.env.AUTH_ENV || '',
             NEXT_PUBLIC_AUTH_ENV: process.env.NEXT_PUBLIC_AUTH_ENV || (process.env.AUTH_ENV === 'test' ? 'test' : ''),
             // Ensure TEST_USER_EMAIL has a fallback to match auth.setup.ts and lib/auth.ts
