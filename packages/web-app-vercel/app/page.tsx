@@ -94,10 +94,16 @@ export default function Home() {
     localStorage.setItem(HOME_SORT_KEY, sortBy);
   }, [sortBy]);
 
-  const selectedItem = useMemo(
-    () => items.find((item) => item.article_id === selectedItemId),
-    [items, selectedItemId]
-  );
+  // Convert items to Map for O(1) search
+  const itemsMap = useMemo(() => {
+    const map = new Map<string, typeof items[0]>();
+    items.forEach((item) => {
+      if (item.article_id) map.set(item.article_id, item);
+    });
+    return map;
+  }, [items]);
+
+  const selectedItem = selectedItemId ? itemsMap.get(selectedItemId) : undefined;
 
   const { showConfirm, confirmDialog } = useConfirmDialog();
 
