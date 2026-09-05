@@ -37,9 +37,22 @@ async function ensureTestUser() {
         const isAlreadyRegistered = error.status === 422 || error.message?.includes("already registered") || error.code?.includes("email_exists");
         
         if (isAlreadyRegistered) {
-            console.log("   User already exists. Fetching ID by listing users...");
+
+            // Optimization: generateLink avoids fetching all users to find the ID, preventing N+1 query.
+            const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+                type: 'magiclink',
+                email: TEST_USER_EMAIL,
+            });
+
+            if (!linkError && linkData?.user?.id) {
+                console.log(`   Found existing user ID via generateLink: ${linkData.user.id}`);
+                return linkData.user.id;
+            }
+
+            console.log("   User already exists. Fetching ID by listing users (fallback)...");
             
             // Pagination handling to find user
+
             let page = 1;
             const perPage = 50;
             let foundUser = null;
