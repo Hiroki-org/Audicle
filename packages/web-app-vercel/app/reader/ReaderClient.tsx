@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -271,7 +271,10 @@ export default function ReaderPageClient() {
 
   // コンポーネントのアンマウント時（リーダー画面から離れるとき）に再生を停止する
   useEffect(() => {
-    return () => {
+
+
+
+  return () => {
       stopRef.current();
       setPlaybackSourceRef.current?.(null);
     };
@@ -933,6 +936,15 @@ export default function ReaderPageClient() {
     [playlistState.items.length],
   );
 
+  const playlistOptions = useMemo(() => {
+    return playlists.map((playlist) => (
+      <option key={playlist.id} value={playlist.id}>
+        {playlist.is_default ? "📌 " : ""}
+        {playlist.name}
+      </option>
+    ));
+  }, [playlists]);
+
   return (
     <div className="h-screen overflow-hidden flex flex-col">
       {/* ヘッダー: コンパクト化されたナビゲーションとコントロール */}
@@ -990,12 +1002,7 @@ export default function ReaderPageClient() {
                   className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
                   disabled={isLoading || playlists.length === 0}
                 >
-                  {playlists.map((playlist) => (
-                    <option key={playlist.id} value={playlist.id}>
-                      {playlist.is_default ? "📌 " : ""}
-                      {playlist.name}
-                    </option>
-                  ))}
+                  {playlistOptions}
                 </select>
 
                 <button
