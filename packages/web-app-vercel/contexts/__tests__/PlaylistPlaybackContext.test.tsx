@@ -393,10 +393,6 @@ describe("generateShuffledIndices", () => {
 
   test("shuffles correctly using Math.random", () => {
     // Mock Math.random to always return 0.5
-    // i=4 (len=5): j = Math.floor(0.5 * 5) = 2. Swaps index 4 and 2. Array: [0, 1, 4, 3, 2]
-    // i=3: j = Math.floor(0.5 * 4) = 2. Swaps index 3 and 2. Array: [0, 1, 3, 4, 2]
-    // i=2: j = Math.floor(0.5 * 3) = 1. Swaps index 2 and 1. Array: [0, 3, 1, 4, 2]
-    // i=1: j = Math.floor(0.5 * 2) = 1. Swaps index 1 and 1. Array: [0, 3, 1, 4, 2]
     jest.spyOn(Math, "random").mockReturnValue(0.5);
 
     const result = generateShuffledIndices(5);
