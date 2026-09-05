@@ -10,9 +10,6 @@ sys.modules["google.cloud.texttospeech"] = MagicMock()
 sys.modules["uvicorn"] = MagicMock()
 
 os.environ["CORS_ALLOWED_ORIGINS"] = "http://localhost"
-# Add parent directory to path to import main
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from main import _split_text, MAX_TTS_BYTES
 
 class TestSplitText(unittest.TestCase):

@@ -12,8 +12,6 @@ sys.modules["google.cloud.texttospeech"] = MagicMock()
 # Configure CORS for test environment
 os.environ["CORS_ALLOWED_ORIGINS"] = "http://localhost:3000"
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from fastapi.testclient import TestClient
 import main
 
