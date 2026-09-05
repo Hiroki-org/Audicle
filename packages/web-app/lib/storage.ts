@@ -39,14 +39,14 @@ export const articleStorage = {
         const index: Article[] = [];
         let successCount = 0;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        articles.forEach((article: any) => {
+        articles.forEach((item: unknown) => {
             // 必須フィールドの存在チェック
-            if (!article || typeof article !== 'object' || !article.id) {
-                logger.warn("Migration: Skipping invalid article", article);
+            if (!item || typeof item !== 'object' || !('id' in item) || !(item as Partial<Article>).id) {
+                logger.warn("Migration: Skipping invalid article", item);
                 return;
             }
 
+            const article = item as Article;
             const { chunks, ...metadata } = article;
             const chunkCount = Array.isArray(chunks) ? chunks.length : 0;
 
