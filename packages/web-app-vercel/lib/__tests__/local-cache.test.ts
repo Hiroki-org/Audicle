@@ -118,6 +118,24 @@ describe("local-cache", () => {
             );
         });
 
+        it("should properly serialize CACHE_VERSION and Date.now() timestamp into the envelope", () => {
+            const mockDateNow = 1234567890;
+            const dateSpy = jest.spyOn(Date, "now").mockReturnValue(mockDateNow);
+
+            setArticlesCache(mockUserId, mockData);
+
+            expect(global.localStorage.setItem).toHaveBeenCalledWith(
+                mockKey,
+                JSON.stringify({
+                    version: 1, // CACHE_VERSION
+                    timestamp: mockDateNow,
+                    payload: mockData,
+                })
+            );
+
+            dateSpy.mockRestore();
+        });
+
         it("should catch and warn other unknown errors", () => {
             const unknownError = new Error("Some unknown error");
 
