@@ -1,7 +1,7 @@
 /** @jest-environment node */
 // 簡易版テスト（MSWなし）
 jest.mock('@/lib/api-auth', () => ({
-    requireAuth: jest.fn(async (handler) => handler),
+    requireAuth: jest.fn(() => Promise.resolve({ userEmail: 'test@example.com', response: null })),
     getUserEmailFromRequest: jest.fn(() => Promise.resolve('test@example.com'))
 }))
 
@@ -21,6 +21,24 @@ global.fetch = jest.fn(() =>
 import * as routeModule from '../route'
 
 describe('/api/extract route', () => {
+
+    it('returns 401 if unauthorized', async () => {
+        const { requireAuth } = require('@/lib/api-auth');
+        const { NextResponse } = require('next/server');
+        (requireAuth as jest.Mock).mockResolvedValueOnce({
+            userEmail: null,
+            response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        });
+
+        const mockRequest = new Request('http://localhost:3000/api/extract', {
+            method: 'POST',
+            body: JSON.stringify({ url: 'https://example.com' }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const res = await routeModule.POST(mockRequest);
+        expect(res.status).toBe(401);
+    });
+
     beforeEach(() => {
         // Reset fetch mock before each test
         (global.fetch as jest.Mock).mockReset()

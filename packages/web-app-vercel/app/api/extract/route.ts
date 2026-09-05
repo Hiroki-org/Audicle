@@ -5,6 +5,7 @@ import { normalizeArticleText } from "@/lib/parseArticle";
 import { parseHTML } from "linkedom";
 import { ExtractResponse } from "@/types/api";
 import { isSafeUrl } from "@/lib/ssrf";
+import { requireAuth } from "@/lib/api-auth";
 
 // Node.js runtimeを明示的に指定（JSDOMはEdge Runtimeで動作しない）
 export const runtime = "nodejs";
@@ -33,6 +34,16 @@ export async function POST(request: NextRequest) {
         }
         throw error;
     }
+
+  const { userEmail, response: authResponse } = await requireAuth();
+  if (authResponse) {
+    if (corsHeaders) {
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        authResponse.headers.set(key, value);
+      });
+    }
+    return authResponse;
+  }
 
   try {
     const { url } = await request.json();
