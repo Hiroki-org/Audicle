@@ -143,5 +143,38 @@ class TestSynthesizeSpeech(unittest.TestCase):
         self.assertEqual(response.headers["x-fallback"], "true")
         self.assertIn("Complete synthesis failure", response.headers["x-error"])
 
+
+    @patch('main._get_client')
+    def test_google_api_call_error_502(self, mock_get_client):
+        from fastapi import HTTPException
+        import asyncio
+
+        class FakeGoogleAPICallError(Exception):
+            pass
+
+        class FakeRetryError(Exception):
+            pass
+
+        with patch('main.GoogleAPICallError', FakeGoogleAPICallError), patch('main.RetryError', FakeRetryError):
+            mock_client_instance = MagicMock()
+            mock_client_instance.synthesize_speech.side_effect = FakeGoogleAPICallError("Test Google API Error")
+            mock_get_client.return_value = mock_client_instance
+
+            with self.assertRaises(HTTPException) as context:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(main._synthesize_to_bytes("Hello world", "test-voice"))
+                loop.close()
+
+            self.assertEqual(context.exception.status_code, 502)
+            self.assertIn("Test Google API Error", context.exception.detail)
+
 if __name__ == '__main__':
+
+
+
+
+
+
+
     unittest.main()
