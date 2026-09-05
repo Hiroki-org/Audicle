@@ -3,7 +3,6 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 import os
-import re
 
 # Mock external dependencies
 sys.modules["google.api_core.exceptions"] = MagicMock()
