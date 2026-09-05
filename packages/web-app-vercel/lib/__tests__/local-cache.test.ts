@@ -102,34 +102,17 @@ describe("local-cache", () => {
             dateSpy.mockRestore();
         });
 
-        it("should catch and warn QuotaExceededError", () => {
-            const quotaError = new Error("Quota exceeded");
-            quotaError.name = "QuotaExceededError";
-
+        it("should handle localStorage.setItem errors gracefully", () => {
+            const testError = new Error("Storage full");
             (global.localStorage.setItem as jest.Mock).mockImplementation(() => {
-                throw quotaError;
+                throw testError;
             });
 
             setArticlesCache(mockUserId, mockData);
 
             expect(console.warn).toHaveBeenCalledWith(
-                "Failed to save articles to cache (quota exceeded):",
-                quotaError
-            );
-        });
-
-        it("should catch and warn other unknown errors", () => {
-            const unknownError = new Error("Some unknown error");
-
-            (global.localStorage.setItem as jest.Mock).mockImplementation(() => {
-                throw unknownError;
-            });
-
-            setArticlesCache(mockUserId, mockData);
-
-            expect(console.warn).toHaveBeenCalledWith(
-                "Failed to save articles to cache:",
-                unknownError
+                "Failed to set articles cache:",
+                testError
             );
         });
     });
