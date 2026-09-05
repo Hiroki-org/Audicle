@@ -72,44 +72,23 @@ export async function POST(
                 articleError = e as Error
             }
         } else {
-            // まず既存の記事を検索
-            const { data: existingArticle } = await supabase
+            const { data: upserted, error: upsertError } = await supabase
                 .from('articles')
-                .select()
-                .eq('owner_email', userEmail)
-                .eq('url', article_url)
-                .single()
-
-            if (existingArticle) {
-                // 既存の記事があれば更新
-                const { data: updated, error: updateError } = await supabase
-                    .from('articles')
-                    .update({
-                        title: article_title,
-                        thumbnail_url: thumbnail_url || null,
-                        last_read_position: last_read_position || 0,
-                    })
-                    .eq('id', existingArticle.id)
-                    .select()
-                    .single()
-                article = updated
-                articleError = updateError
-            } else {
-                // 新規作成
-                const { data: created, error: createError } = await supabase
-                    .from('articles')
-                    .insert({
+                .upsert(
+                    {
                         owner_email: userEmail,
                         url: article_url,
                         title: article_title,
                         thumbnail_url: thumbnail_url || null,
                         last_read_position: last_read_position || 0,
-                    })
-                    .select()
-                    .single()
-                article = created
-                articleError = createError
-            }
+                    },
+                    { onConflict: 'owner_email,url' }
+                )
+                .select()
+                .single()
+
+            article = upserted
+            articleError = upsertError
         }
 
         if (articleError) {

@@ -122,56 +122,26 @@ async function handleShareTarget(
                 0
             )
         } else {
-            // まず既存の記事を検索
-            const { data: existingArticle, error: searchError } = await supabase
+            const { data: upserted, error: upsertError } = await supabase
                 .from('articles')
-                .select()
-                .eq('owner_email', userEmail)
-                .eq('url', sharedUrl)
-                .maybeSingle()
-
-            if (searchError) {
-                console.error('Error searching for existing article:', searchError)
-                throw new Error('記事の検索に失敗しました')
-            }
-
-            if (existingArticle) {
-                // 既存の記事があればタイトルを更新（共有時にタイトルが渡された場合）
-                if (sharedTitle && sharedTitle !== existingArticle.title) {
-                    const { data: updated, error: updateError } = await supabase
-                        .from('articles')
-                        .update({ title: sharedTitle })
-                        .eq('id', existingArticle.id)
-                        .select()
-                        .single()
-
-                    if (updateError) {
-                        console.error('Error updating article title:', updateError)
-                        throw new Error('記事タイトルの更新に失敗しました')
-                    }
-                    article = updated
-                } else {
-                    article = existingArticle
-                }
-            } else {
-                // 新規作成
-                const { data: created, error: createError } = await supabase
-                    .from('articles')
-                    .insert({
+                .upsert(
+                    {
                         owner_email: userEmail,
                         url: sharedUrl,
                         title: sharedTitle || 'Shared Article',
                         last_read_position: 0,
-                    })
-                    .select()
-                    .single()
+                    },
+                    { onConflict: 'owner_email,url' }
+                )
+                .select()
+                .single()
 
-                if (createError) {
-                    console.error('Error creating article:', createError)
-                    throw new Error('記事の作成に失敗しました')
-                }
-                article = created
+            if (upsertError) {
+                console.error('Error upserting article:', upsertError)
+                throw new Error('記事の作成/更新に失敗しました')
             }
+
+            article = upserted
         }
 
         if (!article) {
