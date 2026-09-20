@@ -102,10 +102,6 @@ export function setArticlesCache(userId: string, data: CachedPlaylistData): void
         localStorage.setItem(key, JSON.stringify(envelope));
     } catch (error) {
         // QuotaExceededError and others may occur; log to help debugging
-        if ((error as any)?.name === "QuotaExceededError") {
-            console.warn("Failed to save articles to cache (quota exceeded):", error);
-        } else {
-            console.warn("Failed to save articles to cache:", error);
-        }
+        console.warn('Failed to set articles cache:', error);
     }
 }
