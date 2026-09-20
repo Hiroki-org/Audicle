@@ -1,7 +1,7 @@
 /** @jest-environment node */
 // 簡易版テスト（MSWなし）
 jest.mock('@/lib/api-auth', () => ({
-    requireAuth: jest.fn(async (handler) => handler),
+    requireAuth: jest.fn(() => Promise.resolve({ userEmail: 'test@example.com', response: null })),
     getUserEmailFromRequest: jest.fn(() => Promise.resolve('test@example.com'))
 }))
 
@@ -14,17 +14,66 @@ jest.mock('@/lib/ssrf', () => ({
 global.fetch = jest.fn(() =>
     Promise.resolve({
         ok: true,
+        status: 200,
+        headers: {
+            get: () => null
+        },
         text: () => Promise.resolve('<html><body><p>Test content</p></body></html>')
     })
 ) as jest.Mock
 
+import { requireAuth } from '@/lib/api-auth';
+import { isSafeUrl } from '@/lib/ssrf';
 import * as routeModule from '../route'
 
 describe('/api/extract route', () => {
+
+    it('returns 401 if unauthorized', async () => {
+                const { NextResponse } = require('next/server');
+        const headersMap = new Map();
+        const responseObj = {
+            status: 401,
+            headers: {
+                set: (key, val) => headersMap.set(key, val),
+                get: (key) => headersMap.get(key)
+            },
+            json: async () => ({ error: 'Unauthorized' })
+        };
+
+        (requireAuth as jest.Mock).mockResolvedValueOnce({
+            userEmail: null,
+            response: responseObj
+        });
+
+        const mockRequest = new Request('http://localhost:3000/api/extract', {
+            method: 'POST',
+            body: JSON.stringify({ url: 'https://example.com' }),
+            headers: {
+                'Content-Type': 'application/json',
+                'Origin': 'https://allowed-origin.com'
+            }
+        });
+        const res = await routeModule.POST(mockRequest);
+        expect(res.status).toBe(401);
+
+        // Assertions for origin, credentials, methods, and Vary headers
+        expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed-origin.com');
+        expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+        expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS');
+        expect(res.headers.get('Vary')).toBe('Origin');
+    });
+
+
+    const originalEnv = process.env;
     beforeEach(() => {
-        // Reset fetch mock before each test
-        (global.fetch as jest.Mock).mockReset()
-    })
+        jest.resetModules();
+        process.env = { ...originalEnv, ALLOWED_ORIGINS: 'https://allowed-origin.com' };
+        (global.fetch as jest.Mock).mockReset();
+    });
+    afterEach(() => {
+        process.env = originalEnv;
+    });
+
 
     it('returns 400 for missing url', async () => {
         const mockRequest = new Request('http://localhost:3000/api/extract', {
@@ -59,7 +108,8 @@ describe('/api/extract route', () => {
         (global.fetch as jest.Mock).mockResolvedValueOnce({
             ok: false,
             status: 401,
-            statusText: 'Unauthorized'
+            statusText: 'Unauthorized',
+            headers: { get: () => null }
         })
 
         const mockRequest = new Request('http://localhost:3000/api/extract', {
@@ -77,7 +127,8 @@ describe('/api/extract route', () => {
         (global.fetch as jest.Mock).mockResolvedValueOnce({
             ok: false,
             status: 403,
-            statusText: 'Forbidden'
+            statusText: 'Forbidden',
+            headers: { get: () => null }
         })
 
         const mockRequest = new Request('http://localhost:3000/api/extract', {
@@ -92,8 +143,8 @@ describe('/api/extract route', () => {
     })
 
     it('returns 403 when SSRF check fails (isSafeUrl false)', async () => {
-        const { isSafeUrl } = require('@/lib/ssrf');
-        (isSafeUrl as jest.Mock).mockResolvedValueOnce(false);
+        (requireAuth as jest.Mock).mockResolvedValueOnce({ userEmail: 'test@example.com', response: null });
+                (isSafeUrl as jest.Mock).mockResolvedValueOnce(false);
 
         const mockRequest = new Request('http://localhost:3000/api/extract', {
             method: 'POST',

@@ -5,6 +5,7 @@ import { normalizeArticleText } from "@/lib/parseArticle";
 import { parseHTML } from "linkedom";
 import { ExtractResponse } from "@/types/api";
 import { isSafeUrl } from "@/lib/ssrf";
+import { requireAuth } from "@/lib/api-auth";
 
 // Node.js runtimeを明示的に指定（JSDOMはEdge Runtimeで動作しない）
 export const runtime = "nodejs";
@@ -24,7 +25,7 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let corsHeaders: Record<string, string>;
+  let corsHeaders: Record<string, string> = {};
     try {
         corsHeaders = getCorsHeaders(request);
     } catch (error) {
@@ -33,6 +34,16 @@ export async function POST(request: NextRequest) {
         }
         throw error;
     }
+
+  const { userEmail, response: authResponse } = await requireAuth();
+  if (authResponse) {
+    if (corsHeaders && authResponse.headers) {
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        authResponse.headers.set(key, value);
+      });
+    }
+    return authResponse;
+  }
 
   try {
     const { url } = await request.json();
@@ -114,7 +125,7 @@ export async function POST(request: NextRequest) {
           error:
             "このURLは認証が必要なサイトです。ログインが必要なページは読み込めません。",
         },
-        { status: error.statusCode, headers: corsHeaders },
+        { status: error.statusCode || 403, headers: corsHeaders },
       );
     }
 
