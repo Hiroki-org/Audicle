@@ -25,6 +25,8 @@ describe('/api/extract route', () => {
     it('returns 401 if unauthorized', async () => {
         const { requireAuth } = require('@/lib/api-auth');
         const { NextResponse } = require('next/server');
+        const previousAllowedOrigins = process.env.ALLOWED_ORIGINS;
+        process.env.ALLOWED_ORIGINS = 'https://reader.example.com';
         (requireAuth as jest.Mock).mockResolvedValueOnce({
             userEmail: null,
             response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -33,10 +35,25 @@ describe('/api/extract route', () => {
         const mockRequest = new Request('http://localhost:3000/api/extract', {
             method: 'POST',
             body: JSON.stringify({ url: 'https://example.com' }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json',
+                Origin: 'https://reader.example.com'
+            }
         });
-        const res = await routeModule.POST(mockRequest);
-        expect(res.status).toBe(401);
+        try {
+            const res = await routeModule.POST(mockRequest);
+            expect(res.status).toBe(401);
+            expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://reader.example.com');
+            expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+            expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS');
+            expect(res.headers.get('Vary')).toBe('Origin');
+        } finally {
+            if (previousAllowedOrigins === undefined) {
+                delete process.env.ALLOWED_ORIGINS;
+            } else {
+                process.env.ALLOWED_ORIGINS = previousAllowedOrigins;
+            }
+        }
     });
 
     beforeEach(() => {
