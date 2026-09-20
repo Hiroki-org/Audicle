@@ -85,8 +85,7 @@ export default defineConfig({
             // Expose CI and test helpers to the Next.js dev server started by Playwright
             CI: process.env.CI || '',
             TEST_SESSION_TOKEN: process.env.TEST_SESSION_TOKEN || '',
-            // Provide a default EMAIL_HASH_SECRET for local/test runs to avoid "must be set" errors.
-            EMAIL_HASH_SECRET: process.env.EMAIL_HASH_SECRET || 'test-secret-for-playwright',
+            EMAIL_HASH_SECRET: process.env.EMAIL_HASH_SECRET || '',
             // R2 and KV environment variables for storage and metadata
             R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID || '',
             R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID || '',
