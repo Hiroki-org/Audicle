@@ -17,9 +17,9 @@ jobs:
         working-directory: packages/web-app-vercel
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.1
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: "npm"
@@ -40,8 +40,8 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: "npm"
@@ -95,8 +95,8 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: "npm"
@@ -133,8 +133,8 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: "npm"
@@ -171,8 +171,8 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: "npm"
@@ -208,8 +208,8 @@ jobs:
       run:
         working-directory: packages/web-app-vercel
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: "npm"
