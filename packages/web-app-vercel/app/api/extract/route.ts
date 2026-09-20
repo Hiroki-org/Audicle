@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api-auth";
 import { getCorsHeaders, CorsError } from '@/lib/cors';
 import { Readability } from "@mozilla/readability";
 import { normalizeArticleText } from "@/lib/parseArticle";
@@ -25,6 +26,8 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   let corsHeaders: Record<string, string>;
+  const { userEmail, response: authResponse } = await requireAuth();
+  if (authResponse) return authResponse;
     try {
         corsHeaders = getCorsHeaders(request);
     } catch (error) {

@@ -1,15 +1,8 @@
-replies = """[
+import json
+replies = [
     {
-        "comment_id": "3077548234",
-        "reply": "了解しました。このPRでの追加対応は見送りとし、スレッドを解決済みとして扱います。作業を停止します。"
-    },
-    {
-        "comment_id": "3077547947",
-        "reply": "了解しました。このPRでの追加対応は見送りとし、スレッドを解決済みとして扱います。作業を停止します。"
-    },
-    {
-        "comment_id": "3077548115",
-        "reply": "了解しました。このPRでの追加対応は見送りとし、スレッドを解決済みとして扱います。作業を停止します。"
+        "comment_id": "5748052475",
+        "reply": "Understood. Acknowledging that this PR is obsolete/duplicate and has been superseded. I am stopping work on this task."
     }
-]"""
-print(replies)
+]
+print(json.dumps(replies))
