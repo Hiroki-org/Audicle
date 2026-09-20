@@ -100,10 +100,9 @@ export const articleStorage = {
   // 記事を追加
   add: (article: Omit<Article, "id" | "createdAt"> & { chunks: Chunk[] }): Article => {
     // createdAtが渡されても無視するように除外
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { chunks, ...temp } = article as any;
+    const { chunks, ...temp } = article;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { createdAt, ...rest } = temp;
+    const { createdAt, ...rest } = temp as typeof temp & { createdAt?: unknown };
 
     const newArticle: Article = {
       ...rest,
