@@ -1,6 +1,7 @@
 import { initializeNewUser } from '../user-initialization';
 import { supabase } from '../supabase';
 import { getOrCreateDefaultPlaylist } from '../playlist-utils';
+import { logger } from '../logger';
 
 jest.mock('../supabase', () => ({
   supabase: {
@@ -25,7 +26,9 @@ describe('initializeNewUser', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.spyOn(logger, 'info').mockImplementation(() => {});
     jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(logger, 'error').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
     delete process.env.AUTH_ENV;
     delete process.env.NEXT_PUBLIC_AUTH_ENV;
@@ -168,7 +171,7 @@ describe('initializeNewUser', () => {
     const result = await initializeNewUser(userId, userEmail);
 
     expect(result).toEqual({ success: false, error: 'Failed to check user settings' });
-    expect(console.error).toHaveBeenCalledWith('Error checking user settings:', mockError);
+    expect(logger.error).toHaveBeenCalledWith('Error checking user settings:', mockError);
   });
 
   it('should return failure if creating settings fails', async () => {
@@ -190,7 +193,7 @@ describe('initializeNewUser', () => {
     const result = await initializeNewUser(userId, userEmail);
 
     expect(result).toEqual({ success: false, error: 'Failed to create user settings' });
-    expect(console.error).toHaveBeenCalledWith('Error creating user settings:', mockCreateError);
+    expect(logger.error).toHaveBeenCalledWith('Error creating user settings:', mockCreateError);
   });
 
   it('should return success even if creating default playlist fails', async () => {
@@ -215,7 +218,7 @@ describe('initializeNewUser', () => {
     const result = await initializeNewUser(userId, userEmail);
 
     expect(result).toEqual({ success: true });
-    expect(console.error).toHaveBeenCalledWith('Failed to create default playlist:', playlistError);
+    expect(logger.error).toHaveBeenCalledWith('Failed to create default playlist:', playlistError);
   });
 
   it('should catch unexpected runtime errors and return failure', async () => {
@@ -227,7 +230,7 @@ describe('initializeNewUser', () => {
     const result = await initializeNewUser(userId, userEmail);
 
     expect(result).toEqual({ success: false, error: runtimeError.message });
-    expect(console.error).toHaveBeenCalledWith('Unexpected error in initializeNewUser:', runtimeError);
+    expect(logger.error).toHaveBeenCalledWith('Unexpected error in initializeNewUser:', runtimeError);
   });
 
   it('should handle non-Error thrown objects in catch block', async () => {
@@ -239,6 +242,6 @@ describe('initializeNewUser', () => {
     const result = await initializeNewUser(userId, userEmail);
 
     expect(result).toEqual({ success: false, error: 'Unknown error' });
-    expect(console.error).toHaveBeenCalledWith('Unexpected error in initializeNewUser:', nonErrorObject);
+    expect(logger.error).toHaveBeenCalledWith('Unexpected error in initializeNewUser:', nonErrorObject);
   });
 });
