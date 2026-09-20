@@ -86,11 +86,8 @@ export default function PopularPage() {
       }
 
       const data: PopularArticlesResponse = await response.json();
-      console.log("[DEBUG] API response data:", data);
-      console.log("[DEBUG] articles count:", data.articles?.length ?? 0);
       const fetchedAt = Date.now();
       setArticles(data.articles);
-      console.log("[DEBUG] setArticles called with:", data.articles);
       setLastFetchedAt(fetchedAt);
       setCachedEntry(selectedPeriod, {
         articles: data.articles,
@@ -107,13 +104,8 @@ export default function PopularPage() {
 
   useEffect(() => {
     const cached = getCachedEntry(period);
-    console.log("[DEBUG] useEffect: period=", period, "cached=", cached);
     if (cached && isFresh(cached.fetchedAt)) {
       // 新鮮なキャッシュがあれば表示
-      console.log(
-        "[DEBUG] Using fresh cache, articles count:",
-        cached.articles?.length
-      );
       setArticles(cached.articles);
       setLastFetchedAt(cached.fetchedAt);
       setIsLoading(false);
@@ -121,7 +113,6 @@ export default function PopularPage() {
       setNotice(null);
     } else {
       // キャッシュがないか古い場合は取得
-      console.log("[DEBUG] Cache miss or stale, will fetch from API");
       if (cached) {
         // 古いデータがあれば、取得中にそれを表示
         setArticles(cached.articles);
