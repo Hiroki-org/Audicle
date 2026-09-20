@@ -1,7 +1,7 @@
 /** @jest-environment node */
 // 簡易版テスト（MSWなし）
 jest.mock('@/lib/api-auth', () => ({
-    requireAuth: jest.fn(async (handler) => handler),
+    requireAuth: jest.fn(() => Promise.resolve({ userEmail: 'test@example.com', response: null })),
     getUserEmailFromRequest: jest.fn(() => Promise.resolve('test@example.com'))
 }))
 
