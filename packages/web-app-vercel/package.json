@@ -45,14 +45,14 @@
     "jsonwebtoken": "^9.0.2",
     "linkedom": "^0.18.3",
     "lucide-react": "^1.14.0",
-    "next": "^16.3.5",
+    "next": "16.4.3",
     "next-auth": "^5.0.0-beta.32",
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "react-hot-toast": "^2.6.0",
     "serwist": "^10.0.0-preview.14",
     "tailwind-merge": "^3.5.0",
-    "undici": "^6.28.0",
+    "undici": "^6.29.1",
     "use-debounce": "^10.1.1"
   },
   "devDependencies": {
@@ -83,7 +83,7 @@
     "msw": "^2.14.2",
     "playwright": "^1.45.0",
     "prettier": "^3.8.3",
-    "sharp": "^0.35.0",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4",
     "ts-morph": "^28.0.0",
     "tsx": "^4.21.0",
@@ -91,6 +91,8 @@
   },
   "overrides": {
     "browserslist": "^4.29.3",
-    "fast-xml-parser": "^5.7.3"
+    "fast-xml-parser": "^5.7.3",
+    "source-map-js": "^1.2.2",
+    "zod": "^4.6.7"
   }
 }
