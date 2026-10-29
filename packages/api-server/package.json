@@ -13,5 +13,8 @@
     "node-fetch": "^2.6.7"
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "source-map-js": "^1.2.2"
+  }
 }
