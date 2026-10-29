@@ -31,6 +31,8 @@ const eslintConfig = [
       "react-hooks": reactHooksPlugin,
     },
     rules: {
+      "no-useless-assignment": "warn",
+      "preserve-caught-error": "warn",
       // Keep some rules relaxed for tests and scripts, other rules are inherited from recommended configs
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-require-imports": "off",
